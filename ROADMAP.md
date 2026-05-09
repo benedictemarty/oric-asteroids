@@ -15,8 +15,8 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 3 | Vaisseau rotatif (32 angles) + tirs + scan clavier VIA direct | 2 sem. | 3 sem. |
 | ✅ | 4 | Astéroïdes (4 formes × 3 tailles, mouvement, fragmentation, wraparound safe) | 2 sem. | 3 sem. |
 | ✅ | 5 | Collisions L∞ + score 7-seg + vies + HUD + respawn invincible | 1 sem. | 2 sem. |
-| 🔜 | 6 | Soucoupe (grande/petite) + IA de tir | 1 sem. | 2 sem. |
-| ⏳ | 7 | Hyperespace + écran titre + high scores | 1 sem. | 2 sem. |
+| ✅ | 6 | Soucoupe grande/petite + IA tir 8-way / ship-tracking + spawn cyclique | 1 sem. | 2 sem. |
+| 🔜 | 7 | Hyperespace + écran titre + high scores | 1 sem. | 2 sem. |
 | ⏳ | 8 | Son AY‑3‑8912 (effets + thump) | 1 sem. | 3 sem. |
 | ⏳ | 9 | Synchro VSync « propre » + polish + `.dsk` final | 1 sem. | 2 sem. |
 | | **Total** | | **~3 mois** | **~6 mois** |
@@ -144,13 +144,33 @@ si la rangée 4 ne suffit pas (ex: ESC pour pause).
   n'apparaît pas encore).
 - Score arcade soucoupe (200 grande / 1000 petite) sera ajouté en Phase 6.
 
-### Phase 6 — Soucoupe + IA
+### Phase 6 — Soucoupe + IA ✅
 
-**Définition de fin** :
-- Soucoupe grande (cible facile, tirs aléatoires) et petite (visée précise).
-- Apparition selon la table Atari (`statusSaucer`, RNG).
-- IA de tir transposée du désassemblage 6502 rev 4.
-- Sortie de l'écran, respawn sur le côté opposé.
+**Définition de fin validée (2026-05-10)** :
+- Soucoupe en 2 tailles (grande rayon 7, petite rayon 4), forme 7 segments
+  XOR (trapèze + dôme + ligne médiane).
+- Apparition cyclique tous les 300 frames (~18 s à 17 Hz observés), bord
+  aléatoire RNG, Y aléatoire dans zone safe.
+- Probabilité petite UFO indexée sur score (0% < 1000, 30% ≥ 5000, 50% ≥ 10000).
+- IA tir simplifiée : grand = aléatoire 8-way, petit = visée ship + bruit
+  RNG décroissant avec le score.
+- Mouvement horizontal continu + drift vertical aléatoire.
+- Score 200/1000 (grand/petit) conforme arcade.
+- Collisions : 5 paires (bullet×UFO, bullet×asteroid, ship×asteroid,
+  ship×UFO/bullet, UFO_bullet×asteroid).
+
+**Bug Phase 6 documenté** :
+- Le clear BSS automatique de crt0.s plante l'activation HIRES quand
+  `__BSS_SIZE__ ≥ $83` (131 octets). Cause racine non identifiée (pas
+  un débordement, pas un chevauchement ZP, encodage `cpy #$83` correct).
+  Workaround : crt0 ne clear plus BSS, les modules C initialisent
+  explicitement leur état au démarrage.
+
+**Phase 6b (future, optionnelle)** :
+- IA arcade fidèle (table de précision 32 entrées indexée par score
+  vs seuils discrets actuels).
+- Multiple UFO simultanés (Atari original = 1 max, mais variantes possibles).
+- Investigation racine du bug BSS clear (Phase 9 polish).
 
 ### Phase 7 — Hyperespace + écran titre + high scores
 

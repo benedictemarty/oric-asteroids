@@ -7,7 +7,80 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir : Phase 6 (soucoupe grande/petite + IA de tir).
+À venir : Phase 7 (hyperespace + écran titre + high scores).
+
+## [0.7.0] - 2026-05-10
+
+### Phase 6 — Soucoupe + IA de tir ✅
+
+**Définition de fin validée :**
+- Soucoupe grande (UFO_LARGE, rayon 7) et petite (UFO_SMALL, rayon 4),
+  forme à 7 segments tracés en XOR (corps trapézoïdal + dôme).
+- Apparition cyclique selon `UFO_SPAWN_PERIOD = 300` frames (~18 s),
+  bord aléatoire (gauche/droite via RNG), Y aléatoire dans la zone safe.
+- Probabilité petite UFO en fonction du score (cf. arcade) :
+  score < 1000 → 0% small, ≥5000 → 30%, ≥10000 → 50%.
+- Mouvement horizontal continu + drift vertical aléatoire (UFO_DRIFT_PERIOD).
+- IA tir périodique (UFO_FIRE_PERIOD = 35 frames) :
+  * UFO_LARGE : direction aléatoire 8-way
+  * UFO_SMALL : visée vers le ship + bruit RNG (si score < 5000)
+- Score UFO_LARGE = 200, UFO_SMALL = 1000 (conforme arcade).
+- Collisions : tir joueur vs UFO, ship vs UFO, ship vs tir UFO,
+  tir UFO vs asteroid (auto-frag, pas de score).
+- Sortie d'écran : UFO disparaît, attend prochain spawn.
+- `make check` PASS, capture identique sur 3 runs.
+
+### Added
+
+- `src/ufo.h` + `src/ufo.c` (290 lignes) :
+  - État BSS (12 octets) : ufo_active/x/y/vx/vy/type + bullet info.
+  - Tables segments hardcodées : `seg_large`, `seg_small` (7 segs × 4 bytes).
+  - `ufo_init/tick/draw/kill`, `ufo_radius`, `ufo_bullet_update/draw`.
+  - Fonction de spawn (`ufo_spawn`) interne, IA tir (`ufo_fire`).
+- `tests/ref/phase6_ufo.ppm` — capture de référence (vaisseau centre,
+  4 grands asteroids, HUD + 3 vies, sans UFO actif au moment T).
+
+### Changed
+
+- `src/game.c` :
+  - Intégration UFO complète (init, tick, draw, collisions).
+  - 4 helpers de collision : bullets×asteroids, bullets×UFO,
+    ship×asteroids, ship×UFO/UFO_bullet, UFO_bullet×asteroids.
+  - Init explicite `ship_invincible`, `ship_was_drawn` (BSS clear retiré).
+- `Makefile` — ajout `src/ufo.c`, capture/référence renommées
+  `phase6_ufo.ppm`.
+
+### Fixed (bug Phase 6 — investigation profonde)
+
+- **Clear BSS de crt0.s retiré** : un bug bizarre apparaît quand
+  `__BSS_SIZE__ >= $83` (131 octets). Symptôme : l'écran HIRES n'est
+  plus activé après `hires_init`, le mode TEXT reste affiché. Le seuil
+  $82 fonctionne, $83 plante. Investigation a confirmé :
+  * Pas un débordement de binaire (binaire reste petit)
+  * Pas un chevauchement ZP (ptr1 utilisé comme pointeur temp)
+  * Pas un overflow stack ou IRQ
+  * Reproductible avec n'importe quel module ajoutant ≥12 octets BSS
+  * `cpy #<__BSS_SIZE__` correctement encodé `cpy #$83`
+- **Workaround appliqué** : crt0 ne fait plus de clear BSS automatique.
+  Les modules C initialisent EXPLICITEMENT leurs variables au démarrage
+  (`bullets_init`, `asteroids_init`, `hud_init`, `ufo_init`, init
+  manuel de `ship_invincible` et `ship_was_drawn` dans `game_run`).
+- Cause racine du bug à investiguer en Phase 9 (polish).
+
+### Décisions techniques Phase 6
+
+- **1 UFO max simultané** au lieu d'un pool : simplifie la logique IA et
+  l'allocation BSS (12 octets total). L'arcade Atari original limite
+  également à un UFO actif par moment.
+- **Forme dessinée en 7 segments hardcodés** plutôt qu'en table générée :
+  l'UFO a une forme fixe (pas de rotation), 7 segments × 4 bytes = 28
+  bytes RODATA par taille, 56 bytes total. Pas de gain à séparer.
+- **IA tir simplifié** vs Atari arcade rev 4 :
+  * arcade : table de précision indexée par score (32 entrées)
+  * Phase 6 : seuils discrets sur score (5000, 10000) — résolution
+    suffisante pour la jouabilité.
+- **Edge-trigger spawn** : un seul `ufo_spawn_timer` 16-bit décrémenté
+  chaque frame. Pas d'IRQ ni d'event queue.
 
 ## [0.6.0] - 2026-05-09
 

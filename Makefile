@@ -13,7 +13,7 @@ EXEC_ADDR = 1280
 CFG       = cfg/oric1.cfg
 BUILD     = build
 
-SRCS_C    = src/main.c src/game.c src/asteroids.c src/hud.c
+SRCS_C    = src/main.c src/game.c src/asteroids.c src/hud.c src/ufo.c
 SRCS_ASM  = src/asm/crt0.s src/asm/line.s src/asm/ship.s \
             src/asm/ship_verts.s src/asm/input.s src/asm/shapes.s
 
@@ -27,9 +27,10 @@ OBJ_MAIN    = $(BUILD)/main.o
 OBJ_GAME    = $(BUILD)/game.o
 OBJ_ASTER   = $(BUILD)/asteroids.o
 OBJ_HUD     = $(BUILD)/hud.o
+OBJ_UFO     = $(BUILD)/ufo.o
 OBJS        = $(OBJ_CRT0) $(OBJ_LINE) $(OBJ_SHIP) $(OBJ_VERTS) \
               $(OBJ_INPUT) $(OBJ_SHAPES) $(OBJ_MAIN) $(OBJ_GAME) \
-              $(OBJ_ASTER) $(OBJ_HUD)
+              $(OBJ_ASTER) $(OBJ_HUD) $(OBJ_UFO)
 
 BIN       = $(BUILD)/$(PROJECT).bin
 TAP       = $(BUILD)/$(PROJECT).tap
@@ -38,10 +39,10 @@ TAP       = $(BUILD)/$(PROJECT).tap
 FASTLOAD_DONE  = 3500000
 TIME_AFTER     = 4000000
 TEST_CYCLES    = $(shell echo $$(($(FASTLOAD_DONE) + $(TIME_AFTER))))
-SCREENSHOT     = tests/out/phase5_play.ppm
-REF_SHOT       = tests/ref/phase5_play.ppm
+SCREENSHOT     = tests/out/phase6_ufo.ppm
+REF_SHOT       = tests/ref/phase6_ufo.ppm
 BENCH_CYCLES   = $(shell echo $$(($(FASTLOAD_DONE) + 25000000)))
-BENCH_PROF     = tests/out/phase5_bench.prof
+BENCH_PROF     = tests/out/phase6_bench.prof
 
 # Inputs scriptés Phase 3 :
 #   après 3.5M cycles : CALL 1280 (lance le jeu)
@@ -107,6 +108,12 @@ $(BUILD)/hud.s: src/hud.c src/hud.h | $(BUILD)
 	$(CC65) -t none -O -I src -o $@ $<
 
 $(OBJ_HUD): $(BUILD)/hud.s
+	$(CA65) -t none -o $@ $<
+
+$(BUILD)/ufo.s: src/ufo.c src/ufo.h src/asteroids.h | $(BUILD)
+	$(CC65) -t none -O -I src -o $@ $<
+
+$(OBJ_UFO): $(BUILD)/ufo.s
 	$(CA65) -t none -o $@ $<
 
 $(BIN): $(OBJS) $(CFG)
