@@ -73,8 +73,9 @@ des 9 phases.
 | 10b | Shapes Atari N sommets variables (11-13) sans décimation | `phase10b-done` / `v1.1.1` |
 | 10c | Spawn arcade-fidèle (vagues progressives, RNG positions/vél.) | `phase10c-done` / `v1.1.2` |
 | 10d | Lettre W + affichage "WAVE n" dans HUD | `phase10d-done` / `v1.1.3` |
+| 10e | Démo passive arcade-style en écran titre | `phase10e-done` / `v1.1.4` |
 
-## Différé Phase 10e+
+## Différé Phase 10f+
 
 - Persistance high scores en `.tap` ou `.dsk` (driver cassette résident).
 - Image `.dsk` Microdisc avec sauvegarde native.

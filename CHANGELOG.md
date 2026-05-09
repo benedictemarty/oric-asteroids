@@ -7,13 +7,46 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10e+ :
+À venir Phase 10f+ :
 - Variables Atari arcade (`statusShip`, `horzVelShip`, etc.) côté code.
 - IA soucoupe rev 4 (table de précision indexée par score).
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
-- Démo passive en écran titre.
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.1.4] - 2026-05-10
+
+### Phase 10e — Démo passive en écran titre ✅
+
+L'écran titre intègre maintenant une **démo passive arcade-style** :
+les asteroids sont spawnés et animés en arrière-plan pendant que
+"ASTEROIDS" + "PRESS SPACE" sont affichés. À l'appui de SPACE (ou
+au timeout), la transition vers le jeu **conserve l'état des asteroids**
+en mouvement — pas de re-spawn brutal.
+
+### Changed
+
+- `src/game.c` : 
+  - `asteroids_init(0x42)` + `asteroids_spawn_wave()` AVANT la boucle
+    d'attente du titre.
+  - Boucle d'attente : `asteroids_draw()` (erase) + `asteroids_update()` +
+    `asteroids_draw()` (redraw) chaque frame.
+  - À la sortie : on n'appelle PAS `asteroids_init` à nouveau pour ne pas
+    casser l'état (transition titre→jeu fluide, asteroids déjà présents).
+  - `wave_displayed = 0` force l'affichage initial de "WAVE 1" dans la
+    1ère frame de la boucle de jeu (l'asteroids_spawn_wave initial a
+    déjà mis `current_wave = 1`).
+
+### Décisions techniques Phase 10e
+
+- **Transition fluide titre→jeu** : économise un re-spawn potentiellement
+  visible à l'œil (XOR effacement + nouveau spawn). Cohérent avec
+  l'arcade Atari où la démo se fond dans le gameplay.
+- **Pas d'IA ship en démo** (ship invisible pendant le titre) : l'arcade
+  original a une IA qui joue automatiquement en démo (Asteroids "attract
+  mode"). Reporté à Phase 10g — nécessite un mini-bot.
+- **Pas de score affiché en démo** : on évite de "spoil" un score
+  factice. Le HUD apparaît avec le score réel à la transition.
 
 ## [1.1.3] - 2026-05-10
 

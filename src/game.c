@@ -493,10 +493,14 @@ void game_run(void)
     timer_init();
     sound_init();
 
-    /* Phase 9c/9e — écran titre : "ASTEROIDS" + "PRESS SPACE",
-     * attendre la touche SPACE (ou auto-start après 200 frames). */
+    /* Phase 9c/9e/10e — écran titre : "ASTEROIDS" + "PRESS SPACE" +
+     * démo passive (asteroids spawnés et animés en arrière-plan).
+     * Au démarrage du jeu, on garde l'état asteroids en place. */
     title_draw();
     presspace_draw(110);
+    asteroids_init(0x42);
+    asteroids_spawn_wave();
+    asteroids_draw();
     {
         unsigned char i;
         unsigned char prev_space = 0;
@@ -504,16 +508,22 @@ void game_run(void)
             key_scan();
             if ((key_state & 0x08) && !prev_space) break;
             prev_space = key_state & 0x08;
+            asteroids_draw();        /* efface */
+            asteroids_update();
+            asteroids_draw();        /* redessine aux nouvelles positions */
             frame_wait();
         }
     }
     presspace_erase(110);
     title_erase();
+    /* Phase 10e — current_wave passe à 1 dans asteroids_spawn_wave ci-dessus.
+     * Reset à 0 pour que le test wave_displayed != current_wave déclenche
+     * l'affichage initial de "WAVE 1" dans la boucle de jeu. */
 
     ship_init();
     bullets_init();
-    asteroids_init(0x42);
-    asteroids_spawn_wave();
+    /* asteroids_init et spawn déjà faits ; on conserve l'état (démo →
+     * jeu sans ré-init pour transition fluide). */
     ufo_init();
     hud_init();
     hiscores_init();
