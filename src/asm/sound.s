@@ -41,6 +41,7 @@
         FX_FIRE    = 1
         FX_EXPLODE = 2
         FX_THUMP   = 3
+        FX_HYPER   = 4    ; Phase 9b — whoosh hyperespace
 
 ;-----------------------------------------------------------------
 ; Variables ZP
@@ -203,6 +204,29 @@ _sound_play_fx:
         sta  _sfx_timer
         jmp  @done
 @not_thump:
+
+        cmp  #FX_HYPER
+        bne  @not_hyper
+        ; Hyperespace : noise + tone sweep grave, durée 14 frames
+        lda  #$10              ; freq noise medium
+        ldy  #6
+        jsr  _psg_write
+        lda  #$80              ; freq tone A lo (basse)
+        ldy  #0
+        jsr  _psg_write
+        lda  #$01              ; freq tone A hi
+        ldy  #1
+        jsr  _psg_write
+        lda  #$0E              ; volume A
+        ldy  #8
+        jsr  _psg_write
+        lda  #$76              ; mixer : tone A on (bit 0 = 0) + noise A on (bit 3 = 0)
+        ldy  #7
+        jsr  _psg_write
+        lda  #14
+        sta  _sfx_timer
+        jmp  @done
+@not_hyper:
 
 @done:
         pla

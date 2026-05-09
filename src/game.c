@@ -223,6 +223,7 @@ static void ship_respawn(void)
  * Edge-trigger sur DOWN + cooldown HYPER_COOLDOWN frames. */
 static void ship_hyperspace(void)
 {
+    sound_play_fx(FX_HYPER);
     if (rng8() < HYPER_DEATH_CHANCE) {
         hud_lose_life();
         ship_respawn();

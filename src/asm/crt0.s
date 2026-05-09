@@ -1,13 +1,12 @@
-; crt0.s — startup Oric-1 pour cc65 target none
-; Initialise pile matérielle, c_sp (pile logicielle cc65), BSS, appelle _main.
+; crt0.s — startup Oric-1 utilisant initlib/donelib de cc65
 ;
-; Utilise ptr1 (alloué par cc65 dans la ZP) comme pointeur temporaire pour
-; le clear BSS — n'écrase pas line.s/ship.s qui réservent $80-$8E en ZP.
+; initlib appelle zerobss (clear BSS officiel) puis les constructeurs.
+; donelib appelle les destructeurs (à RTS de _main).
 
         .import         _main
         .import         __STACKSTART__
-        .import         __BSS_RUN__, __BSS_SIZE__
-        .importzp       c_sp, ptr1
+        .import         initlib, donelib
+        .importzp       c_sp
 
         .segment        "STARTUP"
 
@@ -15,18 +14,19 @@ start:
         ldx     #$FF
         txs
 
+        ; Init c_sp
         lda     #<__STACKSTART__
         sta     c_sp
         lda     #>__STACKSTART__
         sta     c_sp+1
 
-        ; Pas de clear BSS automatique : chaque module C initialise
-        ; explicitement ses variables (bullets_init, asteroids_init, hud_init,
-        ; ufo_init...). Évite un bug Phosphoric/cc65 reproduit Phase 6 quand
-        ; BSS_SIZE >= $83 (cause précise non identifiée — la zone HIRES
-        ; n'est plus activée correctement après le clear).
+        ; Init lib cc65 (zerobss + constructeurs CONDES)
+        jsr     initlib
 
+        ; Programme principal
         jsr     _main
 
-hang:
-        jmp     hang
+        ; Cleanup (destructeurs CONDES)
+        jsr     donelib
+
+hang:   jmp     hang

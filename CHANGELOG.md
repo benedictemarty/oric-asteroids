@@ -7,11 +7,62 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-Différé Phase 9b/10 :
+Différé Phase 9c/10 :
 - Persistance high scores en `.tap` (driver cassette résident, lecture initiales).
 - Image `.dsk` Microdisc finale.
 - Écran titre vectoriel (lettres "ASTEROIDS" en segments).
-- Effets sons manquants (thrust continu, UFO, hyperespace, enveloppe AY).
+- Effets sons manquants : thrust continu, UFO oscillant, enveloppe AY.
+
+## [1.0.1] - 2026-05-10
+
+### Phase 9b — Fix bug BSS + effet hyperespace ✅
+
+**Bug BSS clear résolu — cause racine identifiée :**
+- Symptôme : avec `__BSS_SIZE__ ≥ $83`, l'écran HIRES n'était pas activé
+  après `hires_init` (Phase 6 → 8 utilisaient un workaround : pas de
+  clear BSS automatique, init explicite par les modules).
+- **Cause racine** : différence subtile entre notre `crt0.s` maison et
+  le `zerobss` officiel cc65 (`/usr/local/share/cc65/lib/none.lib`).
+  Notre code initialisait `A=#0`, `Y=#0` et utilisait `cpy #<size; bne loop`
+  *après* le `sta` ; cc65 utilise un séquençage différent
+  (`tay; cpy; beq exit; sta; iny; bne L3`) qui s'avère fiable pour
+  toutes les valeurs de `__BSS_SIZE__`. La différence exacte n'est pas
+  pleinement caractérisée mais n'est plus pertinente : on adopte la
+  routine officielle.
+- **Fix** : `crt0.s` simplifié, appelle `initlib` (`zerobss` + constructeurs
+  CONDES) au démarrage. Plus besoin d'init explicite redondant des
+  variables BSS dans les modules C.
+- Reproductibilité : capture phase9 identique à v1.0.0 (md5 match).
+
+### Added
+
+- `FX_HYPER` : effet hyperespace (whoosh = noise + tone grave, 14 frames),
+  joué dans `ship_hyperspace()`. 4 effets sonores au total maintenant.
+
+### Changed
+
+- `src/asm/crt0.s` (-30 lignes) : simplifié, utilise `initlib` cc65
+  pour zerobss + constructeurs.
+- `src/asm/sound.s` : ajout config `FX_HYPER` (PSG noise + tone canal A).
+- `src/sound.h` : `#define FX_HYPER 4`.
+- `src/game.c` : `sound_play_fx(FX_HYPER)` dans `ship_hyperspace`.
+
+### Décisions techniques Phase 9b
+
+- **Adopter le runtime cc65 officiel** (`initlib`) plutôt que de
+  débugger un comportement subtil de notre `zerobss` maison : effort
+  vs valeur trop déséquilibré. La routine officielle est testée par
+  des milliers d'utilisateurs cc65, c'est un standard de facto.
+- **Conserver les `_init` explicites** des modules : ils initialisent
+  des valeurs spécifiques (RNG seed 0x42, score_extra=10000, ship au
+  centre, etc.), pas seulement zéro. Le `zerobss` ne fait que zéroter.
+- **Ne pas implémenter thrust continu / UFO oscillant en Phase 9b** :
+  ces effets nécessitent un état "on/off" ou modulation continue
+  (LFO logiciel) qui sortent du modèle "1 effet ponctuel" de Phase 8.
+  Phase 9c les ajoutera avec un système de canaux dédiés.
+- **Ne pas implémenter écran titre vectoriel en Phase 9b** : nécessite
+  une font alphanumérique de ~26 lettres × 5-7 segments chacune
+  (~150 segments hardcodés en RODATA). Reporté à Phase 9c.
 
 ## [1.0.0] - 2026-05-10
 

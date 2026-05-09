@@ -63,8 +63,9 @@ des 9 phases.
 | 7 | Hyperespace + restart + high scores top 5 | `phase7-done` |
 | 8 | Son AY-3-8912 (tir + explosion + thump cadencé) | `phase8-done` |
 | 9 | VSync ULA + polish + README | `phase9-done` / `v1.0.0` |
+| 9b | Fix bug BSS (initlib cc65) + FX_HYPER | `phase9b-done` / `v1.0.1` |
 
-## Différé Phase 9b / 10
+## Différé Phase 9c / 10
 
 - Persistance high scores en `.tap` ou `.dsk` (driver cassette résident).
 - Image `.dsk` Microdisc avec sauvegarde native.

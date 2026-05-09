@@ -19,6 +19,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 7 | Hyperespace + restart + high scores top 5 (RAM) | 1 sem. | 2 sem. |
 | ✅ | 8 | Son AY-3-8912 : tir + explosion + thump cadencé sur asteroids_count | 1 sem. | 3 sem. |
 | ✅ | 9 | VSync ULA via CB1 + polish hiscores + README (v1.0.0) | 1 sem. | 2 sem. |
+| ✅ | 9b | Fix bug BSS clear (initlib cc65) + FX_HYPER (v1.0.1) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.
