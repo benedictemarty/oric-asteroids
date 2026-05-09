@@ -7,7 +7,72 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir : Phase 8 (son AY-3-8912 sous IRQ Timer 1).
+À venir : Phase 9 (synchro VSync ULA + polish + .dsk final + persistance high scores).
+
+## [0.9.0] - 2026-05-10
+
+### Phase 8 — Son AY-3-8912 (effets) ✅
+
+**Définition de fin validée :**
+- Driver PSG bas-niveau (`src/asm/sound.s`) : `_psg_write` (BC1/BDIR via PCR),
+  `_sound_init` (mixer reg 7 = $7F + volumes 0), `_sound_play_fx` (init
+  registres selon FX_ID), `_sound_tick` (décrémente timer + cut net en fin).
+- 3 effets implémentés (1 actif à la fois, override) :
+  * `FX_FIRE` : tone canal A ~310 Hz, vol 14, durée 6 frames.
+  * `FX_EXPLODE` : noise canal A, freq noise max ($1F), vol 15, 25 frames.
+  * `FX_THUMP` : tone canal B très grave (freq hi=$08), vol 14, 8 frames.
+- API C (`src/sound.h`) : `sound_init`, `sound_tick`, `sound_play_fx`.
+- Hooks dans `game_run` :
+  * `sound_init()` au démarrage
+  * `sound_tick()` chaque frame
+  * `sound_play_fx(FX_FIRE)` dans `bullet_fire`
+  * `sound_play_fx(FX_EXPLODE)` sur impact bullet/asteroid + ship/asteroid
+  * `sound_play_fx(FX_THUMP)` cadencé selon `asteroids_count`
+    (période 30/22/14/6 frames pour 8+/4+/2+/0+ asteroids — tension croissante)
+- Partage `kb_pcr_save` ZP avec `input.s` (1 octet).
+- 84 écritures PSG vérifiées dans le trace Phosphoric (sound_init +
+  ~3 thump déclenchés en 5.5M cycles).
+- `make check` PASS, capture identique sur 3 runs.
+
+### Added
+
+- `src/asm/sound.s` (175 lignes) : driver PSG bare-metal.
+- `src/sound.h` : API C.
+- `tests/ref/phase8_sound.ppm` — capture référence.
+
+### Changed
+
+- `src/asm/input.s` : `kb_pcr_save` exporté en zeropage (`.exportzp`)
+  pour partage avec `sound.s`.
+- `src/game.c` :
+  - `#include "sound.h"`
+  - `sound_init()` après `timer_init()`
+  - `sound_play_fx(FX_FIRE)` dans `bullet_fire`
+  - `sound_play_fx(FX_EXPLODE)` dans `collisions_bullets_asteroids`
+    et `collisions_ship_asteroids`
+  - Bloc thump cadencé via `thump_timer` + `asteroids_count`
+  - `sound_tick()` avant `frame_wait`
+- `Makefile` — ajout `src/asm/sound.s` + capture `phase8_sound.ppm`.
+
+### Décisions techniques Phase 8
+
+- **1 effet à la fois** plutôt que mix multi-canaux : simplifie l'état
+  (1 enum + 1 timer en ZP). L'arcade Atari mixe plusieurs effets
+  (thump continu + tirs/explosions sur autres voies) ; Phase 8b ajoutera
+  un canal dédié pour le thump (canal B en parallèle d'A).
+- **Cut net en fin d'effet** vs enveloppe progressive : économie en cycles
+  CPU. Phase 8b utilisera l'enveloppe matérielle AY-3-8912 (registres 11-13).
+- **Thrust et UFO sans son** en Phase 8 (différé Phase 8b) : le son
+  thrust nécessite un état "on/off" continu, l'UFO une oscillation
+  modulée — incompatible avec le modèle "1 effet ponctuel" actuel.
+- **`kb_pcr_save` partagé** entre `input.s` et `sound.s` : économise 1 octet
+  ZP et garantit la cohérence du PCR entre scan clavier et écriture PSG
+  (mêmes bits 0 et 4 à préserver).
+- **DDRA forcé $FF** dans chaque appel PSG, restauré ensuite : la ROM
+  Oric peut laisser DDRA en input ($00) après son scan VSync ; sans cela
+  les écritures `sta $0301` n'atteindraient pas le PSG (cf. bug Phase 3).
+- **SEI/CLI** autour de chaque séquence PSG : la ROM IRQ peut elle aussi
+  scanner le clavier via le PSG, on évite les conflits PCR/ORA.
 
 ## [0.8.0] - 2026-05-10
 

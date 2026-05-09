@@ -14,6 +14,7 @@
 #include "asteroids.h"
 #include "hud.h"
 #include "ufo.h"
+#include "sound.h"
 
 /* ------------------------------------------------------------------ */
 /* Symboles importés                                                   */
@@ -75,6 +76,10 @@ void key_scan(void);
 /* Phase 7 — high scores */
 #define HISCORE_COUNT       5
 
+/* Phase 8 — cadence du thump (frames) — diminue avec moins d'asteroids */
+#define THUMP_PERIOD_BASE   30
+#define THUMP_PERIOD_MIN    6
+
 /* Score asteroid + UFO arcade */
 static const unsigned int score_by_size[3] = { 100, 50, 20 };
 #define UFO_SCORE_LARGE     200U
@@ -109,6 +114,9 @@ static unsigned char ship_was_drawn;
 /* Phase 7 — high scores en RAM (persistance .tap reportée Phase 9) */
 static unsigned int  hiscores[HISCORE_COUNT];
 static unsigned char hiscores_drawn;     /* dernier état affiché du tableau */
+
+/* Phase 8 — cadence thump : décrémente sur le timer, déclenche sound_play_fx */
+static unsigned char thump_timer;
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -238,6 +246,7 @@ static void bullet_fire(void)
             blt_vy[i]  = ship_thry[ship_angle];
             blt_ttl[i] = BULLET_TTL;
             fire_cd    = FIRE_COOLDOWN;
+            sound_play_fx(FX_FIRE);
             return;
         }
     }
@@ -296,6 +305,7 @@ static void collisions_bullets_asteroids(void)
             if (collide(blt_x[b], blt_y[b], asteroids[a].x, asteroids[a].y, r)) {
                 hud_add_score(score_by_size[asteroids[a].size]);
                 asteroids_fragment(a);
+                sound_play_fx(FX_EXPLODE);
                 blt_ttl[b] = 0;
                 break;
             }
@@ -313,6 +323,7 @@ static unsigned char collisions_ship_asteroids(void)
         if (collide(ship_x, ship_y, asteroids[a].x, asteroids[a].y, r)) {
             hud_lose_life();
             ship_respawn();
+            sound_play_fx(FX_EXPLODE);
             return 1;
         }
     }
@@ -472,6 +483,7 @@ void game_run(void)
 
     hires_init();
     timer_init();
+    sound_init();
     ship_init();
     bullets_init();
     asteroids_init(0x42);
@@ -479,6 +491,7 @@ void game_run(void)
     ufo_init();
     hud_init();
     hiscores_init();
+    thump_timer = THUMP_PERIOD_BASE;
 
     ship_draw();
     ship_was_drawn = 1;
@@ -540,6 +553,24 @@ void game_run(void)
 
         if (ship_invincible) ship_invincible--;
         check_next_wave();
+
+        /* Phase 8 : thump cadencé sur asteroids_count, accélère quand
+         * il reste peu d'asteroids (cf. arcade : tension croissante) */
+        if (!gameover && sfx_id == FX_NONE) {
+            if (thump_timer == 0) {
+                unsigned char n = asteroids_count();
+                unsigned char period;
+                if (n >= 8)      period = THUMP_PERIOD_BASE;
+                else if (n >= 4) period = THUMP_PERIOD_BASE - 8;
+                else if (n >= 2) period = THUMP_PERIOD_BASE - 16;
+                else             period = THUMP_PERIOD_MIN;
+                sound_play_fx(FX_THUMP);
+                thump_timer = period;
+            } else {
+                thump_timer--;
+            }
+        }
+        sound_tick();
 
         /* Détecter passage en game over (insérer dans hi-scores) */
         if (gameover && !prev_gameover) {

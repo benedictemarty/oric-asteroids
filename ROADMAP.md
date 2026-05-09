@@ -17,8 +17,8 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 5 | Collisions L∞ + score 7-seg + vies + HUD + respawn invincible | 1 sem. | 2 sem. |
 | ✅ | 6 | Soucoupe grande/petite + IA tir 8-way / ship-tracking + spawn cyclique | 1 sem. | 2 sem. |
 | ✅ | 7 | Hyperespace + restart + high scores top 5 (RAM) | 1 sem. | 2 sem. |
-| 🔜 | 8 | Son AY‑3‑8912 (effets + thump) | 1 sem. | 3 sem. |
-| ⏳ | 9 | Synchro VSync « propre » + polish + `.dsk` final | 1 sem. | 2 sem. |
+| ✅ | 8 | Son AY-3-8912 : tir + explosion + thump cadencé sur asteroids_count | 1 sem. | 3 sem. |
+| 🔜 | 9 | VSync ULA + polish + `.dsk` final + persistance high scores | 1 sem. | 2 sem. |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.
@@ -195,14 +195,31 @@ si la rangée 4 ne suffit pas (ex: ESC pour pause).
 - Rendu propre de la table high scores (digits 7-seg réutilisés).
 - Démo passive en écran d'attente (IA simple jouant la frame 0).
 
-### Phase 8 — Son AY‑3‑8912
+### Phase 8 — Son AY-3-8912 ✅
 
-**Définition de fin** :
-- Player AY sous IRQ (Timer 1 VIA), piloté en page zéro.
-- Effets : tirs, explosions petites/moyennes/grandes, thrust, soucoupe,
-  hyperespace, extra ship, thump‑thump cadencé par `astWaveTimerReload`.
-- Pas de pop / glitch audible.
-- Mix supportable à volume Oric standard.
+**Définition de fin validée (2026-05-10)** :
+- Driver PSG bare-metal en asm (`sound.s`, 175 lignes) : `_psg_write`,
+  `_sound_init` (mixer + volumes init), `_sound_play_fx` (déclencher
+  un effet par ID), `_sound_tick` (décrémente timer + cut).
+- 3 effets implémentés : `FX_FIRE` (tone aigu), `FX_EXPLODE` (noise),
+  `FX_THUMP` (tone très grave).
+- API C (`sound.h`) appelée depuis `game.c` : sons sur tir, sur impact
+  bullet/ship vs asteroid, thump cadencé par `asteroids_count` (30 →
+  6 frames, tension croissante conforme arcade).
+- 84 écritures PSG vérifiées dans le trace Phosphoric en 5.5M cycles.
+- Mode polling (pas d'IRQ Timer 1) : `sound_tick` appelé chaque frame
+  de `game_run`, suffit pour les effets ponctuels.
+
+**Hors scope Phase 8 (différé Phase 8b)** :
+- Player AY sous IRQ Timer 1 (l'IRQ libérerait CPU mais complique
+  la cohérence PSG/clavier).
+- Effet thrust continu (besoin état on/off, modèle "1 effet" ne suffit pas).
+- Effet UFO oscillant (besoin LFO).
+- Effets explosions multi-tailles (différenciation petite/moyenne/grande).
+- Effet hyperespace (whoosh).
+- Effet extra ship.
+- Enveloppe AY (registres 11-13) au lieu de cut net.
+- Mix multi-canaux (thump continu sur B + tirs/explosions sur A).
 
 ### Phase 9 — Polish + `.dsk` final
 

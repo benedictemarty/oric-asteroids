@@ -32,6 +32,7 @@
 
         .export   _key_scan
         .importzp _key_state
+        .exportzp kb_pcr_save        ; partagé avec sound.s
 
         VIA_ORB    = $0300
         VIA_ORA    = $0301

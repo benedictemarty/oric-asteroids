@@ -15,7 +15,8 @@ BUILD     = build
 
 SRCS_C    = src/main.c src/game.c src/asteroids.c src/hud.c src/ufo.c
 SRCS_ASM  = src/asm/crt0.s src/asm/line.s src/asm/ship.s \
-            src/asm/ship_verts.s src/asm/input.s src/asm/shapes.s
+            src/asm/ship_verts.s src/asm/input.s src/asm/shapes.s \
+            src/asm/sound.s
 
 OBJ_CRT0    = $(BUILD)/crt0.o
 OBJ_LINE    = $(BUILD)/line.o
@@ -23,14 +24,15 @@ OBJ_SHIP    = $(BUILD)/ship.o
 OBJ_VERTS   = $(BUILD)/ship_verts.o
 OBJ_INPUT   = $(BUILD)/input.o
 OBJ_SHAPES  = $(BUILD)/shapes.o
+OBJ_SOUND   = $(BUILD)/sound.o
 OBJ_MAIN    = $(BUILD)/main.o
 OBJ_GAME    = $(BUILD)/game.o
 OBJ_ASTER   = $(BUILD)/asteroids.o
 OBJ_HUD     = $(BUILD)/hud.o
 OBJ_UFO     = $(BUILD)/ufo.o
 OBJS        = $(OBJ_CRT0) $(OBJ_LINE) $(OBJ_SHIP) $(OBJ_VERTS) \
-              $(OBJ_INPUT) $(OBJ_SHAPES) $(OBJ_MAIN) $(OBJ_GAME) \
-              $(OBJ_ASTER) $(OBJ_HUD) $(OBJ_UFO)
+              $(OBJ_INPUT) $(OBJ_SHAPES) $(OBJ_SOUND) $(OBJ_MAIN) \
+              $(OBJ_GAME) $(OBJ_ASTER) $(OBJ_HUD) $(OBJ_UFO)
 
 BIN       = $(BUILD)/$(PROJECT).bin
 TAP       = $(BUILD)/$(PROJECT).tap
@@ -39,8 +41,8 @@ TAP       = $(BUILD)/$(PROJECT).tap
 FASTLOAD_DONE  = 3500000
 TIME_AFTER     = 4000000
 TEST_CYCLES    = $(shell echo $$(($(FASTLOAD_DONE) + $(TIME_AFTER))))
-SCREENSHOT     = tests/out/phase7_full.ppm
-REF_SHOT       = tests/ref/phase7_full.ppm
+SCREENSHOT     = tests/out/phase8_sound.ppm
+REF_SHOT       = tests/ref/phase8_sound.ppm
 BENCH_CYCLES   = $(shell echo $$(($(FASTLOAD_DONE) + 25000000)))
 BENCH_PROF     = tests/out/phase6_bench.prof
 
@@ -86,13 +88,16 @@ $(OBJ_INPUT): src/asm/input.s | $(BUILD)
 $(OBJ_SHAPES): src/asm/shapes.s | $(BUILD)
 	$(CA65) -t none -o $@ $<
 
+$(OBJ_SOUND): src/asm/sound.s | $(BUILD)
+	$(CA65) -t none -o $@ $<
+
 $(BUILD)/main.s: src/main.c | $(BUILD)
 	$(CC65) -t none -O -I src -o $@ $<
 
 $(OBJ_MAIN): $(BUILD)/main.s
 	$(CA65) -t none -o $@ $<
 
-$(BUILD)/game.s: src/game.c src/asteroids.h | $(BUILD)
+$(BUILD)/game.s: src/game.c src/asteroids.h src/hud.h src/ufo.h src/sound.h | $(BUILD)
 	$(CC65) -t none -O -I src -o $@ $<
 
 $(OBJ_GAME): $(BUILD)/game.s
