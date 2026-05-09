@@ -7,13 +7,65 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-Différé Phase 10 :
-- Persistance high scores en `.tap` (driver cassette résident, saisie initiales).
-- Image `.dsk` Microdisc finale.
-- UFO oscillant (LFO logiciel sur freq tone canal C).
-- Enveloppe AY-3-8912 (registres 11-13) pour fade-out propre.
-- Démo passive en écran titre (asteroids tournent en arrière-plan).
+À venir Phase 10 :
+- Shapes Atari arcade authentiques (extraction depuis désasm rev 4).
+- Persistance high scores en `.tap` / `.dsk`.
+- UFO oscillant + enveloppe AY.
+- Démo passive en écran titre.
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.0.6] - 2026-05-10
+
+### Phase 9g — Fix bug XOR sommets partagés ✅
+
+**Bug identifié et corrigé sur tous les tracés vectoriels :**
+- Symptôme : un pixel partagé entre 2 segments adjacents (ex: pointe d'un
+  triangle, sommet d'un polygone fermé) est XOR-é 2× → effacé. La pointe
+  du vaisseau, la pointe du A, et tous les sommets des asteroids et UFOs
+  étaient invisibles.
+- Cause : `_draw_line_xor` trace tous les pixels y compris les endpoints,
+  donc 2 segments touchant le même point produisent un double-XOR =
+  effacement.
+- **Fix universel** : après le tracé des segments, **replot des sommets
+  partagés** (1 pixel via `_draw_line_xor` avec `lx0=lx1, ly0=ly1`).
+  3× XOR = pixel tracé → sommet visible.
+- Validation visuelle :
+  * Ship : pointe (120, 88) maintenant visible (était manquante).
+  * Lettre A : pointe (4, 0) maintenant visible (n'avait que 2 branches
+    écartées avant).
+  * Asteroids : 8 sommets de chaque polygone maintenant visibles.
+  * UFO : tous les endpoints des 7 segments replots.
+- 6 vraies pertes de pixels par lettre / forme / shape — fix sans
+  perturber le rendu.
+
+### Added
+
+- Format compact des lettres étendu : segments puis `0xFF` puis liste
+  de plots `(x,y)` puis `0xFE`.
+- 12 lettres mises à jour dans `src/title.c` avec leurs sommets partagés.
+- `src/asm/ship.s` : 3 plots après les 3 segments.
+- `src/asteroids.c` : boucle de 8 plots après les 8 segments.
+- `src/ufo.c` : replot des endpoints des 7 segments (~14 plots, conservateur).
+
+### Changed
+
+- `tests/ref/phase9_release.ppm` : régénérée (capture diffère légèrement
+  car les sommets sont maintenant tracés).
+
+### Décisions techniques Phase 9g
+
+- **Replot via `_draw_line_xor` 1-pixel** plutôt que `plot` séparé :
+  notre `_draw_line_xor` gère déjà le cas dégénéré `(x,y)→(x,y)` =
+  1 pixel tracé. Évite d'ajouter une nouvelle routine.
+- **Fix par replot** plutôt que modifier `_draw_line_xor` pour exclure
+  l'endpoint : approche conservatrice qui ne casse pas la sémantique
+  d'API existante (`_draw_line_xor` reste "trace tous les pixels").
+- **Liste explicite des sommets partagés par lettre** : plus simple
+  que détecter automatiquement les endpoints dupliqués. ~5 plots/lettre,
+  surcoût minime.
+- **Pour UFO : replot de TOUS les endpoints** (~14 plots) plutôt que
+  seulement les partagés. Conservateur — les endpoints non-partagés
+  sont juste tracés une fois de plus (visible mais pas dérangeant).
 
 ## [1.0.5] - 2026-05-10
 

@@ -138,7 +138,31 @@ draw_three_lines:
         sta  _lx1
         lda  sh_ty2
         sta  _ly1
-        jmp  _draw_line_xor    ; tail call (rts dans draw_line_xor)
+        jsr  _draw_line_xor
+
+        ; Replot des 3 sommets : chacun XOR 2x par les segments → effacé.
+        ; On le re-XOR (3e fois → tracé) pour le rendre visible.
+        lda  sh_tx0
+        sta  _lx0
+        sta  _lx1
+        lda  sh_ty0
+        sta  _ly0
+        sta  _ly1
+        jsr  _draw_line_xor    ; plot P0
+        lda  sh_tx1
+        sta  _lx0
+        sta  _lx1
+        lda  sh_ty1
+        sta  _ly0
+        sta  _ly1
+        jsr  _draw_line_xor    ; plot P1
+        lda  sh_tx2
+        sta  _lx0
+        sta  _lx1
+        lda  sh_ty2
+        sta  _ly0
+        sta  _ly1
+        jmp  _draw_line_xor    ; plot P2 (tail call)
 
 ;-----------------------------------------------------------------
 ; _ship_draw / _ship_erase — XOR idempotent : même routine

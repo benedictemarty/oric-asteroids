@@ -23,110 +23,144 @@ static const unsigned char letter_A[] = {
     0, 9, 4, 0,         /* gauche montante */
     4, 0, 8, 9,         /* droite descendante */
     2, 5, 6, 5,         /* barre milieu */
-    0xFF
+    0xFF,
+    4, 0,               /* plot pointe (partagée) */
+    0xFE
 };
 
 static const unsigned char letter_S[] = {
-    8, 1, 0, 1,         /* haut */
-    0, 1, 0, 5,         /* descente gauche haut */
-    0, 5, 8, 5,         /* milieu */
-    8, 5, 8, 9,         /* descente droite bas */
-    8, 9, 0, 9,         /* bas */
-    0xFF
+    8, 1, 0, 1,
+    0, 1, 0, 5,
+    0, 5, 8, 5,
+    8, 5, 8, 9,
+    8, 9, 0, 9,
+    0xFF,
+    0, 1,  0, 5,  8, 5,  8, 9,
+    0xFE
 };
 
 static const unsigned char letter_T[] = {
-    0, 0, 8, 0,         /* barre haute */
-    4, 0, 4, 9,         /* verticale centre */
-    0xFF
+    0, 0, 8, 0,
+    4, 0, 4, 9,
+    0xFF,
+    4, 0,
+    0xFE
 };
 
 static const unsigned char letter_E[] = {
-    0, 0, 0, 9,         /* verticale gauche */
-    0, 0, 8, 0,         /* haut */
-    0, 5, 6, 5,         /* milieu */
-    0, 9, 8, 9,         /* bas */
-    0xFF
+    0, 0, 0, 9,
+    0, 0, 8, 0,
+    0, 5, 6, 5,
+    0, 9, 8, 9,
+    0xFF,
+    0, 0,  0, 5,  0, 9,
+    0xFE
 };
 
 static const unsigned char letter_R[] = {
-    0, 0, 0, 9,         /* verticale gauche */
-    0, 0, 6, 0,         /* haut */
-    6, 0, 8, 2,         /* coin haut-droit */
-    8, 2, 8, 4,         /* descente courte */
-    8, 4, 0, 5,         /* diagonale interne */
-    0, 5, 8, 9,         /* jambe droite */
-    0xFF
+    0, 0, 0, 9,
+    0, 0, 6, 0,
+    6, 0, 8, 2,
+    8, 2, 8, 4,
+    8, 4, 0, 5,
+    0, 5, 8, 9,
+    0xFF,
+    0, 0,  6, 0,  8, 2,  8, 4,  0, 5,
+    0xFE
 };
 
 static const unsigned char letter_O[] = {
-    0, 0, 8, 0,         /* haut */
-    8, 0, 8, 9,         /* droite */
-    8, 9, 0, 9,         /* bas */
-    0, 9, 0, 0,         /* gauche */
-    0xFF
+    0, 0, 8, 0,
+    8, 0, 8, 9,
+    8, 9, 0, 9,
+    0, 9, 0, 0,
+    0xFF,
+    0, 0,  8, 0,  8, 9,  0, 9,
+    0xFE
 };
 
 static const unsigned char letter_I[] = {
-    4, 0, 4, 9,         /* verticale */
-    0, 0, 8, 0,         /* serif haut */
-    0, 9, 8, 9,         /* serif bas */
-    0xFF
+    4, 0, 4, 9,
+    0, 0, 8, 0,
+    0, 9, 8, 9,
+    0xFF,
+    4, 0,  4, 9,
+    0xFE
 };
 
 static const unsigned char letter_D[] = {
-    0, 0, 0, 9,         /* gauche */
-    0, 0, 6, 0,         /* haut */
-    6, 0, 8, 3,         /* coin haut-droit */
-    8, 3, 8, 6,         /* droite */
-    8, 6, 6, 9,         /* coin bas-droit */
-    6, 9, 0, 9,         /* bas */
-    0xFF
+    0, 0, 0, 9,
+    0, 0, 6, 0,
+    6, 0, 8, 3,
+    8, 3, 8, 6,
+    8, 6, 6, 9,
+    6, 9, 0, 9,
+    0xFF,
+    0, 0,  6, 0,  8, 3,  8, 6,  6, 9,  0, 9,
+    0xFE
 };
 
 /* Phase 9d — lettres pour "GAME OVER" */
 
 static const unsigned char letter_G[] = {
-    8, 1, 0, 1,         /* haut */
-    0, 1, 0, 9,         /* gauche */
-    0, 9, 8, 9,         /* bas */
-    8, 9, 8, 5,         /* droite bas */
-    8, 5, 4, 5,         /* barre milieu */
-    0xFF
+    8, 1, 0, 1,
+    0, 1, 0, 9,
+    0, 9, 8, 9,
+    8, 9, 8, 5,
+    8, 5, 4, 5,
+    0xFF,
+    0, 1,  0, 9,  8, 9,  8, 5,
+    0xFE
 };
 
 static const unsigned char letter_M[] = {
-    0, 9, 0, 0,         /* gauche */
-    0, 0, 4, 5,         /* descente vers centre */
-    4, 5, 8, 0,         /* montée vers droite */
-    8, 0, 8, 9,         /* droite */
-    0xFF
+    0, 9, 0, 0,
+    0, 0, 4, 5,
+    4, 5, 8, 0,
+    8, 0, 8, 9,
+    0xFF,
+    0, 0,  4, 5,  8, 0,
+    0xFE
 };
 
 static const unsigned char letter_V[] = {
-    0, 0, 4, 9,         /* gauche descendante */
-    4, 9, 8, 0,         /* droite montante */
-    0xFF
+    0, 0, 4, 9,
+    4, 9, 8, 0,
+    0xFF,
+    4, 9,
+    0xFE
 };
 
 /* Phase 9e — lettres pour "PRESS SPACE" */
 
 static const unsigned char letter_P[] = {
-    0, 0, 0, 9,         /* verticale gauche */
-    0, 0, 6, 0,         /* haut */
-    6, 0, 8, 2,         /* coin haut-droit */
-    8, 2, 8, 4,         /* descente courte */
-    8, 4, 0, 5,         /* fermeture boucle */
-    0xFF
+    0, 0, 0, 9,
+    0, 0, 6, 0,
+    6, 0, 8, 2,
+    8, 2, 8, 4,
+    8, 4, 0, 5,
+    0xFF,
+    0, 0,  6, 0,  8, 2,  8, 4,
+    0xFE
 };
 
 static const unsigned char letter_C[] = {
-    8, 1, 0, 1,         /* haut */
-    0, 1, 0, 9,         /* gauche */
-    0, 9, 8, 9,         /* bas (peu courant pour C mais ok) */
-    0xFF
+    8, 1, 0, 1,
+    0, 1, 0, 9,
+    0, 9, 8, 9,
+    0xFF,
+    0, 1,  0, 9,
+    0xFE
 };
 
+/* Format compact :
+ *   liste de 4-tuples (x0,y0,x1,y1) — segments —
+ *   0xFF marqueur fin segments
+ *   liste de 2-tuples (x,y) — plots de sommets partagés —
+ *   0xFE marqueur fin total (peut suivre directement 0xFF si pas de plots)
+ *
+ * Le replot des sommets partagés contre-balance le double-XOR (un sommet
+ * touché par 2 segments est XOR 2× → effacé ; le replot le re-XOR → tracé). */
 static void draw_letter(const unsigned char *segs,
                         unsigned char ox, unsigned char oy)
 {
@@ -138,6 +172,15 @@ static void draw_letter(const unsigned char *segs,
         ly1 = oy + segs[i + 3];
         draw_line_xor();
         i += 4;
+    }
+    i++;     /* skip 0xFF */
+    while (segs[i] != 0xFE) {
+        lx0 = ox + segs[i + 0];
+        ly0 = oy + segs[i + 1];
+        lx1 = lx0;
+        ly1 = ly0;
+        draw_line_xor();    /* plot 1 pixel */
+        i += 2;
     }
 }
 

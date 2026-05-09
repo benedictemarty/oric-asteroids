@@ -127,6 +127,17 @@ static void asteroid_draw_one(unsigned char idx)
         ly1 = (unsigned char)((signed char)ay + dy1);
         draw_line_xor();
     }
+    /* Phase 9g : replot des 8 sommets (polygone fermé → chaque sommet est
+     * partagé entre 2 segments adjacents → XOR 2× = effacé sans replot). */
+    for (i = 0; i < 8; i++) {
+        dx0 = shape_x[base + i];
+        dy0 = shape_y[base + i];
+        lx0 = (unsigned char)((signed char)ax + dx0);
+        ly0 = (unsigned char)((signed char)ay + dy0);
+        lx1 = lx0;
+        ly1 = ly0;
+        draw_line_xor();
+    }
 }
 
 void asteroids_draw(void)
