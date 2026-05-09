@@ -42,6 +42,8 @@
         FX_EXPLODE = 2
         FX_THUMP   = 3
         FX_HYPER   = 4    ; Phase 9b — whoosh hyperespace
+        FX_THRUST  = 5    ; Phase 9f — noise court continu (override par hold)
+        FX_LIFE    = 6    ; Phase 9f — chime extra ship
 
 ;-----------------------------------------------------------------
 ; Variables ZP
@@ -227,6 +229,44 @@ _sound_play_fx:
         sta  _sfx_timer
         jmp  @done
 @not_hyper:
+
+        cmp  #FX_THRUST
+        bne  @not_thrust
+        ; Thrust : noise canal C, court (3 frames). Re-déclenché chaque
+        ; frame que UP est held → effet de bruit continu approximatif.
+        lda  #$0F              ; freq noise high
+        ldy  #6
+        jsr  _psg_write
+        lda  #$08              ; volume C low (discret)
+        ldy  #10
+        jsr  _psg_write
+        lda  #$3F              ; mixer : noise C on (bit 5 = 0)
+        ldy  #7
+        jsr  _psg_write
+        lda  #3
+        sta  _sfx_timer
+        jmp  @done
+@not_thrust:
+
+        cmp  #FX_LIFE
+        bne  @not_life
+        ; Extra ship : chime tone aigu canal A, durée 20 frames
+        lda  #$30
+        ldy  #0
+        jsr  _psg_write
+        lda  #$00
+        ldy  #1
+        jsr  _psg_write
+        lda  #$0C
+        ldy  #8
+        jsr  _psg_write
+        lda  #$7E              ; mixer : tone A on
+        ldy  #7
+        jsr  _psg_write
+        lda  #20
+        sta  _sfx_timer
+        jmp  @done
+@not_life:
 
 @done:
         pla

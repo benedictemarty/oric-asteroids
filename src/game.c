@@ -126,6 +126,8 @@ static unsigned char gameover_text_drawn; /* Phase 9d : "GAME OVER" affiché */
 
 /* Phase 8 — cadence thump : décrémente sur le timer, déclenche sound_play_fx */
 static unsigned char thump_timer;
+/* Phase 9f — détecter extra life (lives++) pour déclencher FX_LIFE */
+static unsigned char lives_prev;
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -513,6 +515,7 @@ void game_run(void)
     hud_init();
     hiscores_init();
     thump_timer = THUMP_PERIOD_BASE;
+    lives_prev = lives;
 
     ship_draw();
     ship_was_drawn = 1;
@@ -549,7 +552,11 @@ void game_run(void)
         if (!gameover) {
             if (key_state & 0x01) ship_rotate((signed char)-1);
             if (key_state & 0x02) ship_rotate((signed char)+1);
-            if (key_state & 0x04) ship_apply_thrust();
+            if (key_state & 0x04) {
+                ship_apply_thrust();
+                /* Phase 9f : son thrust intermittent quand aucun autre FX */
+                if (sfx_id == FX_NONE) sound_play_fx(FX_THRUST);
+            }
 
             fire_now = key_state & 0x08;
             if (fire_now && !prev_fire) bullet_fire();
@@ -579,6 +586,12 @@ void game_run(void)
 
         if (ship_invincible) ship_invincible--;
         check_next_wave();
+
+        /* Phase 9f : extra life détectée (lives a augmenté) → FX_LIFE */
+        if (lives > lives_prev && sfx_id == FX_NONE) {
+            sound_play_fx(FX_LIFE);
+        }
+        lives_prev = lives;
 
         /* Phase 8 : thump cadencé sur asteroids_count, accélère quand
          * il reste peu d'asteroids (cf. arcade : tension croissante) */

@@ -13,6 +13,8 @@
 #define FX_EXPLODE  2   /* explosion asteroid   (~25 frames, noise)      */
 #define FX_THUMP    3   /* thump cadencé        (~8 frames, tone grave)  */
 #define FX_HYPER    4   /* hyperespace whoosh   (~14 frames, tone+noise) */
+#define FX_THRUST   5   /* thrust noise         (~3 frames, re-déclenché) */
+#define FX_LIFE     6   /* chime extra ship     (~20 frames, tone aigu)  */
 
 extern unsigned char sfx_id;
 extern unsigned char sfx_timer;

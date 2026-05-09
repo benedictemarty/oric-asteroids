@@ -10,9 +10,45 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 Différé Phase 10 :
 - Persistance high scores en `.tap` (driver cassette résident, saisie initiales).
 - Image `.dsk` Microdisc finale.
-- Effets sons manquants : thrust continu, UFO oscillant, enveloppe AY.
+- UFO oscillant (LFO logiciel sur freq tone canal C).
+- Enveloppe AY-3-8912 (registres 11-13) pour fade-out propre.
 - Démo passive en écran titre (asteroids tournent en arrière-plan).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.0.5] - 2026-05-10
+
+### Phase 9f — FX_THRUST + FX_LIFE ✅
+
+**Ajouts :**
+- `FX_THRUST` : noise canal C très court (3 frames), volume 8 (discret).
+  Re-déclenché chaque frame que UP est held → effet de bruit "moteur"
+  approximatif (pseudo-continu via override).
+- `FX_LIFE` : chime tone canal A aigu (freq $30, 20 frames) au moment
+  d'une vie bonus (toutes les 10 000 pts).
+- 6 effets sonores au total : `FIRE`, `EXPLODE`, `THUMP`, `HYPER`,
+  `THRUST`, `LIFE`.
+
+### Added
+
+- `src/asm/sound.s` : configs FX_THRUST + FX_LIFE.
+- `src/sound.h` : `#define FX_THRUST 5`, `#define FX_LIFE 6`.
+- `src/game.c` : 
+  - hook FX_THRUST dans le bloc UP (override seulement si `sfx_id == FX_NONE`
+    — ne perturbe pas FIRE/EXPLODE/HYPER en cours).
+  - `lives_prev` pour détecter `lives++` → FX_LIFE.
+
+### Décisions techniques Phase 9f
+
+- **FX_THRUST réactif** plutôt que continu : le modèle "1 effet à la fois"
+  de sound.s ne supporte pas un canal dédié au thrust. Solution : court
+  effet (3 frames), re-déclenché chaque frame UP — produit un bruit
+  "haché" mais audible. Phase 10 fera un canal dédié pour vraie continuité.
+- **Override conditionnel** (`if sfx_id == FX_NONE`) : pendant un FIRE
+  ou EXPLODE, le thrust est silencieux. Évite de couper les effets
+  d'impact qui sont plus prioritaires gameplay.
+- **FX_LIFE détecté côté game.c** plutôt que dans `hud_add_score` :
+  évite une dépendance hud → sound. La détection `lives > lives_prev`
+  est une simple comparaison à chaque frame.
 
 ## [1.0.4] - 2026-05-10
 

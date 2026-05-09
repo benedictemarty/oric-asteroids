@@ -153,6 +153,11 @@ void hud_draw(void)
     }
 }
 
+/* Phase 9f : déclencher FX_LIFE depuis hud_add_score nécessiterait
+ * une dépendance à sound.h. Plus propre : exposer un flag via
+ * lives_shown vs lives, géré par game.c. Approche actuelle : ajout
+ * implicite via hud_lose_life (joueur perd, pas un bonus). Pour
+ * l'extra life, game.c surveille lives passant > sa valeur précédente. */
 void hud_add_score(unsigned int delta)
 {
     score += delta;

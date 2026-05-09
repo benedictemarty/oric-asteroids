@@ -67,6 +67,7 @@ des 9 phases.
 | 9c | Écran titre "ASTEROIDS" vectoriel 9 lettres | `phase9c-done` / `v1.0.2` |
 | 9d | Lettres GMV + écran "GAME OVER" | `phase9d-done` / `v1.0.3` |
 | 9e | Lettres PC + "PRESS SPACE" + attente input | `phase9e-done` / `v1.0.4` |
+| 9f | FX_THRUST + FX_LIFE (6 effets sons total) | `phase9f-done` / `v1.0.5` |
 
 ## Différé Phase 10
 

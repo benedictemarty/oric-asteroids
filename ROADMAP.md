@@ -23,6 +23,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 9c | Écran titre "ASTEROIDS" vectoriel 9 lettres XOR (v1.0.2) | — | 1 j |
 | ✅ | 9d | Lettres GMV + écran "GAME OVER" XOR (v1.0.3) | — | 1 j |
 | ✅ | 9e | Lettres PC + "PRESS SPACE" + attente input (v1.0.4) | — | 1 j |
+| ✅ | 9f | FX_THRUST + FX_LIFE (6 effets sons total) (v1.0.5) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.
