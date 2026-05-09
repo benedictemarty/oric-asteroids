@@ -28,6 +28,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 10a | Shapes asteroids ATARI ARCADE rev 4 authentiques (v1.1.0) | — | 1 j |
 | ✅ | 10b | Shapes Atari N sommets variables (11-13) sans décimation (v1.1.1) | — | 1 j |
 | ✅ | 10c | Spawn arcade-fidèle (vagues progressives, RNG positions/vél.) (v1.1.2) | — | 1 j |
+| ✅ | 10d | Lettre W + affichage "WAVE n" dans HUD (v1.1.3) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.

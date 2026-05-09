@@ -128,6 +128,9 @@ static unsigned char gameover_text_drawn; /* Phase 9d : "GAME OVER" affiché */
 static unsigned char thump_timer;
 /* Phase 9f — détecter extra life (lives++) pour déclencher FX_LIFE */
 static unsigned char lives_prev;
+/* Phase 10d — affichage "WAVE n" en haut-centre */
+static unsigned char wave_displayed;
+#define WAVE_HUD_Y  16
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -516,6 +519,7 @@ void game_run(void)
     hiscores_init();
     thump_timer = THUMP_PERIOD_BASE;
     lives_prev = lives;
+    wave_displayed = 0;
 
     ship_draw();
     ship_was_drawn = 1;
@@ -592,6 +596,13 @@ void game_run(void)
             sound_play_fx(FX_LIFE);
         }
         lives_prev = lives;
+
+        /* Phase 10d : afficher "WAVE n" si la vague a changé */
+        if (current_wave != wave_displayed) {
+            if (wave_displayed != 0) wave_label_erase(WAVE_HUD_Y, wave_displayed);
+            wave_label_draw(WAVE_HUD_Y, current_wave);
+            wave_displayed = current_wave;
+        }
 
         /* Phase 8 : thump cadencé sur asteroids_count, accélère quand
          * il reste peu d'asteroids (cf. arcade : tension croissante) */

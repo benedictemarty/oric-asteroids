@@ -23,5 +23,7 @@ void hud_lose_life(void);
 /* Phase 9 — dessine un score 5 chiffres à (px, py) en XOR (réutilisé
  * pour la table des high scores en game over). */
 void hud_xor_5digits(unsigned int s, unsigned char px, unsigned char py);
+/* Phase 10d — dessine UN chiffre 7-segments à (px, py) en XOR */
+void hud_xor_digit(unsigned char d, unsigned char px, unsigned char py);
 
 #endif /* HUD_H */

@@ -7,13 +7,46 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10d+ :
+À venir Phase 10e+ :
 - Variables Atari arcade (`statusShip`, `horzVelShip`, etc.) côté code.
 - IA soucoupe rev 4 (table de précision indexée par score).
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
 - Démo passive en écran titre.
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.1.3] - 2026-05-10
+
+### Phase 10d — Affichage "WAVE n" dans le HUD ✅
+
+- Lettre `W` ajoutée (4 segments + 3 plots — V doublé).
+- `wave_label_draw(py, digit)` : "WAVE " (4 lettres + espace) + 1 chiffre
+  7-segments via `hud_xor_digit`.
+- Position : x=80 (centre horizontal), y paramétrable (16 par défaut).
+- Hook dans `game_run` : redessin lorsque `current_wave != wave_displayed`.
+  XOR efface l'ancien numéro avant tracé du nouveau.
+- 12 lettres alphabétiques au total : `A C D E G I M O P R S T V W`.
+
+### Added
+
+- `letter_W` dans `src/title.c` (5×9 px, 4 segments + 3 sommets replots).
+- `wave_label_draw/erase` exposés dans `src/title.h`.
+- `hud_xor_digit(d, px, py)` exposé dans `src/hud.h` — wrapper public
+  autour de `draw_digit` interne.
+- `wave_displayed` + `WAVE_HUD_Y = 16` dans `src/game.c`.
+
+### Décisions techniques Phase 10d
+
+- **Réutilisation de `draw_digit` du HUD** plutôt qu'un module digit-only
+  séparé : économise du code (pas de duplication de la table 7-seg) et
+  garantit la cohérence visuelle.
+- **`current_wave` clampé à 9 dans le HUD** (`if (digit > 9) digit = 9`) :
+  notre `hud_xor_digit` ne gère qu'un chiffre. Pour WAVE 10+ (max 11
+  selon arcade), il faudrait afficher 2 chiffres. Différé Phase 10e
+  (peu probable d'atteindre la wave 10 en pratique, le jeu se complexifie).
+- **Hook par diff `current_wave != wave_displayed`** : XOR-erase de
+  l'ancienne valeur + draw nouvelle. Pas de redraw permanent (économise
+  ~30 segments par frame qui resteraient identiques sinon).
 
 ## [1.1.2] - 2026-05-10
 

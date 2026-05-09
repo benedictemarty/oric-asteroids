@@ -182,3 +182,9 @@ void hud_xor_5digits(unsigned int s, unsigned char px, unsigned char py)
 {
     draw_score(s, px, py);
 }
+
+/* Phase 10d — wrapper public pour dessiner UN chiffre (0-9) */
+void hud_xor_digit(unsigned char d, unsigned char px, unsigned char py)
+{
+    draw_digit(d, px, py);
+}

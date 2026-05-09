@@ -131,6 +131,17 @@ static const unsigned char letter_V[] = {
     0xFE
 };
 
+/* Phase 10d — lettre W (V doublé) */
+static const unsigned char letter_W[] = {
+    0, 0, 2, 9,         /* gauche descendante */
+    2, 9, 4, 4,         /* montée vers centre */
+    4, 4, 6, 9,         /* descente droite-centre */
+    6, 9, 8, 0,         /* montée droite */
+    0xFF,
+    2, 9,  4, 4,  6, 9,
+    0xFE
+};
+
 /* Phase 9e — lettres pour "PRESS SPACE" */
 
 static const unsigned char letter_P[] = {
@@ -250,4 +261,24 @@ void presspace_draw(unsigned char py)
 void presspace_erase(unsigned char py)
 {
     presspace_draw(py);
+}
+
+/* Phase 10d — affichage "WAVE n" en haut-centre.
+ * 5 caractères ("WAVE ") + 1 chiffre = 6 × 12 = 72 px, x = 80.  */
+void wave_label_draw(unsigned char py, unsigned char digit)
+{
+    extern void hud_xor_digit(unsigned char d, unsigned char px, unsigned char py);
+    unsigned char x = 80;
+    draw_letter(letter_W, x +   0, py);
+    draw_letter(letter_A, x +  12, py);
+    draw_letter(letter_V, x +  24, py);
+    draw_letter(letter_E, x +  36, py);
+    /* (espace en x+48) */
+    if (digit > 9) digit = 9;       /* clamp à 1 chiffre pour l'instant */
+    hud_xor_digit(digit, x + 56, py);
+}
+
+void wave_label_erase(unsigned char py, unsigned char digit)
+{
+    wave_label_draw(py, digit);
 }

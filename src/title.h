@@ -11,5 +11,8 @@ void gameover_draw(void);
 void gameover_erase(void);
 void presspace_draw(unsigned char py);
 void presspace_erase(unsigned char py);
+/* Phase 10d — affichage "WAVE n" centré horizontal */
+void wave_label_draw(unsigned char py, unsigned char digit);
+void wave_label_erase(unsigned char py, unsigned char digit);
 
 #endif /* TITLE_H */
