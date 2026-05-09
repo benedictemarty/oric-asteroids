@@ -20,6 +20,7 @@ typedef struct {
 } Asteroid;
 
 extern Asteroid asteroids[MAX_ASTEROIDS];
+extern unsigned char current_wave;        /* Phase 10c — vague courante (1..) */
 
 void asteroids_init(unsigned char seed);
 void asteroids_spawn_wave(void);

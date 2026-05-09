@@ -34,6 +34,10 @@ extern const unsigned char shape_radii[3];
 /* État des astéroïdes (BSS, zéro à l'init via bullets_init logique) */
 Asteroid asteroids[MAX_ASTEROIDS];
 
+/* Phase 10c — wave counter arcade */
+unsigned char current_wave;
+static unsigned char ast_per_wave;
+
 /* RNG : LFSR 8-bit Galois (polynôme x^8 + x^6 + x^5 + x^4 + 1) */
 static unsigned char rng_state;
 
@@ -49,30 +53,56 @@ void asteroids_init(unsigned char seed)
 {
     unsigned char i;
     rng_state = seed ? seed : 0x42;
+    current_wave = 0;
+    ast_per_wave = 0;
     for (i = 0; i < MAX_ASTEROIDS; i++) asteroids[i].active = 0;
 }
 
-/* Spawn la vague initiale : 4 grands aux 4 coins de la zone safe.
- * Vélocités fixes orientées vers le centre (varie selon la forme). */
+/* Spawn d'une vague — Phase 10c arcade-fidèle.
+ * Cf. InitWaveVars à $7168 (`AstPerWave += 2`, max 11).
+ *
+ * Logique transposée de `InitWaveAsteroids` ($719B-$71D5) :
+ *   - Pour chaque asteroid : choisir shape aléatoirement
+ *   - Position aléatoire alternant : top/bottom (Y=0/max, X aléa)
+ *     ou left/right (X=0/max, Y aléa) selon RNG bit
+ *   - Vélocité aléatoire (RNG sur signe + magnitude) */
 void asteroids_spawn_wave(void)
 {
-    static const unsigned char sx[4] = { 30, 210,  30, 210};
-    static const unsigned char sy[4] = { 30,  30, 170, 170};
-    static const signed char   sv[4][2] = {
-        {  1,  1 },     /* coin haut-gauche → vers ↘ */
-        { -1,  1 },     /* coin haut-droit  → vers ↙ */
-        {  1, -1 },     /* coin bas-gauche  → vers ↗ */
-        { -1, -1 },     /* coin bas-droit   → vers ↖ */
-    };
-    unsigned char i;
-    for (i = 0; i < 4; i++) {
-        asteroids[i].x      = sx[i];
-        asteroids[i].y      = sy[i];
-        asteroids[i].vx     = sv[i][0];
-        asteroids[i].vy     = sv[i][1];
-        asteroids[i].shape  = i;
-        asteroids[i].size   = SIZE_LARGE;
+    unsigned char i, n, r;
+
+    if (current_wave == 0) {
+        current_wave = 1;
+        ast_per_wave = 4;
+    } else {
+        ast_per_wave += 2;
+        if (ast_per_wave > 11) ast_per_wave = 11;
+        current_wave++;
+    }
+    n = ast_per_wave;
+    if (n > MAX_ASTEROIDS) n = MAX_ASTEROIDS;
+
+    for (i = 0; i < n; i++) {
         asteroids[i].active = 1;
+        asteroids[i].size   = SIZE_LARGE;
+        /* Shape aléatoire 0-3 (cf. arcade : AND #$18 puis ORA #$04 → status) */
+        asteroids[i].shape  = (rng8() >> 3) & 3;
+
+        /* Position : RNG bit 0 décide top/bottom ou left/right */
+        r = rng8();
+        if (r & 1) {
+            /* Apparaît sur bord gauche/droit, Y aléatoire */
+            asteroids[i].x = (r & 2) ? 12 : 220;
+            asteroids[i].y = 24 + (rng8() % 144);     /* zone safe Y */
+        } else {
+            /* Apparaît sur bord haut/bas, X aléatoire */
+            asteroids[i].x = 20 + (rng8() % 192);     /* zone safe X */
+            asteroids[i].y = (r & 2) ? 20 : 180;
+        }
+
+        /* Vélocité : RNG sur signe + magnitude (1 ou 2) */
+        r = rng8();
+        asteroids[i].vx = ((r & 1) ? 1 : -1) * ((r & 2) ? 2 : 1);
+        asteroids[i].vy = ((r & 4) ? 1 : -1) * ((r & 8) ? 2 : 1);
     }
     /* Marquer les autres comme libres */
     for (; i < MAX_ASTEROIDS; i++) asteroids[i].active = 0;

@@ -71,8 +71,9 @@ des 9 phases.
 | 9g | Fix bug XOR sommets partagés (ship/lettres/asteroids/UFO) | `phase9g-done` / `v1.0.6` |
 | 10a | Shapes asteroids ATARI ARCADE rev 4 authentiques | `phase10a-done` / `v1.1.0` |
 | 10b | Shapes Atari N sommets variables (11-13) sans décimation | `phase10b-done` / `v1.1.1` |
+| 10c | Spawn arcade-fidèle (vagues progressives, RNG positions/vél.) | `phase10c-done` / `v1.1.2` |
 
-## Différé Phase 10c+
+## Différé Phase 10d+
 
 - Persistance high scores en `.tap` ou `.dsk` (driver cassette résident).
 - Image `.dsk` Microdisc avec sauvegarde native.

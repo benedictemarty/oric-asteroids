@@ -7,13 +7,60 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10c+ :
-- Logique de jeu portée du désasm (variables `statusShip`, `horzVelShip`,
-  table `astWaveTimerReload`, IA soucoupe rev 4, séquence spawn arcade).
+À venir Phase 10d+ :
+- Variables Atari arcade (`statusShip`, `horzVelShip`, etc.) côté code.
+- IA soucoupe rev 4 (table de précision indexée par score).
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
 - Démo passive en écran titre.
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.1.2] - 2026-05-10
+
+### Phase 10c — Spawn arcade-fidèle (vagues progressives) ✅
+
+**Logique de spawn portée depuis le désasm rev 4** (`InitWaveVars` à
+`$7168`, `InitWaveAsteroids` à `$719B`) :
+
+- `current_wave` (uint8) : compteur de vagues, démarre à 1 et
+  s'incrémente quand toute la vague est détruite.
+- `ast_per_wave` (uint8) : nombre d'asteroids par vague, démarre à 4
+  et `+= 2` chaque vague, max 11 (cf. `AstPerWave` arcade à `$02F5`).
+- **Spawn arcade-fidèle** (vs anciennement "4 grands aux 4 coins") :
+  * Shape aléatoire (RNG : `(rng8() >> 3) & 3`)
+  * Position alternant top/bottom et left/right selon `r & 1`
+  * Coordonnée libre dans la zone safe via `rng8() % range`
+  * Vélocité signée aléatoire (signe + magnitude 1 ou 2 via RNG)
+
+### Changed
+
+- `src/asteroids.c` :
+  - `current_wave`, `ast_per_wave` (BSS).
+  - `asteroids_init` reset les compteurs.
+  - `asteroids_spawn_wave` : logique arcade complète.
+- `src/asteroids.h` : `extern unsigned char current_wave`.
+- `tests/ref/phase9_release.ppm` : régénérée (positions/vélocités
+  asteroids différentes mais reproductibles via RNG seedé 0x42).
+
+### Décisions techniques Phase 10c
+
+- **Compteur `current_wave` exposé** : utile pour Phase 10d-e où on
+  pourra afficher "WAVE N" en HUD ou faire varier la difficulté du
+  thump / de l'IA UFO selon la wave.
+- **Pas encore de spawn de saucer en Phase 10c** : la condition
+  arcade `ScrSpeedup` (saucer apparait plus souvent quand asteroids
+  count ≤ valeur) sera ajoutée en Phase 10d. Pour l'instant le UFO
+  spawn reste sur son timer fixe.
+- **Vélocité magnitude 1 ou 2** : l'arcade utilise des vitesses 8.8
+  fixed-point variables ; on simplifie à entiers 1 ou 2 px/frame
+  pour rester compatible avec notre format vx/vy 8-bit signed.
+- **Échelle aléatoire `rng8() % 192`** : modulo coûteux en cc65 mais
+  acceptable au moment du spawn (1× par vague, pas en boucle frame).
+
+### Tag
+
+`v1.1.2` — bump patch (changement comportement spawn, RNG seedé donc
+reproductibilité conservée).
 
 ## [1.1.1] - 2026-05-10
 
