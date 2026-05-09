@@ -21,6 +21,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 9 | VSync ULA via CB1 + polish hiscores + README (v1.0.0) | 1 sem. | 2 sem. |
 | ✅ | 9b | Fix bug BSS clear (initlib cc65) + FX_HYPER (v1.0.1) | — | 1 j |
 | ✅ | 9c | Écran titre "ASTEROIDS" vectoriel 9 lettres XOR (v1.0.2) | — | 1 j |
+| ✅ | 9d | Lettres GMV + écran "GAME OVER" XOR (v1.0.3) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.

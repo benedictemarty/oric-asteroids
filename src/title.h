@@ -7,5 +7,7 @@
 
 void title_draw(void);
 void title_erase(void);
+void gameover_draw(void);
+void gameover_erase(void);
 
 #endif /* TITLE_H */

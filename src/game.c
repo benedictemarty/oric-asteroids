@@ -122,6 +122,7 @@ static unsigned char ship_was_drawn;
 /* Phase 7 — high scores en RAM (persistance .tap reportée Phase 9) */
 static unsigned int  hiscores[HISCORE_COUNT];
 static unsigned char hiscores_drawn;     /* dernier état affiché du tableau */
+static unsigned char gameover_text_drawn; /* Phase 9d : "GAME OVER" affiché */
 
 /* Phase 8 — cadence thump : décrémente sur le timer, déclenche sound_play_fx */
 static unsigned char thump_timer;
@@ -521,12 +522,16 @@ void game_run(void)
         if (gameover && hiscores_drawn) {
             hiscores_draw_table();
         }
+        if (gameover && gameover_text_drawn) {
+            gameover_erase();
+        }
 
         /* Restart : SPACE en game over */
         if (gameover && (key_state & 0x08)) {
             game_reset();
             prev_gameover = 0;
             hiscores_drawn = 0;
+            gameover_text_drawn = 0;
             continue;
         }
 
@@ -610,6 +615,8 @@ void game_run(void)
         if (gameover) {
             hiscores_draw_table();
             hiscores_drawn = 1;
+            gameover_draw();
+            gameover_text_drawn = 1;
         }
 
         frame_wait();

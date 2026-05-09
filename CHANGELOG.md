@@ -11,7 +11,42 @@ Différé Phase 10 :
 - Persistance high scores en `.tap` (driver cassette résident, saisie initiales).
 - Image `.dsk` Microdisc finale.
 - Effets sons manquants : thrust continu, UFO oscillant, enveloppe AY.
-- Écran "GAME OVER" / "PRESS SPACE" (besoin de ~6 lettres supplémentaires).
+- Écran "PRESS SPACE" (besoin de lettres P et C en plus).
+- Démo passive en écran titre (asteroids tournent en arrière-plan).
+
+## [1.0.3] - 2026-05-10
+
+### Phase 9d — Lettres GMV + écran GAME OVER ✅
+
+**Définition de fin validée :**
+- 3 nouvelles lettres vectorielles ajoutées : `G` (5 segs), `M` (4 segs),
+  `V` (2 segs).
+- `gameover_draw()` : "GAME OVER" centré horizontal (x=66, y=70),
+  9 caractères × 12 px = 108 px de large. 8 lettres (espace en x+48).
+- `gameover_erase()` = `gameover_draw()` (XOR idempotent).
+- Affichage en game state : XOR effacement avant logique, redessin
+  après. Effacé sur restart (SPACE en game over).
+- `make check` PASS.
+
+### Added
+
+- `src/title.c` : `letter_G`, `letter_M`, `letter_V` (~11 segments),
+  `gameover_draw`, `gameover_erase`.
+- `src/title.h` : prototypes `gameover_draw/erase`.
+- `src/game.c` : `gameover_text_drawn` flag, hooks dessin/effacement
+  dans la boucle.
+
+### Décisions techniques Phase 9d
+
+- **Réutilisation de la font Phase 9c** : `letter_A`, `letter_E`,
+  `letter_O`, `letter_R` sont mutualisés entre `ASTEROIDS` et
+  `GAME OVER`. Économie ≈ 16 segments × 4 octets = 64 octets RODATA.
+- **`V` en 2 segments seulement** : le minimum pour la lisibilité.
+  Pas d'apex pointu (3e segment) — esthétique vectorielle arcade
+  classique (cf. logo Atari original).
+- **Pas de "PRESS SPACE" en Phase 9d** : nécessite les lettres `P`
+  et `C` supplémentaires. Reporté à Phase 9e ou 10. Le restart est
+  documenté dans le README.
 
 ## [1.0.2] - 2026-05-10
 

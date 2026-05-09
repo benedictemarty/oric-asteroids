@@ -84,6 +84,31 @@ static const unsigned char letter_D[] = {
     0xFF
 };
 
+/* Phase 9d — lettres pour "GAME OVER" */
+
+static const unsigned char letter_G[] = {
+    8, 1, 0, 1,         /* haut */
+    0, 1, 0, 9,         /* gauche */
+    0, 9, 8, 9,         /* bas */
+    8, 9, 8, 5,         /* droite bas */
+    8, 5, 4, 5,         /* barre milieu */
+    0xFF
+};
+
+static const unsigned char letter_M[] = {
+    0, 9, 0, 0,         /* gauche */
+    0, 0, 4, 5,         /* descente vers centre */
+    4, 5, 8, 0,         /* montée vers droite */
+    8, 0, 8, 9,         /* droite */
+    0xFF
+};
+
+static const unsigned char letter_V[] = {
+    0, 0, 4, 9,         /* gauche descendante */
+    4, 9, 8, 0,         /* droite montante */
+    0xFF
+};
+
 static void draw_letter(const unsigned char *segs,
                         unsigned char ox, unsigned char oy)
 {
@@ -119,4 +144,26 @@ void title_draw(void)
 void title_erase(void)
 {
     title_draw();
+}
+
+/* Dessine "GAME OVER" centré en y=70.
+ * 9 caractères (avec espace) × 12 = 108 → x = (240 - 108) / 2 = 66. */
+void gameover_draw(void)
+{
+    unsigned char x = 66;
+    unsigned char y = 70;
+    draw_letter(letter_G, x +   0, y);
+    draw_letter(letter_A, x +  12, y);
+    draw_letter(letter_M, x +  24, y);
+    draw_letter(letter_E, x +  36, y);
+    /* (espace en x+48) */
+    draw_letter(letter_O, x +  60, y);
+    draw_letter(letter_V, x +  72, y);
+    draw_letter(letter_E, x +  84, y);
+    draw_letter(letter_R, x +  96, y);
+}
+
+void gameover_erase(void)
+{
+    gameover_draw();
 }

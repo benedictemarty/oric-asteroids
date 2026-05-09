@@ -65,6 +65,7 @@ des 9 phases.
 | 9 | VSync ULA + polish + README | `phase9-done` / `v1.0.0` |
 | 9b | Fix bug BSS (initlib cc65) + FX_HYPER | `phase9b-done` / `v1.0.1` |
 | 9c | Écran titre "ASTEROIDS" vectoriel 9 lettres | `phase9c-done` / `v1.0.2` |
+| 9d | Lettres GMV + écran "GAME OVER" | `phase9d-done` / `v1.0.3` |
 
 ## Différé Phase 10
 
