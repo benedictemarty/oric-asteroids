@@ -7,12 +7,72 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10 :
-- Shapes Atari arcade authentiques (extraction depuis désasm rev 4).
+À venir Phase 10b+ :
+- Shapes Atari avec N sommets variables (11-13 au lieu de décimés à 8).
+- Logique de jeu portée du désasm (variables `statusShip`, table `astWaveTimerReload`,
+  IA soucoupe rev 4, etc.).
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
 - Démo passive en écran titre.
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.1.0] - 2026-05-10
+
+### Phase 10a — Shapes asteroids ATARI ARCADE rev 4 ✅
+
+**Portage authentique des shapes** depuis le désassemblage Atari arcade :
+- Source : [6502disassembly.com/va-asteroids/Asteroids.html](https://6502disassembly.com/va-asteroids/Asteroids.html)
+- Table `AstPtrnPtrTbl` à $51DE → 4 shapes aux adresses $51E6, $51FE, $521A, $5234
+- Format DVG SVEC (Short VECTOR) : déplacements relatifs cumulés depuis l'origine
+- Décodage manuel des SVEC depuis les commentaires du désasm
+- Cumul des positions pour obtenir les sommets absolus
+
+**Décimation à 8 sommets** (compatibilité avec format actuel) :
+- Shape 0 : 11 sommets → 8 décimés (silhouette rocheuse 1)
+- Shape 1 : 13 sommets → 8 décimés (silhouette rocheuse 2)
+- Shape 2 : 12 sommets → 8 décimés (silhouette rocheuse 3)
+- Shape 3 : 13 sommets → 8 décimés (silhouette rocheuse 4)
+
+**Fini les octogones génériques** — les silhouettes Atari sont irrégulières
+avec des concavités (creux dans la pierre). Visuellement cohérent avec
+l'arcade original.
+
+### Added
+
+- `tools/gen_shapes.py` réécrit : 4 shapes Atari hardcodées (cumul
+  manuel des SVEC), échelles ×0.9 / ×1.6 / ×2.6 pour petit/moyen/grand
+  asteroid (rayons cibles 5/9/14 px Oric).
+- Rayons collision auto-calculés depuis les magnitudes max × scale.
+
+### Changed
+
+- `src/asm/shapes.s` régénéré avec les coords Atari authentiques
+  (commentaires références aux adresses ROM source).
+- `tests/ref/phase9_release.ppm` mis à jour (silhouettes différentes).
+
+### Décisions techniques Phase 10a
+
+- **Décimation à 8 sommets** plutôt qu'extension du format à N variable :
+  préserve l'API `_shape_x[96]`, `_shape_y[96]` et `asteroid_draw_one`
+  (boucle de 8 segments). Phase 10b pourra introduire un format variable
+  si la fidélité visuelle nécessite tous les sommets originaux (11-13).
+- **Choix des sommets décimés** : équirépartition par index (1 sur ~1.5),
+  pas d'optimisation visuelle ciblée. Phase 10b pourra raffiner par
+  conservation des "pointes" extrêmes.
+- **Échelles ×0.9 / ×1.6 / ×2.6** au lieu des ratios arcade exacts
+  (large=132, medium=72, small=42 unités DVG, soit ratios 3.14 / 1.71 / 1) :
+  on adapte aux pixels Oric pour cibler nos rayons visuels existants
+  (5/9/14 px). Phase 10b pourra utiliser les ratios arcade exacts si
+  on dispose d'une zone de jeu plus grande.
+- **Pas de portage du code logique** (Phase 10b+) : asteroids spawn,
+  fragmentation, IA soucoupe restent "from scratch" pour l'instant —
+  visuellement c'est l'élément le plus impactant, le code reste pour
+  une phase ultérieure.
+
+### Tag
+
+`v1.1.0` — bump mineur (changement de comportement visuel : shapes
+asteroids différentes vs v1.0.x).
 
 ## [1.0.6] - 2026-05-10
 

@@ -69,8 +69,9 @@ des 9 phases.
 | 9e | Lettres PC + "PRESS SPACE" + attente input | `phase9e-done` / `v1.0.4` |
 | 9f | FX_THRUST + FX_LIFE (6 effets sons total) | `phase9f-done` / `v1.0.5` |
 | 9g | Fix bug XOR sommets partagés (ship/lettres/asteroids/UFO) | `phase9g-done` / `v1.0.6` |
+| 10a | Shapes asteroids ATARI ARCADE rev 4 authentiques | `phase10a-done` / `v1.1.0` |
 
-## Différé Phase 10
+## Différé Phase 10b+
 
 - Persistance high scores en `.tap` ou `.dsk` (driver cassette résident).
 - Image `.dsk` Microdisc avec sauvegarde native.

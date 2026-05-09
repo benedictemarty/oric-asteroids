@@ -1,37 +1,77 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-gen_shapes.py — Génère src/asm/shapes.s : 4 formes d'astéroïdes × 3 tailles.
+gen_shapes.py — Génère src/asm/shapes.s : 4 shapes asteroids ATARI ARCADE rev 4.
 
-Chaque astéroïde est un polygone fermé de 8 sommets stockés sous forme
-de coordonnées signées 8-bit (∆ par rapport au centre).
+Source des shapes : 6502disassembly.com/va-asteroids/Asteroids.html
+- AstPtrnPtrTbl à $51DE pointe vers 4 shapes : $51E6, $51FE, $521A, $5234.
+- Format DVG SVEC (Short VECTOR) : déplacements relatifs cumulés.
+- Décodage manuel des SVEC depuis les commentaires du désassemblage.
 
-Tables flat indexées par : (size * 4 + shape) * 8 + vertex
-  _shape_x[96] : composantes X (12 polygones × 8 sommets)
-  _shape_y[96] : composantes Y
-  _shape_radii[3] : rayon de collision par taille (Phase 5)
+Notre format Oric impose 8 sommets fixes par shape (cohérent avec
+asteroid_draw_one). Les shapes Atari ont 11-13 sommets ; on **décime**
+en gardant 8 sommets représentatifs équirépartis.
 
-Tailles (rayon de base) : petit=5, moyen=9, grand=14.
-Total RODATA : 96 + 96 + 3 = 195 octets.
+Échelle Oric :
+- grand : ×2.5 → max ~14 px (rayon visuel)
+- moyen : ×1.6 → max ~9 px
+- petit : ×0.9 → max ~5 px
+
+Phase 10a — portage authentique des shapes arcade.
 """
 
 import math
 
-# 4 formes via perturbations radiales (8 sommets : 0°, 45°, ..., 315°)
-PERTURB = [
-    [1.00, 0.85, 1.00, 1.00, 0.85, 1.00, 1.00, 0.85],   # forme 0 — rocheuse
-    [1.10, 1.00, 0.80, 1.00, 1.10, 1.00, 0.80, 1.00],   # forme 1 — diamant
-    [0.90, 1.20, 0.90, 1.10, 0.90, 1.20, 0.90, 1.10],   # forme 2 — étoile 4
-    [1.00, 0.95, 1.05, 0.85, 1.05, 0.95, 1.00, 1.10],   # forme 3 — irrégulière
+# Sommets cumulés (en unités DVG arcade) — décodés depuis les SVEC
+# Origine = (0, 0) au centre de l'asteroid.
+
+# Shape 0 (rev 4, $51E6 — 11 sommets) — décimé à 8
+ATARI_SHAPE_0 = [
+    (1, 2), (2, 1), (1, -1), (-1, -5),
+    (-4, -5), (-5, -2), (-4, -1), (-3, -2),
 ]
 
-SIZES = [5, 9, 14]
+# Shape 1 (rev 4, $51FE — 13 sommets) — décimé à 8
+ATARI_SHAPE_1 = [
+    (2, 1), (4, 2), (1, 2), (-1, 3),
+    (-1, 0), (-1, -3), (3, -3), (5, 0),
+]
+
+# Shape 2 (rev 4, $521A — 12 sommets) — décimé à 8
+ATARI_SHAPE_2 = [
+    (-1, 0), (-3, -1), (-1, -4), (2, -4),
+    (4, 0), (2, 3), (-1, 3), (-4, 0),
+]
+
+# Shape 3 (rev 4, $5234 — 13 sommets) — décimé à 8
+ATARI_SHAPE_3 = [
+    (1, 0), (4, 2), (1, 4), (-2, 4),
+    (-4, 2), (-4, -1), (-2, -4), (3, -3),
+]
+
+ATARI_SHAPES = [ATARI_SHAPE_0, ATARI_SHAPE_1, ATARI_SHAPE_2, ATARI_SHAPE_3]
+
+# Échelles pour les 3 tailles Oric (pour atteindre rayons visuels 14/9/5)
+# Les magnitudes Atari max ≈ 5 unités, donc ×2.5 → ~12.5 px
+SCALES = [0.9, 1.6, 2.6]   # petit, moyen, grand
+SIZES_TARGET = [5, 9, 14]   # rayons visuels cibles (info)
 N_VERTS = 8
 N_SHAPES = 4
 N_SIZES = 3
 
-# Rayons de collision (Phase 5) : ~0.85 × rayon visuel
-RADII = [round(s * 0.85) for s in SIZES]
+# Rayons de collision (Phase 5) : max distance origine-sommet à chaque taille
+def compute_radii():
+    radii = []
+    for size_id in range(N_SIZES):
+        max_r = 0
+        s = SCALES[size_id]
+        for shape in ATARI_SHAPES:
+            for (x, y) in shape:
+                d = max(abs(x), abs(y)) * s
+                if d > max_r:
+                    max_r = d
+        radii.append(int(round(max_r)))
+    return radii
 
 
 def to_byte(v):
@@ -40,29 +80,29 @@ def to_byte(v):
 
 
 def main():
+    radii = compute_radii()
     print("; ===============================================================")
     print("; shapes.s — auto-généré par tools/gen_shapes.py")
-    print("; NE PAS ÉDITER MANUELLEMENT — régénérer avec : make gen_shapes")
+    print("; PORTAGE ATARI ARCADE rev 4 (Phase 10a)")
+    print("; Source : 6502disassembly.com/va-asteroids/Asteroids.html")
+    print(";          AstPtrnPtrTbl → 4 shapes ($51E6, $51FE, $521A, $5234)")
     print("; ===============================================================")
-    print("; 4 formes × 3 tailles × 8 sommets, polygones fermés.")
+    print("; 4 shapes Atari × 3 tailles × 8 sommets (décimés depuis 11-13).")
     print("; Index : (size * 4 + shape) * 8 + vertex")
-    print(f"; Tailles : {SIZES}  Rayons collision : {RADII}")
+    print(f"; Échelles : {SCALES}  Rayons collision : {radii}")
     print()
     print('        .segment "RODATA"')
     print()
     print("        .export _shape_x, _shape_y, _shape_radii")
     print()
 
-    xs = []
-    ys = []
+    xs, ys = [], []
     for size_id in range(N_SIZES):
-        for shape_id in range(N_SHAPES):
-            r = SIZES[size_id]
-            for i in range(N_VERTS):
-                theta = 2.0 * math.pi * i / N_VERTS
-                rr = r * PERTURB[shape_id][i]
-                xs.append(to_byte(round(rr * math.cos(theta))))
-                ys.append(to_byte(round(rr * math.sin(theta))))
+        scale = SCALES[size_id]
+        for shape in ATARI_SHAPES:
+            for (x, y) in shape:
+                xs.append(to_byte(int(round(x * scale))))
+                ys.append(to_byte(int(round(y * scale))))
 
     def emit(name, vals):
         print(f"{name}:  ; {len(vals)} octets, index = (size*4+shape)*8 + vertex")
@@ -75,7 +115,7 @@ def main():
     emit("_shape_y", ys)
 
     print("_shape_radii:  ; rayon collision par taille (Phase 5)")
-    print("        .byte " + ", ".join(str(r) for r in RADII))
+    print("        .byte " + ", ".join(str(r) for r in radii))
 
 
 if __name__ == "__main__":
