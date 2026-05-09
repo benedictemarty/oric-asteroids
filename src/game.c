@@ -86,12 +86,19 @@ static const unsigned int score_by_size[3] = { 100, 50, 20 };
 #define UFO_SCORE_SMALL     1000U
 
 #define VIA_ACR         (*(volatile unsigned char*)0x030B)
+#define VIA_PCR         (*(volatile unsigned char*)0x030C)
 #define VIA_IFR         (*(volatile unsigned char*)0x030D)
 #define VIA_IER         (*(volatile unsigned char*)0x030E)
 #define VIA_T1CL        (*(volatile unsigned char*)0x0304)
 #define VIA_T1CH        (*(volatile unsigned char*)0x0305)
 #define FRAME_LO        0x3F
 #define FRAME_HI        0x9C
+
+/* Phase 9 — synchro VSync ULA via CB1.
+ * Sur Oric-1, CB1 est connecté au signal VSync de l'ULA (50 Hz PAL).
+ * IFR bit 4 = flag CB1, set sur transition. À 25 Hz = 2 VSync par frame. */
+#define VSYNC_FLAG      0x10        /* IFR bit 4 = CB1 */
+#define VSYNCS_PER_FRAME 2          /* 50 Hz / 2 = 25 Hz */
 
 /* ------------------------------------------------------------------ */
 /* État local                                                          */
@@ -148,17 +155,26 @@ static unsigned char collide(unsigned char x1, unsigned char y1,
 
 static void timer_init(void)
 {
-    VIA_ACR = VIA_ACR & 0x3F;
-    VIA_IER = 0x40;
-    VIA_IFR = 0x40;
+    /* Phase 9 : VSync ULA via CB1 (preferé, anti-tearing).
+     * On laisse PCR tel que la ROM le configure (CB1 = falling edge,
+     * géré par la ROM IRQ). Désactivons l'IRQ CB1 pour pouvoir poll
+     * IFR sans rejet. */
+    VIA_ACR = VIA_ACR & 0x3F;       /* Timer 1 one-shot (au cas où fallback) */
+    VIA_IER = 0x40;                  /* Disable T1 IRQ */
+    VIA_IFR = 0x50;                  /* Clear T1 + CB1 flags initialement */
 }
 
 static void frame_wait(void)
 {
-    VIA_T1CL = FRAME_LO;
-    VIA_T1CH = FRAME_HI;
-    while (!(VIA_IFR & 0x40)) { }
-    (void)VIA_T1CL;
+    /* Attendre VSYNCS_PER_FRAME transitions CB1 (= 2 VSync = 25 Hz).
+     * Le flag CB1 est partagé avec la ROM IRQ : la ROM le clear dans
+     * son handler. Pour un polling fiable, on clear nous-mêmes après
+     * chaque attente. */
+    unsigned char i;
+    for (i = 0; i < VSYNCS_PER_FRAME; i++) {
+        while (!(VIA_IFR & VSYNC_FLAG)) { }
+        VIA_IFR = VSYNC_FLAG;        /* clear par écriture du bit */
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -407,30 +423,14 @@ static void hiscores_insert(unsigned int final_score)
     }
 }
 
-/* Dessine en XOR un score 5-chiffres à (px, py) — réutilise la
- * décomposition par soustraction (cohérent avec hud.c).
- * Format : 4×6 px par chiffre, 6 px d'espacement. */
-static void draw_5digit_xor(unsigned int s, unsigned char px, unsigned char py)
-{
-    /* On délègue au HUD : appel répété de hud_draw n'est pas adapté.
-     * À la place on utilise plot() pour 7-seg manuel, mais c'est lourd.
-     * Pour Phase 7, on dessine simplement comme un score HUD : tracer
-     * 5 lignes horizontales = visualisation grossière du score. */
-    unsigned char tens = (s > 1000) ? 24 : (s > 100) ? 16 :
-                         (s > 10)   ? 8  : 4;
-    plot(px, py);
-    plot(px + tens, py);
-    plot(px, py + 2);
-    plot(px + tens, py + 2);
-}
-
-/* Dessine la liste des high scores en game over (centre écran) */
+/* Dessine la table des high scores en game over (centre écran).
+ * Phase 9 : utilise hud_xor_5digits (rendu 7-seg propre). */
 static void hiscores_draw_table(void)
 {
     unsigned char i, py;
     for (i = 0; i < HISCORE_COUNT; i++) {
-        py = 60 + i * 12;
-        draw_5digit_xor(hiscores[i], 100, py);
+        py = 70 + i * 14;
+        hud_xor_5digits(hiscores[i], 105, py);
     }
 }
 

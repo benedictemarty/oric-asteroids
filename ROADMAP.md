@@ -18,7 +18,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 6 | Soucoupe grande/petite + IA tir 8-way / ship-tracking + spawn cyclique | 1 sem. | 2 sem. |
 | ✅ | 7 | Hyperespace + restart + high scores top 5 (RAM) | 1 sem. | 2 sem. |
 | ✅ | 8 | Son AY-3-8912 : tir + explosion + thump cadencé sur asteroids_count | 1 sem. | 3 sem. |
-| 🔜 | 9 | VSync ULA + polish + `.dsk` final + persistance high scores | 1 sem. | 2 sem. |
+| ✅ | 9 | VSync ULA via CB1 + polish hiscores + README (v1.0.0) | 1 sem. | 2 sem. |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.
@@ -221,13 +221,21 @@ si la rangée 4 ne suffit pas (ex: ESC pour pause).
 - Enveloppe AY (registres 11-13) au lieu de cut net.
 - Mix multi-canaux (thump continu sur B + tirs/explosions sur A).
 
-### Phase 9 — Polish + `.dsk` final
+### Phase 9 — VSync ULA + polish + README ✅
 
-**Définition de fin** :
-- Bascule sur le vrai signal VSync ULA, mesure absence de tearing.
-- Image `.dsk` Microdisc avec sauvegarde high scores native.
-- README + manuel jeu utilisateur.
-- Pack final `.tap` + `.dsk` + sources sous tag `v1.0.0`.
+**Définition de fin validée (2026-05-10)** :
+- Bascule sur signal VSync ULA via CB1 (IFR bit 4), polling 2 fois
+  par frame de jeu (50 Hz / 2 = 25 Hz). Élimine le drift Timer 1.
+- Rendu propre de la table des high scores en game over (réutilise
+  `draw_score` via API publique `hud_xor_5digits`).
+- README.md complet : build, run, touches, architecture, phases.
+- `v1.0.0` taggué.
+
+**Hors scope Phase 9 (reporté Phase 9b/10)** :
+- Persistance high scores en `.tap` ou `.dsk` (driver cassette résident).
+- Image `.dsk` Microdisc finale (besoin tap2dsk + driver).
+- Écran titre vectoriel (font alphanumérique ~26 lettres).
+- Saisie initiales 3 lettres au clavier (sans alphabet en font 7-seg).
 
 ---
 

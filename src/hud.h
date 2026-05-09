@@ -20,5 +20,8 @@ void hud_draw(void);
 void hud_add_score(unsigned int delta);
 /* Décrémente une vie ; passe à gameover=1 si lives atteint 0. */
 void hud_lose_life(void);
+/* Phase 9 — dessine un score 5 chiffres à (px, py) en XOR (réutilisé
+ * pour la table des high scores en game over). */
+void hud_xor_5digits(unsigned int s, unsigned char px, unsigned char py);
 
 #endif /* HUD_H */

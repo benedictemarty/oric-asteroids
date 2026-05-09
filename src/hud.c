@@ -80,6 +80,8 @@ static void draw_digit(unsigned char d, unsigned char px, unsigned char py)
     if (m & 0x01) line(px, py + D_HM, px + D_W, py + D_HM);
 }
 
+void hud_xor_5digits(unsigned int s, unsigned char px, unsigned char py);
+
 /* Tracer un score 5 chiffres (avec zéros à gauche) à (px, py) en XOR */
 static void draw_score(unsigned int s, unsigned char px, unsigned char py)
 {
@@ -168,4 +170,10 @@ void hud_lose_life(void)
     }
     lives--;
     if (lives == 0) gameover = 1;
+}
+
+/* Wrapper public exporté pour réutiliser draw_score (table hi-scores) */
+void hud_xor_5digits(unsigned int s, unsigned char px, unsigned char py)
+{
+    draw_score(s, px, py);
 }

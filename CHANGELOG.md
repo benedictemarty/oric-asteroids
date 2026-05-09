@@ -7,7 +7,77 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir : Phase 9 (synchro VSync ULA + polish + .dsk final + persistance high scores).
+Différé Phase 9b/10 :
+- Persistance high scores en `.tap` (driver cassette résident, lecture initiales).
+- Image `.dsk` Microdisc finale.
+- Écran titre vectoriel (lettres "ASTEROIDS" en segments).
+- Effets sons manquants (thrust continu, UFO, hyperespace, enveloppe AY).
+
+## [1.0.0] - 2026-05-10
+
+### Phase 9 — VSync ULA + polish + README ✅
+
+**Définition de fin validée :**
+- Synchro frame via **VSync ULA** (CB1 du VIA 6522, IFR bit 4) au lieu
+  de Timer 1 polling. La ROM Oric configure CB1 pour son IRQ VSync ;
+  on poll le flag IFR sans installer de handler IRQ. À 25 Hz =
+  2 transitions CB1 par frame de jeu (`VSYNCS_PER_FRAME = 2`).
+- Élimine le risque de tearing du Timer 1 (drift cumulatif).
+- Rendu propre des high scores en game over : réutilise `draw_score`
+  du HUD via la nouvelle API `hud_xor_5digits(s, px, py)`. Position
+  centrale (105, 70 + i*14) pour chaque ligne.
+- README.md complet (build, run, touches, architecture, phases livrées,
+  crédits).
+- `make check` PASS, capture identique sur 3 runs.
+
+### Added
+
+- `src/hud.h` : prototype public `hud_xor_5digits(s, px, py)`.
+- `src/hud.c` : wrapper public exporté autour de `draw_score` (interne).
+- `README.md` — manuel utilisateur + build + crédits.
+- `tests/ref/phase9_release.ppm` — capture finale.
+
+### Changed
+
+- `src/game.c` :
+  - `frame_wait` : remplace polling Timer 1 IFR ($40) par polling
+    CB1 IFR ($10), boucle 2 fois (50 Hz / 2 = 25 Hz).
+  - `timer_init` : clear T1+CB1 flags initiaux, garde Timer 1 désactivé
+    en repli (au cas où VSync absent — non testé en Phase 9).
+  - `hiscores_draw_table` : appelle `hud_xor_5digits` (rendu 7-seg
+    propre), placeholder `draw_5digit_xor` supprimé.
+- `Makefile` : capture/référence renommées `phase9_release.ppm`.
+
+### Décisions techniques Phase 9
+
+- **VSync ULA via polling IFR** plutôt que handler IRQ : simplifie
+  drastiquement le code (pas de vector remap, pas de save/restore
+  de contexte). Le polling consomme quelques cycles inutiles mais
+  c'est négligeable vs le coût du rendu (~75 000 cycles/frame).
+- **Pas de `.dsk` final ni persistance high scores en Phase 9** :
+  ces deux éléments demandent un driver cassette/disque résident
+  dans le binaire (~1-2 Ko de code asm + bin2dsk). Reportés à
+  Phase 9b ou Phase 10.
+- **Pas d'écran titre vectoriel** : nécessite une font alphanumérique
+  de ~26 lettres × 5 segments chacune (~130 segments hardcodés en
+  RODATA). Reporté à Phase 9b. Le jeu démarre directement, le HUD
+  vide indique implicitement l'état "pré-jeu".
+- **`hud_xor_5digits` exposé** : permet de réutiliser le rendu
+  7-segments du HUD pour la table des high scores. Évite la
+  duplication d'une `font_digits` séparée.
+
+### Tag
+
+`v1.0.0` — premier release stable. 9 phases livrées sur 9 prévues.
+
+### Statistiques finales
+
+- **2666 lignes** de code (asm + C + Python).
+- **10464 octets** de binaire (sur 38 Ko utiles disponibles, soit ~28%).
+- **9 tags** `phase{1..9}-done` + `v1.0.0`.
+- **9 captures de référence** (1 par phase, validées par `make check`).
+- **2 générateurs Python** : `gen_ship.py` (32 angles), `gen_shapes.py`
+  (4 formes × 3 tailles).
 
 ## [0.9.0] - 2026-05-10
 

@@ -41,8 +41,8 @@ TAP       = $(BUILD)/$(PROJECT).tap
 FASTLOAD_DONE  = 3500000
 TIME_AFTER     = 4000000
 TEST_CYCLES    = $(shell echo $$(($(FASTLOAD_DONE) + $(TIME_AFTER))))
-SCREENSHOT     = tests/out/phase8_sound.ppm
-REF_SHOT       = tests/ref/phase8_sound.ppm
+SCREENSHOT     = tests/out/phase9_release.ppm
+REF_SHOT       = tests/ref/phase9_release.ppm
 BENCH_CYCLES   = $(shell echo $$(($(FASTLOAD_DONE) + 25000000)))
 BENCH_PROF     = tests/out/phase6_bench.prof
 
