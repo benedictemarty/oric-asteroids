@@ -109,6 +109,24 @@ static const unsigned char letter_V[] = {
     0xFF
 };
 
+/* Phase 9e — lettres pour "PRESS SPACE" */
+
+static const unsigned char letter_P[] = {
+    0, 0, 0, 9,         /* verticale gauche */
+    0, 0, 6, 0,         /* haut */
+    6, 0, 8, 2,         /* coin haut-droit */
+    8, 2, 8, 4,         /* descente courte */
+    8, 4, 0, 5,         /* fermeture boucle */
+    0xFF
+};
+
+static const unsigned char letter_C[] = {
+    8, 1, 0, 1,         /* haut */
+    0, 1, 0, 9,         /* gauche */
+    0, 9, 8, 9,         /* bas (peu courant pour C mais ok) */
+    0xFF
+};
+
 static void draw_letter(const unsigned char *segs,
                         unsigned char ox, unsigned char oy)
 {
@@ -166,4 +184,27 @@ void gameover_draw(void)
 void gameover_erase(void)
 {
     gameover_draw();
+}
+
+/* Dessine "PRESS SPACE" centré en y=70 ou param py.
+ * 11 caractères × 12 = 132 → x = (240 - 132) / 2 = 54. */
+void presspace_draw(unsigned char py)
+{
+    unsigned char x = 54;
+    draw_letter(letter_P, x +   0, py);
+    draw_letter(letter_R, x +  12, py);
+    draw_letter(letter_E, x +  24, py);
+    draw_letter(letter_S, x +  36, py);
+    draw_letter(letter_S, x +  48, py);
+    /* (espace) */
+    draw_letter(letter_S, x +  72, py);
+    draw_letter(letter_P, x +  84, py);
+    draw_letter(letter_A, x +  96, py);
+    draw_letter(letter_C, x + 108, py);
+    draw_letter(letter_E, x + 120, py);
+}
+
+void presspace_erase(unsigned char py)
+{
+    presspace_draw(py);
 }

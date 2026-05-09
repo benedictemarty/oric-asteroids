@@ -66,6 +66,7 @@ des 9 phases.
 | 9b | Fix bug BSS (initlib cc65) + FX_HYPER | `phase9b-done` / `v1.0.1` |
 | 9c | Écran titre "ASTEROIDS" vectoriel 9 lettres | `phase9c-done` / `v1.0.2` |
 | 9d | Lettres GMV + écran "GAME OVER" | `phase9d-done` / `v1.0.3` |
+| 9e | Lettres PC + "PRESS SPACE" + attente input | `phase9e-done` / `v1.0.4` |
 
 ## Différé Phase 10
 

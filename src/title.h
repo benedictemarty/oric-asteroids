@@ -9,5 +9,7 @@ void title_draw(void);
 void title_erase(void);
 void gameover_draw(void);
 void gameover_erase(void);
+void presspace_draw(unsigned char py);
+void presspace_erase(unsigned char py);
 
 #endif /* TITLE_H */

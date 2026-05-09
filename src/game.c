@@ -488,12 +488,21 @@ void game_run(void)
     timer_init();
     sound_init();
 
-    /* Phase 9c — écran titre 2 secondes (50 frames @ 25 Hz) */
+    /* Phase 9c/9e — écran titre : "ASTEROIDS" + "PRESS SPACE",
+     * attendre la touche SPACE (ou auto-start après 200 frames). */
     title_draw();
+    presspace_draw(110);
     {
         unsigned char i;
-        for (i = 0; i < 50; i++) frame_wait();
+        unsigned char prev_space = 0;
+        for (i = 0; i < 200; i++) {
+            key_scan();
+            if ((key_state & 0x08) && !prev_space) break;
+            prev_space = key_state & 0x08;
+            frame_wait();
+        }
     }
+    presspace_erase(110);
     title_erase();
 
     ship_init();
@@ -524,6 +533,7 @@ void game_run(void)
         }
         if (gameover && gameover_text_drawn) {
             gameover_erase();
+            presspace_erase(140);
         }
 
         /* Restart : SPACE en game over */
@@ -616,6 +626,7 @@ void game_run(void)
             hiscores_draw_table();
             hiscores_drawn = 1;
             gameover_draw();
+            presspace_draw(140);
             gameover_text_drawn = 1;
         }
 

@@ -11,8 +11,55 @@ Différé Phase 10 :
 - Persistance high scores en `.tap` (driver cassette résident, saisie initiales).
 - Image `.dsk` Microdisc finale.
 - Effets sons manquants : thrust continu, UFO oscillant, enveloppe AY.
-- Écran "PRESS SPACE" (besoin de lettres P et C en plus).
 - Démo passive en écran titre (asteroids tournent en arrière-plan).
+- Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.0.4] - 2026-05-10
+
+### Phase 9e — Lettres PC + "PRESS SPACE" + attente input ✅
+
+**Définition de fin validée :**
+- 2 nouvelles lettres : `P` (5 segs), `C` (3 segs).
+- `presspace_draw(py)` : "PRESS SPACE" centré horizontal (x=54),
+  position y paramétrable. 11 caractères × 12 = 132 px de large.
+  10 lettres dessinées (5 lettres dans "PRESS" + 5 dans "SPACE",
+  espace en x+60).
+- **Écran titre interactif** : affiche "ASTEROIDS" + "PRESS SPACE"
+  à y=80 et y=110. Attend SPACE (edge-trigger) ou auto-start après
+  200 frames (~8 s). Démarre le jeu sur appui SPACE.
+- **Écran game over enrichi** : "GAME OVER" (y=70) + "PRESS SPACE"
+  (y=140) + table high scores. Restart sur SPACE.
+- 11 lettres alphabétiques au total : `A C D E G I M O P R S T V`
+  + espace.
+- `make check` PASS sur la nouvelle référence (capture pendant titre
+  avec "PRESS SPACE" affiché).
+
+### Added
+
+- `src/title.c` : `letter_P`, `letter_C` (~8 segments),
+  `presspace_draw(py)`, `presspace_erase(py)`.
+- `src/title.h` : prototypes correspondants.
+- `src/game.c` :
+  - Boucle d'attente input dans l'écran titre (SPACE ou timeout 200 frames).
+  - `presspace_draw(140)` en game over, `presspace_erase` au restart.
+
+### Changed
+
+- `tests/ref/phase9_release.ppm` : capture maintenant prise pendant
+  l'écran titre (cohérent avec le flow démarrage UX).
+
+### Décisions techniques Phase 9e
+
+- **Auto-start après 8 s** plutôt qu'attente infinie : si Phosphoric
+  est lancé sans interaction (CI), le jeu démarre quand même. Acceptable
+  vs un écran titre éternel qui bloquerait les tests automatiques.
+- **`PRESS SPACE` paramétré par py** : permet un placement à 110 (titre)
+  et 140 (game over) sans dupliquer la fonction.
+- **Lettres `P` et `C` minimalistes** : `C` n'est qu'un cadre 3 côtés
+  (ouvert à droite), pas de courbe. `P` est un `R` sans la jambe
+  (boucle haute uniquement).
+- **Espace = saut de 24 px** dans `presspace_draw` (au lieu de 12) :
+  marque visuellement le séparateur entre "PRESS" et "SPACE".
 
 ## [1.0.3] - 2026-05-10
 
