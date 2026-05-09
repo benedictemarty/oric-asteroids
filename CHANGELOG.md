@@ -7,7 +7,78 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir : Phase 5 (collisions cercle-cercle, vies, score, HUD).
+À venir : Phase 6 (soucoupe grande/petite + IA de tir).
+
+## [0.6.0] - 2026-05-09
+
+### Phase 5 — Collisions + vies + score + HUD ✅
+
+**Définition de fin validée :**
+- Détection collision distance-L∞ (`abs_diff(x1,x2) ≤ r && abs_diff(y1,y2) ≤ r`,
+  ~10 cycles de vérif par paire) au lieu de la distance euclidienne :
+  + rapide en 6502 (pas de mul 8×8), -10% de précision géométrique acceptable.
+- Bullet vs asteroid : itération `4 × MAX_ASTEROIDS` ; sur impact, `bullet TTL=0`,
+  `asteroids_fragment(idx)`, `hud_add_score(score_by_size[size])`.
+- Ship vs asteroid : suspendu pendant `INVINCIBLE_FRAMES = 40` après respawn.
+- Scoring conforme arcade : grand=20, moyen=50, petit=100. Extra ship tous
+  les 10 000 pts (`HUD_EXTRA_BONUS`).
+- 3 vies de départ. Game over à 0 vies (boucle continue mais ship invisible
+  + inputs ignorés).
+- HUD : score 5 chiffres en 7-segments en haut-gauche (4×6 px chacun, ~6
+  segments allumés/chiffre, ~25 pixels-segments redessinés sur changement),
+  vies en mini-triangles haut-droite (3 segments × N).
+- Vague suivante : `asteroids_count() == 0` → `asteroids_spawn_wave()`.
+- `make check` PASS, capture identique sur 3 runs.
+
+### Added
+
+- `src/hud.h` + `src/hud.c` :
+  - Table `digit_segs[10]` (10 octets RODATA) — bitmask 7-segments par chiffre.
+  - `draw_digit`, `draw_score`, `draw_lives` (XOR via `draw_line_xor`).
+  - `hud_init`, `hud_draw` (redraw conditionnel sur changement),
+    `hud_add_score` (auto-detect bonus 10 000), `hud_lose_life`.
+  - Variables exposées : `score`, `score_extra`, `lives`, `gameover`.
+- `tests/ref/phase5_play.ppm` — capture (vaisseau centre, 4 grands aux
+  coins, "00000" haut-gauche, 3 mini-vaisseaux haut-droite).
+
+### Changed
+
+- `src/game.c` :
+  - `collisions_bullets_asteroids` + `collisions_ship_asteroids` (helper
+    `collide` distance-L∞).
+  - `ship_respawn` (centre, immobile, angle 0, `ship_invincible = 40`).
+  - `check_next_wave` (respawn 4 grands quand 0 actifs).
+  - Boucle : input/update ignorés en `gameover`; ship clignote pendant
+    invincibilité (visible si bit 1 du timer set, soit ~2 frames on/off).
+- `Makefile` — ajout `src/hud.c`, capture/référence renommées
+  `phase5_play.ppm`.
+
+### Fixed
+
+- `hud_draw` : bug de premier dessin. `score == score_shown == 0` ne
+  déclenchait jamais `draw_score` au démarrage. Ajout d'un flag
+  `hud_first_frame` pour forcer le dessin initial.
+
+### Décisions techniques Phase 5
+
+- **Distance L∞** plutôt qu'euclidienne : pas de multiplication 8×8 nécessaire.
+  Le rectangle englobant donne une fausse détection de coin (~21% surface
+  excédentaire) — négligeable au regard de la grande différence ship-radius
+  vs asteroid-radius.
+- **Score 7-segments** vs font bitmap : 7 lignes XOR par chiffre (réutilise
+  `draw_line_xor`), pas de table de glyphes. Cohérent avec l'esthétique
+  vectorielle Atari arcade.
+- **Redraw conditionnel** du HUD : le score change rarement (à chaque tir
+  réussi), le redraw permanent gaspillerait ~50 segments × 5 px × 97 c/px
+  × 2 = ~50 000 cycles/frame. Avec redraw conditionnel : 0 cycles HUD la
+  plupart des frames.
+- **Décomposition score par soustraction** plutôt que division en C :
+  cc65 implémente `unsigned int / 10` en routine logicielle (~150 cycles).
+  La boucle `while (t >= 10000) t -= 10000; d++;` est plus rapide pour
+  des valeurs typiques < 6 chiffres.
+- **Invincibilité respawn 40 frames** (~2.4 s à 17 Hz observés) : laisse
+  au joueur le temps de s'orienter. Clignotement bit 1 du timer
+  (cycles de 4 frames on/off).
 
 ## [0.5.0] - 2026-05-09
 

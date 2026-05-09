@@ -14,8 +14,8 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 2 | Bresenham XOR + benchmark (97 c/px, 25 Hz acté) | 2 sem. | 4–6 sem. |
 | ✅ | 3 | Vaisseau rotatif (32 angles) + tirs + scan clavier VIA direct | 2 sem. | 3 sem. |
 | ✅ | 4 | Astéroïdes (4 formes × 3 tailles, mouvement, fragmentation, wraparound safe) | 2 sem. | 3 sem. |
-| 🔜 | 5 | Collisions + gestion vies/score | 1 sem. | 2 sem. |
-| ⏳ | 6 | Soucoupe (grande/petite) + IA de tir | 1 sem. | 2 sem. |
+| ✅ | 5 | Collisions L∞ + score 7-seg + vies + HUD + respawn invincible | 1 sem. | 2 sem. |
+| 🔜 | 6 | Soucoupe (grande/petite) + IA de tir | 1 sem. | 2 sem. |
 | ⏳ | 7 | Hyperespace + écran titre + high scores | 1 sem. | 2 sem. |
 | ⏳ | 8 | Son AY‑3‑8912 (effets + thump) | 1 sem. | 3 sem. |
 | ⏳ | 9 | Synchro VSync « propre » + polish + `.dsk` final | 1 sem. | 2 sem. |
@@ -117,15 +117,32 @@ si la rangée 4 ne suffit pas (ex: ESC pour pause).
 - Extraction des shapes Atari authentiques (Nick Mikstas) en remplacement
   des octogones génériques actuels.
 
-### Phase 5 — Collisions + vies + score
+### Phase 5 — Collisions + vies + score ✅
 
-**Définition de fin** :
-- Détection collision cercle‑cercle 8 bits signé en asm.
-- Tir vs astéroïde, tir vs soucoupe, vaisseau vs astéroïde, vaisseau vs soucoupe.
-- Scoring conforme à l'arcade : 20/50/100 pour grand/moyen/petit,
-  200/1000 pour soucoupe grande/petite.
-- 3 vies de départ, ship extra à 10 000 pts.
-- Affichage HUD score + vies en HIRES.
+**Définition de fin validée (2026-05-09)** :
+- Détection collision distance-L∞ (`max(|∆x|,|∆y|) ≤ rsum`) en C : pas de
+  multiplication 8×8 requise, ~20 cycles par paire. Précision suffisante
+  pour gameplay arcade (faux-positifs aux coins ≤ 21%).
+- Bullet vs asteroid (itération `4 × 12 = 48` paires/frame max) : impact
+  → `asteroids_fragment(idx)` + `hud_add_score(20/50/100)`.
+- Ship vs asteroid : suspendu pendant `INVINCIBLE_FRAMES = 40` post-respawn.
+- Scoring conforme arcade : grand=20, moyen=50, petit=100. Extra ship
+  tous les 10 000 pts.
+- 3 vies de départ. Game over (lives=0) bloque inputs et ship invisible.
+- HUD : score 5 chiffres en 7-segments (`draw_line_xor` × 6 segments/chiffre)
+  haut-gauche ; vies en mini-triangles haut-droite. Redraw conditionnel
+  sur changement uniquement.
+- Vague suivante : `asteroids_count() == 0` → respawn 4 grands.
+
+**Bugs Phase 5 documentés** :
+- Premier rendu HUD : `score == score_shown == 0` n'entrait jamais dans
+  la branche redraw. Flag `hud_first_frame` ajouté pour forcer le dessin
+  initial.
+
+**Notes Phase 5** :
+- Tir vs soucoupe et vaisseau vs soucoupe = Phase 6 (la soucoupe
+  n'apparaît pas encore).
+- Score arcade soucoupe (200 grande / 1000 petite) sera ajouté en Phase 6.
 
 ### Phase 6 — Soucoupe + IA
 
