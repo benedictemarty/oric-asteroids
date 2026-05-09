@@ -10,8 +10,8 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 
 | Statut | Phase | Livrable | Optimiste | Réaliste |
 |---|---|---|---|---|
-| 🔜 | 1 | Squelette OSDK + HIRES + triangle statique | 1 sem. | 2 sem. |
-| ⏳ | 2 | Bresenham XOR optimisé + benchmark cycles + SMC | 2 sem. | 4–6 sem. |
+| ✅ | 1 | Squelette sans OSDK + HIRES + triangle statique | 1 sem. | 2 sem. |
+| 🔜 | 2 | Bresenham XOR optimisé + benchmark cycles + SMC | 2 sem. | 4–6 sem. |
 | ⏳ | 3 | Vaisseau rotatif + tirs + input clavier | 2 sem. | 3 sem. |
 | ⏳ | 4 | Astéroïdes (formes, mouvement, fragmentation, wraparound) | 2 sem. | 3 sem. |
 | ⏳ | 5 | Collisions + gestion vies/score | 1 sem. | 2 sem. |

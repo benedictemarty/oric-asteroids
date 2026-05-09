@@ -47,22 +47,34 @@ analogiques discrets arcade → AY‑3‑8912 Oric).
 
 ### Particularité du mode HIRES Oric
 
-Chaque ligne fait **40 octets** = 240 pixels (6 pixels par octet). Chaque octet est interprété
-selon son **bit 7**, qui agit comme **discriminateur** :
+Chaque ligne fait **40 octets** = 240 pixels (6 pixels par octet). Le type de chaque
+octet est déterminé par le test `(byte & 0x60) == 0` (bits 6 ET 5 tous deux à zéro) :
 
-- **bit 7 = 1** → octet pixel : bits 0–5 = 6 pixels (poids fort à gauche), **bit 6 = inverse vidéo**.
-- **bit 7 = 0** → octet d'attribut : modifie INK / PAPER pour la suite de la ligne ; ses 6 positions
-  pixels ne s'affichent **pas** comme pixels (couleur de fond visible à la place).
+- `(byte & 0x60) == 0` → **octet attribut** : modifie INK / PAPER pour la suite de la
+  ligne ; ses 6 positions ne s'affichent pas comme pixels (couleur de fond visible).
+- `(byte & 0x60) != 0` → **octet pixel** :
+  - **bit 7 = 1** → inverse vidéo (fg/bg échangés)
+  - **bits 5–0** → 6 pixels (bit 5 = gauche, bit 0 = droite)
+  - **bit 6** = « bit de sécurité » : doit être mis à 1 dès que les bits 5–0 valent tous
+    0, sinon le byte tomberait dans la catégorie attribut
 
 Cas du jeu — **fil de fer monochrome PAPER 0 / INK 7** :
-les attributs sont figés au boot dans la (ou les) première(s) colonne(s) de chaque ligne, puis
-**plus jamais touchés**. La routine de tracé n'écrit ensuite que des octets pixels (`ORA #$80`
-systématique sur l'octet final, ou bit 7 préposé dans la table de masques). Le « piège bit 7 »
-ne se déclenche pas pendant le gameplay.
+Phosphoric (et le vrai Oric) réinitialisent ink = BLANC / paper = NOIR au début de
+chaque scanline, donc **aucun octet attribut INK/PAPER n'est nécessaire**.
+La routine de tracé écrit uniquement des octets pixels avec **bit 6 = 1 toujours**
+(`ORA #$40` pour garantir la non‑attribution quand aucun bit pixel n'est allumé).
 
-**Conséquence sur la résolution utile** : 1 à 2 colonnes consommées par les attributs ⇒
-**~228 à 234 pixels horizontaux exploitables** pour la zone de jeu, à acter dans la conception
-des shapes et du wraparound.
+Pour déclencher le mode HIRES depuis le mode texte : écrire `0x1C`
+(= `0b00011100`, attribut de contrôle vidéo : vid_mode = 4) dans la zone texte
+(`$BB80`). `vid_mode` persiste ensuite de frame en frame sans réécriture.
+
+**Init HIRES** : remplir `$A000`–`$BF3F` (8 000 octets) avec **`0x40`** (octet pixel
+vierge, bit 6 = 1, aucun pixel allumé). **Ne pas utiliser `0x80`** : `(0x80 & 0x60) = 0`
+le classe comme attribut.
+
+**Conséquence sur la résolution utile** : si l'on utilise des colonnes d'attributs, 1 à
+2 colonnes sont consommées ⇒ **~228 à 234 px horizontaux exploitables**. Sans attributs
+(monochrome PAPER 0 / INK 7 par défaut), les **240 px sont disponibles**.
 
 ---
 

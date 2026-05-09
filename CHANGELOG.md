@@ -7,7 +7,40 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir : Phase 1 du roadmap (squelette OSDK + HIRES + triangle statique).
+À venir : Phase 2 (Bresenham XOR optimisé + benchmark cycles + SMC).
+
+## [0.2.0] - 2026-05-09
+
+### Phase 1 — Squelette sans OSDK + HIRES + triangle statique ✅
+
+**Définition de fin validée** : `make check` passe, 177 pixels blancs détectés,
+triangle visible autour de (120, 28) sur Phosphoric HIRES 240×200.
+
+### Added
+
+- `cfg/oric1.cfg` — configuration linker ld65 pour Oric-1 (RAM à $0500,
+  ZP à $80, pile C à $9FFF).
+- `src/asm/crt0.s` — startup bare-metal cc65 / ld65 (stack matériel + logiciel,
+  effacement BSS, appel `_main`, boucle infinie au retour).
+- `src/main.c` — init HIRES + triangle statique (vaisseau Asteroids).
+- `Makefile` — build cc65+ld65+bin2tap, sans OSDK ; cibles `all`, `run`,
+  `test`, `ref`, `check`, `clean`.
+- `tests/ref/phase1_triangle.ppm` — capture de référence Phosphoric headless
+  (6M cycles, CALL 1280 à 3,5M cycles).
+
+### Changed
+
+- Correction guide §2 et CLAUDE.md HIRES : discriminateur réel
+  `(byte & 0x60) == 0` (bits 6 ET 5 à 0 = attribut), bit 7 = inverse vidéo,
+  init HIRES = `0x40` (jamais `0x80` qui serait classé attribut).
+
+### Technical notes
+
+- Chaîne sans OSDK : `cc65 -t none` → `ca65` → `ld65 -C cfg/oric1.cfg`
+  → `bin2tap` (outil Phosphoric).
+- Fast load Phosphoric : injection différée à ~3M cycles (après RAM test
+  BASIC 1.0) ; exécution via `--type-keys 3500000:CALL 1280\n`.
+- HIRES init : `0x1C` à `$BB80` (vid_mode=4, persiste), HIRES rempli `0x40`.
 
 ## [0.1.0] - 2026-05-09
 

@@ -26,9 +26,13 @@ Phase de cadrage. Le dépôt ne contient pour l'instant qu'un seul document : `a
 
 ### Mode HIRES Oric (cf. §2 du guide)
 - 240 × 200 monochrome, **40 octets/ligne, 6 pixels/octet**, mémoire écran à `$A000–$BF3F`.
-- **Bit 7 = discriminateur** : 1 → octet pixel (bits 0‑5 = pixels, bit 6 = inverse vidéo) ; 0 → octet d'attribut (modifie INK/PAPER pour la suite de la ligne, ne s'affiche pas comme pixel).
-- Cas du jeu (monochrome PAPER 0 / INK 7) : attributs **figés au boot** dans la première colonne, puis jamais retouchés. Les écritures pendant le gameplay ont **toutes bit 7 = 1** (`ORA #$80` final ou bit pré‑posé en table de masques).
-- Résolution utile réelle : **~228–234 px** horizontaux après colonnes d'attributs.
+- **Discriminateur pixel/attribut** : `(byte & 0x60) == 0` (bits 6 ET 5 tous deux à 0) → attribut ; sinon → pixel.
+  - Attribut : modifie INK/PAPER, ne s'affiche pas en pixels.
+  - Pixel : bit 7 = 1 → inverse vidéo ; bits 5‑0 → 6 pixels (bit 5 = gauche).
+  - **bit 6 = bit de sécurité** : toujours mettre à 1 dans les octets pixel (`ORA #$40`) pour éviter la détection attribut quand aucun bit pixel n'est allumé.
+- Cas du jeu (monochrome PAPER 0 / INK 7) : Phosphoric réinitialise ink=BLANC/paper=NOIR à chaque scanline → **aucun attribut INK/PAPER nécessaire**. Écriture de pixels uniquement avec bit 6 = 1 (`ORA #$40`).
+- **Init HIRES** : écrire `0x1C` à `$BB80` (attribut video mode = 4 → HIRES, persist entre frames), puis remplir `$A000`–`$BF3F` avec **`0x40`** (JAMAIS `0x80` — `(0x80 & 0x60) = 0` serait classé attribut).
+- Résolution utile : **240 px** en monochrome sans attributs par ligne.
 
 ### Carte mémoire (cf. §6)
 - Page zéro `$00–$FF` : pointeurs et indices critiques.
