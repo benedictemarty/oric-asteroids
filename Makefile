@@ -14,11 +14,12 @@ CFG       = cfg/oric1.cfg
 BUILD     = build
 
 SRCS_C    = src/main.c
-SRCS_ASM  = src/asm/crt0.s
+SRCS_ASM  = src/asm/crt0.s src/asm/line.s
 
 OBJ_CRT0  = $(BUILD)/crt0.o
+OBJ_LINE  = $(BUILD)/line.o
 OBJ_MAIN  = $(BUILD)/main.o
-OBJS      = $(OBJ_CRT0) $(OBJ_MAIN)
+OBJS      = $(OBJ_CRT0) $(OBJ_LINE) $(OBJ_MAIN)
 
 BIN       = $(BUILD)/$(PROJECT).bin
 TAP       = $(BUILD)/$(PROJECT).tap
@@ -29,17 +30,22 @@ TAP       = $(BUILD)/$(PROJECT).tap
 FASTLOAD_DONE  = 3500000
 TIME_AFTER     = 2500000
 TEST_CYCLES    = $(shell echo $$(($(FASTLOAD_DONE) + $(TIME_AFTER))))
-SCREENSHOT     = tests/out/phase1_triangle.ppm
-REF_SHOT       = tests/ref/phase1_triangle.ppm
+SCREENSHOT     = tests/out/phase2_lines.ppm
+REF_SHOT       = tests/ref/phase2_lines.ppm
+BENCH_CYCLES   = $(shell echo $$(($(FASTLOAD_DONE) + 25000000)))
+BENCH_PROF     = tests/out/phase2_bench.prof
 
-.PHONY: all clean run test ref check
+.PHONY: all clean run test ref check bench
 
 all: $(TAP)
 
 $(BUILD):
 	mkdir -p $(BUILD)
 
-$(OBJ_CRT0): $(SRCS_ASM) | $(BUILD)
+$(OBJ_CRT0): src/asm/crt0.s | $(BUILD)
+	$(CA65) -t none -o $@ $<
+
+$(OBJ_LINE): src/asm/line.s | $(BUILD)
 	$(CA65) -t none -o $@ $<
 
 $(BUILD)/main.s: $(SRCS_C) | $(BUILD)
@@ -76,6 +82,15 @@ check: test
 	@cmp -s $(REF_SHOT) $(SCREENSHOT) && \
 	  echo "PASS — capture identique à la référence" || \
 	  (echo "FAIL — divergence avec la référence"; exit 1)
+
+bench: $(TAP)
+	@mkdir -p tests/out
+	$(EMU) --headless -m oric1 -r $(ROM) -t $(TAP) -f \
+	       --type-keys "$(FASTLOAD_DONE):CALL $(LOAD_ADDR)\n" \
+	       --cycles $(BENCH_CYCLES) \
+	       --profile $(BENCH_PROF)
+	@echo "=== Rapport profiler ==="
+	@cat $(BENCH_PROF)
 
 clean:
 	rm -rf $(BUILD) tests/out

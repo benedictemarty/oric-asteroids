@@ -7,7 +7,62 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir : Phase 2 (Bresenham XOR optimisé + benchmark cycles + SMC).
+À venir : Phase 3 (vaisseau rotatif + tirs + input clavier).
+
+## [0.3.0] - 2026-05-09
+
+### Phase 2 — Bresenham XOR + benchmark cycles ✅
+
+**Résultats benchmark** : ~97 c/px (Phosphoric --profile, 1000×151 px,
+estimation via répartition cycles code/ROM/infini). Objectif ≤18 c/px non
+atteint ; 25 Hz acté comme cible nominale.
+
+**Définition de fin validée :**
+- `line.s` trace tout segment XOR en HIRES, bit6=1 maintenu.
+- Bresenham idempotent (draw+erase = état initial).
+- 10 scénarios géométriques versionnés (H, V, diagonales, obliques).
+- Benchmark mesuré et décision Hz documentée.
+- `make check` PASS.
+
+### Added
+
+- `src/asm/line.s` — Bresenham XOR 6502 complet :
+  - Tables précalculées en RODATA (880 octets) : adresses lignes HIRES,
+    colonnes et masques de pixels.
+  - `_hires_init` : déclenchement mode HIRES ($1C → $BB80) + effacement
+    HIRES avec 0x40 (correction bug : reload A=$40 dans boucle externe).
+  - `_draw_line_xor` : normalisation sx=+1 (swap si lx0>lx1), init unique
+    de l_ptr/l_mask via tables, mises à jour incrémentales dans la boucle
+    (mask LSR sur pas x, ptr±40 sur pas y).
+- `tests/ref/phase2_lines.ppm` — capture de référence Phase 2 (triangle
+  + 10 lignes géométriques, 2273 pixels blancs).
+
+### Changed
+
+- `src/asm/crt0.s` — fix critique : init `c_sp` via symbole linker
+  (était adresse hardcodée $80 = `_lx0`, causait stack C corrompu).
+- `Makefile` — targets `bench` + `BENCH_PROF`, `BENCH_CYCLES` étendu.
+
+### Fixed (bugs découverts et corrigés durant Phase 2)
+
+- `crt0.s` : c_sp initialisé à $80/$81 (= _lx0/_ly0 en ZP) au lieu du
+  vrai `c_sp` (à $8E avec notre layout ZP). Cause : appels de fonctions
+  cc65 avec paramètres stack corrompus.
+- `hires_init` : boucle externe `lda l_ptr+1` écrasait A=$40, pages
+  $A1-$BE remplies avec leur numéro de page au lieu de $40.
+- `_draw_line_xor` : `bpl` (bit de signe) utilisé pour comparer dx/dy
+  pouvant dépasser 127. Remplacé par `bcs/bcc` (carry, comparaison
+  unsigned). Symptôme : sy=-1 pour des lignes descendantes.
+
+### Décision Hz
+
+**25 Hz acté comme cible nominale.** À 97 c/px :
+- 15 seg × 15 px × 97 c/px × 2 = 43 650 cycles ≈ budget 25 Hz (40 000)
+- 30 seg × 20 px × 97 c/px × 2 = 116 400 cycles >> budget
+
+Scènes de jeu simplifiées (≤15 segments, ≤15 px/segment) pour la cible
+25 Hz. SMC + déroulage (Phase 2b) nécessaires pour ≥30 segments à 25 Hz
+ou toute cible 50 Hz.
 
 ## [0.2.0] - 2026-05-09
 

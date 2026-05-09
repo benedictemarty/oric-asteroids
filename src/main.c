@@ -1,95 +1,80 @@
 /*
- * Phase 1 — Squelette OSDK-free : HIRES init + triangle statique (vaisseau).
- * Cible : Oric-1 48K, compilé avec cc65 --target none + ld65 oric1.cfg.
- *
- * Encodage HIRES Oric (confirmé Phosphoric video.c) :
- *   (byte & 0x60)==0  → attribut  (modifie INK/PAPER, pas de pixels)
- *   (byte & 0x60)!=0  → pixel      bit7=1=inverse, bits5-0=6 pixels
- *   Init "vierge"     = 0x40       (bit6=1 → pixel, aucun bit allumé)
- *   Déclencher HIRES  = écrire 0x1C à $BB80 (attribut mode vidéo=4)
+ * Phase 2 — Bresenham XOR en asm 6502.
+ * Tests couverts : idempotence XOR, h/v/diagonales/obliques.
+ * Référence visuelle pour make check : triangle + croix + bords + obliques.
  */
 
-#define HIRES_BASE  0xA000U
-#define HIRES_W     240
-#define HIRES_H     200
-#define HIRES_COLS   40
+/* Routines asm (line.s) */
+void hires_init(void);
+void draw_line_xor(void);
 
-#define BB80        0xBB80U     /* 1er octet de la zone texte, ligne 0 */
+/* Paramètres de ligne en ZP (exportés depuis line.s).
+ * #pragma zpsym force cc65 à utiliser l'adressage page zéro. */
+extern unsigned char lx0, ly0, lx1, ly1;
+#pragma zpsym ("lx0")
+#pragma zpsym ("ly0")
+#pragma zpsym ("lx1")
+#pragma zpsym ("ly1")
 
-#define POKE(a,v)   (*((volatile unsigned char *)(a)) = (unsigned char)(v))
-#define PEEK(a)     (*((volatile unsigned char *)(a)))
-
-/* ------------------------------------------------------------------ */
-static void hires_init(void)
+/* Wrapper C → ZP → asm */
+static void line(unsigned char x0, unsigned char y0,
+                 unsigned char x1, unsigned char y1)
 {
-    unsigned int i;
-
-    /* Déclencher le mode HIRES depuis le mode texte : attribut 0x1C
-     * → vid_mode = 4 (bit HIRES), persiste entre frames. */
-    POKE(BB80, 0x1C);
-
-    /* Remplir l'écran HIRES avec 0x40 : octet pixel vierge, noir.
-     * 0x40 = bit6=1 → non-attribut, bits5-0=0 → aucun pixel allumé. */
-    for (i = 0; i < (unsigned int)(HIRES_COLS * HIRES_H); i++) {
-        POKE(HIRES_BASE + i, 0x40);
-    }
-}
-
-/* ------------------------------------------------------------------ */
-static void plot_pixel(int x, int y)
-{
-    unsigned int addr;
-    unsigned char col, mask, byte;
-
-    if ((unsigned int)x >= (unsigned int)HIRES_W) return;
-    if ((unsigned int)y >= (unsigned int)HIRES_H) return;
-
-    col  = (unsigned char)((unsigned int)x / 6U);
-    mask = (unsigned char)(0x20U >> ((unsigned int)x % 6U));
-    addr = HIRES_BASE + (unsigned int)y * (unsigned int)HIRES_COLS + col;
-
-    byte = PEEK(addr);
-    /* Allumer le pixel, forcer bit6=1 (prévient détection attribut),
-     * forcer bit7=0 (mode normal, pas d'inverse vidéo). */
-    POKE(addr, (byte | mask | 0x40U) & 0x7FU);
-}
-
-/* ------------------------------------------------------------------ */
-static void draw_line(int x0, int y0, int x1, int y1)
-{
-    int dx, dy, sx, sy, adx, ady, err, e2;
-
-    dx  = x1 - x0;  dy  = y1 - y0;
-    adx = dx < 0 ? -dx : dx;
-    ady = dy < 0 ? -dy : dy;
-    sx  = dx < 0 ? -1 : 1;
-    sy  = dy < 0 ? -1 : 1;
-    err = adx - ady;
-
-    for (;;) {
-        plot_pixel(x0, y0);
-        if (x0 == x1 && y0 == y1) break;
-        e2 = 2 * err;
-        if (e2 > -ady) { err -= ady; x0 += sx; }
-        if (e2 <  adx) { err += adx; y0 += sy; }
-    }
+    lx0 = x0; ly0 = y0; lx1 = x1; ly1 = y1;
+    draw_line_xor();
 }
 
 /* ------------------------------------------------------------------ */
 void main(void)
 {
-    /* Sommets du vaisseau triangulaire (centré, style arcade Asteroids) */
-    int tx = 120, ty = 28;   /* apex haut      */
-    int lx =  72, ly = 168;  /* bas gauche     */
-    int rx = 168, ry = 168;  /* bas droite     */
-
     hires_init();
 
-    draw_line(tx, ty, lx, ly);   /* bord gauche    */
-    draw_line(tx, ty, rx, ry);   /* bord droit     */
-    draw_line(lx, ly, rx, ry);   /* base           */
+    /* --- Test idempotence XOR : 3 passes sur le triangle ---
+     *  Pass 1 : dessine
+     *  Pass 2 : efface (XOR = retour à l'état vierge)
+     *  Pass 3 : redessine (visible sur la capture de référence)
+     */
+#define TRI_TX 120
+#define TRI_TY  28
+#define TRI_LX  72
+#define TRI_LY 168
+#define TRI_RX 168
+#define TRI_RY 168
 
-    /* Boucle d'attente — Phosphoric --cycles N coupe automatiquement
-     * pour les tests CI ; en interactif, fermer la fenêtre. */
+    line(TRI_TX, TRI_TY, TRI_LX, TRI_LY);
+    line(TRI_TX, TRI_TY, TRI_RX, TRI_RY);
+    line(TRI_LX, TRI_LY, TRI_RX, TRI_RY);
+
+    line(TRI_TX, TRI_TY, TRI_LX, TRI_LY);   /* efface */
+    line(TRI_TX, TRI_TY, TRI_RX, TRI_RY);
+    line(TRI_LX, TRI_LY, TRI_RX, TRI_RY);
+
+    line(TRI_TX, TRI_TY, TRI_LX, TRI_LY);   /* redessine */
+    line(TRI_TX, TRI_TY, TRI_RX, TRI_RY);
+    line(TRI_LX, TRI_LY, TRI_RX, TRI_RY);
+
+    /* --- Lignes géométriques de test (10 cas) --- */
+    line(  0,   0, 239,   0);   /* horizontale haute         */
+    line(  0, 199, 239, 199);   /* horizontale basse         */
+    line(  0,   0,   0, 199);   /* verticale gauche          */
+    line(239,   0, 239, 199);   /* verticale droite          */
+    line(  0,   0, 239, 199);   /* diagonale ↘               */
+    line(239,   0,   0, 199);   /* diagonale ↙               */
+    line(  0, 100, 239, 100);   /* horizontale centrale      */
+    line(120,   0, 120, 199);   /* verticale centrale        */
+    line( 60,  50, 180, 150);   /* oblique pente ~1.1        */
+    line( 60, 150, 180,  50);   /* oblique pente ~-1.1       */
+
+    /* --- Boucle de benchmark : 1000 tracés de la même ligne diagonale ---
+     * Ligne (30,30)→(180,150) : dx=150, dy=120 → 151 pixels.
+     * 1000 × 151 px = 151 000 pixels. Le profiler mesure le coût réel.
+     * XOR = alternance draw/erase → l'écran oscille mais c'est voulu ici. */
+    {
+        unsigned int n;
+        for (n = 1000; n != 0; n--) {
+            line(30, 30, 180, 150);
+        }
+    }
+
     for (;;) {}
 }

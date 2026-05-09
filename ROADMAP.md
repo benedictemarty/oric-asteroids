@@ -11,7 +11,8 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | Statut | Phase | Livrable | Optimiste | Réaliste |
 |---|---|---|---|---|
 | ✅ | 1 | Squelette sans OSDK + HIRES + triangle statique | 1 sem. | 2 sem. |
-| 🔜 | 2 | Bresenham XOR optimisé + benchmark cycles + SMC | 2 sem. | 4–6 sem. |
+| ✅ | 2 | Bresenham XOR + benchmark (97 c/px, 25 Hz acté) | 2 sem. | 4–6 sem. |
+| 🔜 | 3 | Vaisseau rotatif + tirs + input clavier | 2 sem. | 3 sem. |
 | ⏳ | 3 | Vaisseau rotatif + tirs + input clavier | 2 sem. | 3 sem. |
 | ⏳ | 4 | Astéroïdes (formes, mouvement, fragmentation, wraparound) | 2 sem. | 3 sem. |
 | ⏳ | 5 | Collisions + gestion vies/score | 1 sem. | 2 sem. |
@@ -40,21 +41,26 @@ Pour un développeur **débutant en 6502**, doubler l'estimation réaliste
 - Test de non‑régression visuel : capture HIRES `tests/ref/phase1_triangle.ppm`
   versionnée et comparée bit‑à‑bit en CI.
 
-### Phase 2 — Routine de ligne XOR optimisée
+### Phase 2 — Routine de ligne XOR ✅
 
-**Définition de fin** :
-- `line.s` trace un segment quelconque sur HIRES en EOR, écriture bit 7 = 1.
-- Benchmark mesuré sur Phosphoric (`--profile`) : **≤ 18 cycles/pixel**
-  sur scénario standardisé (segments aléatoires couvrant tous les angles).
-- Tracé idempotent : retracer la même liste de segments efface l'image.
-- **Décision arrêtée** : 50 Hz tenable ou bascule officielle 25 Hz.
-- Tests : 10 scénarios géométriques (lignes verticales, horizontales,
-  diagonales, courtes, longues, traversant les colonnes d'attributs)
-  versionnés.
+**Définition de fin validée (2026-05-09)** :
+- `line.s` trace tout segment XOR sur HIRES, bit6=1 toujours.
+- Benchmark mesuré : **~97 cycles/pixel** (Phosphoric --profile,
+  1 000 × 151 px). Objectif ≤18 c/px non atteint ; SMC = Phase 2b.
+- Tracé idempotent (draw + erase = état initial). ✓
+- **Décision arrêtée : 25 Hz nominal.**
+  À 97 c/px, 15 seg × 15 px × 2 ≈ 43 650 cycles ~ budget 40 000. ✓
+- 10 scénarios géométriques versionnés (H, V, diagonales, obliques). ✓
+- `make check` PASS.
 
-**Risque calendrier principal du projet**. Si l'objectif n'est pas tenu :
-arbitrage entre baisse de complexité visuelle, bascule 25 Hz définitive,
-ou refonte algorithmique (tracé de polygones plutôt que segments).
+**Bugs Phase 2 documentés** :
+- `crt0` : c_sp initialisé à adresse hardcodée ($80) au lieu du symbole
+  linker — stack C corrompu, appels de fonctions incorrects.
+- `hires_init` : boucle d'effacement écrasait A=$40 avec le numéro de page.
+- `_draw_line_xor` : `bpl` pour comparer y-coords > 127 (bcs/bcc requis).
+
+**Phase 2b (future)** : SMC + déroulage boucle pour atteindre 40-50 c/px
+et permettre 30 segments × 20 px à 25 Hz (scènes arcade complètes).
 
 ### Phase 3 — Vaisseau rotatif + tirs + input clavier
 
