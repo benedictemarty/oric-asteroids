@@ -15,6 +15,7 @@
 #include "hud.h"
 #include "ufo.h"
 #include "sound.h"
+#include "title.h"
 
 /* ------------------------------------------------------------------ */
 /* Symboles importés                                                   */
@@ -485,6 +486,15 @@ void game_run(void)
     hires_init();
     timer_init();
     sound_init();
+
+    /* Phase 9c — écran titre 2 secondes (50 frames @ 25 Hz) */
+    title_draw();
+    {
+        unsigned char i;
+        for (i = 0; i < 50; i++) frame_wait();
+    }
+    title_erase();
+
     ship_init();
     bullets_init();
     asteroids_init(0x42);

@@ -13,7 +13,7 @@ EXEC_ADDR = 1280
 CFG       = cfg/oric1.cfg
 BUILD     = build
 
-SRCS_C    = src/main.c src/game.c src/asteroids.c src/hud.c src/ufo.c
+SRCS_C    = src/main.c src/game.c src/asteroids.c src/hud.c src/ufo.c src/title.c
 SRCS_ASM  = src/asm/crt0.s src/asm/line.s src/asm/ship.s \
             src/asm/ship_verts.s src/asm/input.s src/asm/shapes.s \
             src/asm/sound.s
@@ -30,9 +30,11 @@ OBJ_GAME    = $(BUILD)/game.o
 OBJ_ASTER   = $(BUILD)/asteroids.o
 OBJ_HUD     = $(BUILD)/hud.o
 OBJ_UFO     = $(BUILD)/ufo.o
+OBJ_TITLE   = $(BUILD)/title.o
 OBJS        = $(OBJ_CRT0) $(OBJ_LINE) $(OBJ_SHIP) $(OBJ_VERTS) \
               $(OBJ_INPUT) $(OBJ_SHAPES) $(OBJ_SOUND) $(OBJ_MAIN) \
-              $(OBJ_GAME) $(OBJ_ASTER) $(OBJ_HUD) $(OBJ_UFO)
+              $(OBJ_GAME) $(OBJ_ASTER) $(OBJ_HUD) $(OBJ_UFO) \
+              $(OBJ_TITLE)
 
 BIN       = $(BUILD)/$(PROJECT).bin
 TAP       = $(BUILD)/$(PROJECT).tap
@@ -119,6 +121,12 @@ $(BUILD)/ufo.s: src/ufo.c src/ufo.h src/asteroids.h | $(BUILD)
 	$(CC65) -t none -O -I src -o $@ $<
 
 $(OBJ_UFO): $(BUILD)/ufo.s
+	$(CA65) -t none -o $@ $<
+
+$(BUILD)/title.s: src/title.c src/title.h | $(BUILD)
+	$(CC65) -t none -O -I src -o $@ $<
+
+$(OBJ_TITLE): $(BUILD)/title.s
 	$(CA65) -t none -o $@ $<
 
 $(BIN): $(OBJS) $(CFG)

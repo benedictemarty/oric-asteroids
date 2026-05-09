@@ -7,11 +7,59 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-Différé Phase 9c/10 :
-- Persistance high scores en `.tap` (driver cassette résident, lecture initiales).
+Différé Phase 10 :
+- Persistance high scores en `.tap` (driver cassette résident, saisie initiales).
 - Image `.dsk` Microdisc finale.
-- Écran titre vectoriel (lettres "ASTEROIDS" en segments).
 - Effets sons manquants : thrust continu, UFO oscillant, enveloppe AY.
+- Écran "GAME OVER" / "PRESS SPACE" (besoin de ~6 lettres supplémentaires).
+
+## [1.0.2] - 2026-05-10
+
+### Phase 9c — Écran titre "ASTEROIDS" vectoriel ✅
+
+**Définition de fin validée :**
+- 9 lettres `ASTEROIDS` dessinées en segments XOR via `_draw_line_xor` :
+  - A (3 segs), S (5 segs), T (2 segs), E (4 segs), R (6 segs),
+    O (4 segs), I (3 segs), D (6 segs), S (5 segs)
+  - Total ~38 segments par tracé.
+- Format compact : pour chaque lettre, liste `(x0, y0, x1, y1)` 4-bit,
+  terminée par `0xFF`. Hauteur 10 px, largeur 8 px, espace 12 px.
+- Affichage 50 frames (~2 s à 25 Hz) au démarrage, puis effacement
+  XOR symétrique (`title_erase` = `title_draw`).
+- `ASTEROIDS` centré horizontalement en x=68 (largeur totale 104 px),
+  ligne y=80.
+- `make check` PASS sur la capture post-titre.
+
+### Added
+
+- `src/title.h` + `src/title.c` (115 lignes) : 8 lettres vectorielles
+  (`A` `S` `T` `E` `R` `O` `I` `D` — `S` réutilisé), `title_draw`,
+  `title_erase`.
+- `tests/ref/phase9_release.ppm` mis à jour (post-titre).
+
+### Changed
+
+- `src/game.c` : appel `title_draw` + boucle 50 `frame_wait` +
+  `title_erase` avant l'init du jeu.
+- `Makefile` : ajout `src/title.c` aux sources C.
+
+### Décisions techniques Phase 9c
+
+- **Lettres hardcodées** plutôt que font alphanumérique générique :
+  9 lettres × ~5 segments = ~45 lignes de coords ; une font 26 lettres
+  serait ~150 lignes. Compromis taille/temps.
+- **Format `0xFF` sentinel** pour la fin de la liste de segments :
+  évite de stocker un compteur séparément, lecture simple en C.
+- **Auto-start après 2 s** plutôt qu'attente d'une touche : simplifie
+  le flow (pas d'état `STATE_TITLE` séparé). Phase 10 ajoutera
+  "PRESS SPACE" et démo passive.
+- **Pas de bordure ni d'animation** (pulse, fade) : surcoût de tracé
+  XOR à chaque frame du titre = ~38 segments × 2 × ~5 px × 97 c/px
+  = ~37 000 cycles supplémentaires par frame. Tracé une fois,
+  effacement une fois — minimal.
+- **Pas de clignotement / sweep d'entrée** : Phase 9c reste fonctionnelle ;
+  l'esthétique arcade complète (titre qui pulse, démo passive, etc.)
+  est différée Phase 10.
 
 ## [1.0.1] - 2026-05-10
 
