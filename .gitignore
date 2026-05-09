@@ -1,0 +1,42 @@
+# Build artefacts OSDK
+build/
+*.o
+*.lst
+*.map
+*.sym
+
+# Cibles produites
+*.tap
+*.dsk
+# Exception : tape de scénario de test versionné
+!tests/scenarios/*.tap
+
+# Snapshots de test générés (les références vont dans tests/ref/, à versionner)
+tests/out/
+
+# Profilage / traces Phosphoric
+*.prof
+*.trace
+*.ppm
+!tests/ref/*.ppm
+
+# Dumps de débogage
+memdump_*.bin
+*.savestate
+
+# Éditeurs / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Claude Code local (settings, mémoire conversation)
+.claude/settings.local.json
+
+# Logs / scratch
+*.log
+scratch/
+tmp/
