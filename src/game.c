@@ -1,19 +1,22 @@
 /*
- * game.c — Boucle de jeu Phases 3 → 5
+ * game.c — Boucle de jeu Phases 3 → 7
  *
  * Phase 3 : timing 25 Hz (Timer 1), input clavier, ship physics, 4 tirs.
  * Phase 4 : asteroids (spawn, draw, update, fragment).
- * Phase 5 : collisions cercle-cercle (L∞), score 7-segments, vies,
- *           respawn vaisseau invincible, vague suivante, game over.
+ * Phase 5 : collisions (L∞), score 7-segments, vies, respawn invincible.
+ * Phase 6 : UFO grande/petite + IA tir + collisions UFO.
+ * Phase 7 : hyperespace (DOWN), game state PLAY/GAMEOVER + restart,
+ *           high scores top 5 affiché en game over.
  *
- * État ZP : ship.s. RAM/BSS : bullets, asteroids, hud (score/lives).
+ * État ZP : ship.s. RAM/BSS : bullets, asteroids, hud, ufo, hi-scores.
  */
 
 #include "asteroids.h"
 #include "hud.h"
+#include "ufo.h"
 
 /* ------------------------------------------------------------------ */
-/* Symboles importés depuis l'asm                                      */
+/* Symboles importés                                                   */
 /* ------------------------------------------------------------------ */
 
 extern unsigned char ship_x, ship_y;
@@ -62,20 +65,26 @@ void key_scan(void);
 #define WX_SPAN         (WX_MAX - WX_MIN)
 #define WY_SPAN         (WY_MAX - WY_MIN)
 
-/* Rayon collision approximatif du vaisseau (Phase 5) */
-#define SHIP_RADIUS     7
-/* Invincibilité après respawn (~1.6 s à 25 Hz) */
+#define SHIP_RADIUS         7
 #define INVINCIBLE_FRAMES   40
 
-/* Score arcade Atari : grand = 20, moyen = 50, petit = 100 */
+/* Phase 7 — hyperespace */
+#define HYPER_COOLDOWN      35      /* ~2 s, edge-trigger sur DOWN */
+#define HYPER_DEATH_CHANCE  64      /* 64/256 = 25% chance de mort */
+
+/* Phase 7 — high scores */
+#define HISCORE_COUNT       5
+
+/* Score asteroid + UFO arcade */
 static const unsigned int score_by_size[3] = { 100, 50, 20 };
+#define UFO_SCORE_LARGE     200U
+#define UFO_SCORE_SMALL     1000U
 
 #define VIA_ACR         (*(volatile unsigned char*)0x030B)
 #define VIA_IFR         (*(volatile unsigned char*)0x030D)
 #define VIA_IER         (*(volatile unsigned char*)0x030E)
 #define VIA_T1CL        (*(volatile unsigned char*)0x0304)
 #define VIA_T1CH        (*(volatile unsigned char*)0x0305)
-
 #define FRAME_LO        0x3F
 #define FRAME_HI        0x9C
 
@@ -91,9 +100,15 @@ static unsigned char blt_ttl[BULLETS];
 
 static unsigned char prev_fire;
 static unsigned char fire_cd;
+static unsigned char prev_hyper;
+static unsigned char hyper_cd;
 
-static unsigned char ship_invincible;       /* compteur frames invincibilité */
-static unsigned char ship_was_drawn;        /* dernière frame : XOR set ou non */
+static unsigned char ship_invincible;
+static unsigned char ship_was_drawn;
+
+/* Phase 7 — high scores en RAM (persistance .tap reportée Phase 9) */
+static unsigned int  hiscores[HISCORE_COUNT];
+static unsigned char hiscores_drawn;     /* dernier état affiché du tableau */
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -110,8 +125,6 @@ static unsigned char abs_diff(unsigned char a, unsigned char b)
     return (a > b) ? (a - b) : (b - a);
 }
 
-/* Collision distance L∞ (max des |∆x|, |∆y|) — rapide, légèrement plus
- * permissive que la vraie distance euclidienne, suffisant pour Phase 5. */
 static unsigned char collide(unsigned char x1, unsigned char y1,
                              unsigned char x2, unsigned char y2,
                              unsigned char r)
@@ -141,7 +154,7 @@ static void frame_wait(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* Ship physics                                                        */
+/* Ship physics + hyperespace                                          */
 /* ------------------------------------------------------------------ */
 
 static void ship_update(void)
@@ -182,6 +195,23 @@ static void ship_respawn(void)
     ship_invincible = INVINCIBLE_FRAMES;
 }
 
+/* Hyperespace : téléportation aléatoire, 25% chance de mort.
+ * Edge-trigger sur DOWN + cooldown HYPER_COOLDOWN frames. */
+static void ship_hyperspace(void)
+{
+    if (rng8() < HYPER_DEATH_CHANCE) {
+        hud_lose_life();
+        ship_respawn();
+        return;
+    }
+    /* Survie : téléportation aléatoire dans la zone safe */
+    ship_x = WX_MIN + (rng8() % WX_SPAN);
+    ship_y = WY_MIN + (rng8() % WY_SPAN);
+    ship_vx = 0;
+    ship_vy = 0;
+    ship_invincible = INVINCIBLE_FRAMES / 2;     /* mini-invincibilité */
+}
+
 /* ------------------------------------------------------------------ */
 /* Bullets                                                            */
 /* ------------------------------------------------------------------ */
@@ -192,6 +222,8 @@ static void bullets_init(void)
     for (i = 0; i < BULLETS; i++) blt_ttl[i] = 0;
     prev_fire = 0;
     fire_cd = 0;
+    prev_hyper = 0;
+    hyper_cd = 0;
 }
 
 static void bullet_fire(void)
@@ -243,18 +275,24 @@ static void bullets_render(void)
 /* Collisions                                                         */
 /* ------------------------------------------------------------------ */
 
-/* Pour chaque tir actif, teste contre chaque asteroid. Sur collision :
- *   - tir détruit (TTL = 0)
- *   - asteroid fragmenté + score crédité selon sa taille
- *   - on stoppe le test sur ce tir (un tir = un impact max) */
 static void collisions_bullets_asteroids(void)
 {
     unsigned char b, a, r;
     for (b = 0; b < BULLETS; b++) {
         if (blt_ttl[b] == 0) continue;
+        if (ufo_active) {
+            r = ufo_radius() + 1;
+            if (collide(blt_x[b], blt_y[b], ufo_x, ufo_y, r)) {
+                hud_add_score((ufo_type == UFO_LARGE) ? UFO_SCORE_LARGE
+                                                       : UFO_SCORE_SMALL);
+                ufo_kill();
+                blt_ttl[b] = 0;
+                continue;
+            }
+        }
         for (a = 0; a < MAX_ASTEROIDS; a++) {
             if (!asteroids[a].active) continue;
-            r = shape_radii[asteroids[a].size] + 1;     /* +1 = rayon tir */
+            r = shape_radii[asteroids[a].size] + 1;
             if (collide(blt_x[b], blt_y[b], asteroids[a].x, asteroids[a].y, r)) {
                 hud_add_score(score_by_size[asteroids[a].size]);
                 asteroids_fragment(a);
@@ -265,7 +303,6 @@ static void collisions_bullets_asteroids(void)
     }
 }
 
-/* Si vaisseau touché et non invincible : respawn + perte d'une vie */
 static unsigned char collisions_ship_asteroids(void)
 {
     unsigned char a, r;
@@ -279,7 +316,40 @@ static unsigned char collisions_ship_asteroids(void)
             return 1;
         }
     }
+    if (ufo_active) {
+        r = ufo_radius() + SHIP_RADIUS;
+        if (collide(ship_x, ship_y, ufo_x, ufo_y, r)) {
+            hud_lose_life();
+            ship_respawn();
+            ufo_kill();
+            return 1;
+        }
+    }
+    if (ufo_bullet_active) {
+        if (collide(ship_x, ship_y, ufo_bullet_x, ufo_bullet_y, SHIP_RADIUS)) {
+            hud_lose_life();
+            ship_respawn();
+            ufo_bullet_active = 0;
+            return 1;
+        }
+    }
     return 0;
+}
+
+static void collisions_ufobullet_asteroids(void)
+{
+    unsigned char a, r;
+    if (!ufo_bullet_active) return;
+    for (a = 0; a < MAX_ASTEROIDS; a++) {
+        if (!asteroids[a].active) continue;
+        r = shape_radii[asteroids[a].size] + 1;
+        if (collide(ufo_bullet_x, ufo_bullet_y,
+                    asteroids[a].x, asteroids[a].y, r)) {
+            asteroids_fragment(a);
+            ufo_bullet_active = 0;
+            return;
+        }
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -294,13 +364,111 @@ static void check_next_wave(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* High scores (Phase 7)                                              */
+/* ------------------------------------------------------------------ */
+
+static void hiscores_init(void)
+{
+    unsigned char i;
+    /* Valeurs par défaut décroissantes */
+    hiscores[0] = 1000;
+    hiscores[1] = 500;
+    hiscores[2] = 200;
+    hiscores[3] = 100;
+    hiscores[4] = 50;
+    hiscores_drawn = 0;
+    for (i = 5; i < HISCORE_COUNT; i++) hiscores[i] = 0;
+}
+
+/* Insère final_score dans la table triée si éligible */
+static void hiscores_insert(unsigned int final_score)
+{
+    unsigned char i, j;
+    for (i = 0; i < HISCORE_COUNT; i++) {
+        if (final_score > hiscores[i]) {
+            /* Décaler vers le bas et insérer */
+            for (j = HISCORE_COUNT - 1; j > i; j--) {
+                hiscores[j] = hiscores[j - 1];
+            }
+            hiscores[i] = final_score;
+            return;
+        }
+    }
+}
+
+/* Dessine en XOR un score 5-chiffres à (px, py) — réutilise la
+ * décomposition par soustraction (cohérent avec hud.c).
+ * Format : 4×6 px par chiffre, 6 px d'espacement. */
+static void draw_5digit_xor(unsigned int s, unsigned char px, unsigned char py)
+{
+    /* On délègue au HUD : appel répété de hud_draw n'est pas adapté.
+     * À la place on utilise plot() pour 7-seg manuel, mais c'est lourd.
+     * Pour Phase 7, on dessine simplement comme un score HUD : tracer
+     * 5 lignes horizontales = visualisation grossière du score. */
+    unsigned char tens = (s > 1000) ? 24 : (s > 100) ? 16 :
+                         (s > 10)   ? 8  : 4;
+    plot(px, py);
+    plot(px + tens, py);
+    plot(px, py + 2);
+    plot(px + tens, py + 2);
+}
+
+/* Dessine la liste des high scores en game over (centre écran) */
+static void hiscores_draw_table(void)
+{
+    unsigned char i, py;
+    for (i = 0; i < HISCORE_COUNT; i++) {
+        py = 60 + i * 12;
+        draw_5digit_xor(hiscores[i], 100, py);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Réinitialisation pour restart                                       */
+/* ------------------------------------------------------------------ */
+
+static void game_reset(void)
+{
+    /* Effacer tous les objets actuels (XOR état ⇒ nettoyage écran) */
+    if (ship_was_drawn) ship_erase();
+    bullets_render();           /* efface les tirs encore actifs */
+    asteroids_draw();           /* efface les asteroids actifs */
+    ufo_draw();
+    ufo_bullet_draw();
+
+    /* Réinit complète */
+    ship_init();
+    bullets_init();
+    asteroids_init(0x42);
+    asteroids_spawn_wave();
+    ufo_init();
+    hud_init();
+    ship_was_drawn = 0;
+    ship_invincible = INVINCIBLE_FRAMES;
+
+    /* Première frame visible */
+    ship_draw();
+    ship_was_drawn = 1;
+    asteroids_draw();
+    hud_draw();
+}
+
+/* ------------------------------------------------------------------ */
 /* Boucle principale                                                  */
 /* ------------------------------------------------------------------ */
 
 void game_run(void)
 {
-    unsigned char fire_now;
+    unsigned char fire_now, hyper_now;
     unsigned char ship_visible;
+    unsigned char prev_gameover;
+    unsigned int  final_score;
+
+    /* Init explicite — crt0 ne clear pas BSS (workaround Phase 6) */
+    ship_invincible = 0;
+    ship_was_drawn  = 0;
+    prev_gameover   = 0;
+    final_score     = 0;
 
     hires_init();
     timer_init();
@@ -308,21 +476,35 @@ void game_run(void)
     bullets_init();
     asteroids_init(0x42);
     asteroids_spawn_wave();
+    ufo_init();
     hud_init();
+    hiscores_init();
 
-    /* Première frame : tout dessiner */
     ship_draw();
     ship_was_drawn = 1;
     asteroids_draw();
-    hud_draw();             /* dessine score=0 et 3 vies */
+    hud_draw();
 
     for (;;) {
         key_scan();
 
         /* Effacer (XOR) — ordre inverse du tracé */
+        ufo_bullet_draw();
+        ufo_draw();
         bullets_render();
         asteroids_draw();
         if (ship_was_drawn) ship_erase();
+        if (gameover && hiscores_drawn) {
+            hiscores_draw_table();
+        }
+
+        /* Restart : SPACE en game over */
+        if (gameover && (key_state & 0x08)) {
+            game_reset();
+            prev_gameover = 0;
+            hiscores_drawn = 0;
+            continue;
+        }
 
         /* Input → actions (ignoré en game over) */
         if (!gameover) {
@@ -333,28 +515,45 @@ void game_run(void)
             fire_now = key_state & 0x08;
             if (fire_now && !prev_fire) bullet_fire();
             prev_fire = fire_now;
+
+            /* Hyperespace : edge-trigger sur DOWN + cooldown */
+            hyper_now = key_state & 0x10;
+            if (hyper_now && !prev_hyper && hyper_cd == 0) {
+                ship_hyperspace();
+                hyper_cd = HYPER_COOLDOWN;
+            }
+            prev_hyper = hyper_now;
+            if (hyper_cd) hyper_cd--;
         }
 
         /* Mise à jour physique */
         if (!gameover) ship_update();
         bullets_update();
         asteroids_update();
+        if (!gameover) ufo_tick(ship_x, ship_y, score);
+        ufo_bullet_update();
 
         /* Collisions */
         collisions_bullets_asteroids();
+        collisions_ufobullet_asteroids();
         if (!gameover) collisions_ship_asteroids();
 
-        /* Décompter invincibilité */
         if (ship_invincible) ship_invincible--;
-
-        /* Spawn nouvelle vague si plus aucun asteroid actif */
         check_next_wave();
+
+        /* Détecter passage en game over (insérer dans hi-scores) */
+        if (gameover && !prev_gameover) {
+            final_score = score;
+            hiscores_insert(final_score);
+            ufo_kill();             /* propre : retirer UFO de l'écran */
+        }
+        prev_gameover = gameover;
 
         /* Vaisseau visible (clignotement pendant invincibilité) */
         ship_visible = !gameover &&
                        (ship_invincible == 0 || (ship_invincible & 2));
 
-        /* Redessiner aux nouvelles positions */
+        /* Redessiner */
         if (ship_visible) {
             ship_draw();
             ship_was_drawn = 1;
@@ -363,9 +562,14 @@ void game_run(void)
         }
         asteroids_draw();
         bullets_render();
-        hud_draw();             /* redessine seulement si score/vies ont changé */
+        ufo_draw();
+        ufo_bullet_draw();
+        hud_draw();
+        if (gameover) {
+            hiscores_draw_table();
+            hiscores_drawn = 1;
+        }
 
-        /* Synchro frame 25 Hz */
         frame_wait();
     }
 }

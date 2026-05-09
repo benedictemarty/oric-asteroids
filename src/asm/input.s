@@ -6,6 +6,7 @@
 ;   bit 1 : → (RIGHT, row 4 col 7)
 ;   bit 2 : ↑ (UP, row 4 col 3) — thrust
 ;   bit 3 : SPACE (row 4 col 0) — tir
+;   bit 4 : ↓ (DOWN, row 4 col 6) — hyperespace (Phase 7)
 ;
 ; Architecture clavier Oric-1 (cf. sources Phosphoric / Oricutron) :
 ;   - VIA Port B bits 0-2 ($0300) sélectionnent la colonne (74LS138)
@@ -186,6 +187,23 @@ _key_scan:
         ora  #$08
         sta  _key_state
 @no_fire:
+
+        ;------------------------------------------------------------
+        ; Test colonne 6 = DOWN ARROW (bit 4 → hyperespace)
+        ;------------------------------------------------------------
+        lda  VIA_ORB
+        and  #$F8
+        ora  #6
+        sta  VIA_ORB
+        nop
+        nop
+        lda  VIA_ORB
+        and  #$08
+        beq  @no_hyper
+        lda  _key_state
+        ora  #$10
+        sta  _key_state
+@no_hyper:
 
         ; Restaurer reg14 = $FF (toutes rangées désactivées)
         lda  #$FF

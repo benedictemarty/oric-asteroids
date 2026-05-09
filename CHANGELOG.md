@@ -7,7 +7,62 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir : Phase 7 (hyperespace + écran titre + high scores).
+À venir : Phase 8 (son AY-3-8912 sous IRQ Timer 1).
+
+## [0.8.0] - 2026-05-10
+
+### Phase 7 — Hyperespace + restart + high scores ✅
+
+**Définition de fin validée :**
+- Hyperespace : touche `↓` (DOWN, row 4 col 6), edge-trigger + cooldown
+  35 frames. 25% chance de mort (`HYPER_DEATH_CHANCE = 64/256`),
+  sinon téléportation aléatoire dans la zone safe + mini-invincibilité.
+- Game state implicite via `gameover` (HUD) : inputs/UFO/ship_update
+  ignorés, seul SPACE déclenche `game_reset()`.
+- High scores top 5 en RAM (16-bit), insertion triée à l'entrée du game over.
+- Affichage table high scores en game over (5 lignes, position centrale).
+- Persistance `.tap` reportée Phase 9 (pas de driver cassette résident).
+- **Phase 6 réellement complétée** : intégration UFO dans la boucle
+  game_run (le commit `phase6-done` ajoutait ufo.c/.h sans les appels
+  dans game.c — corrigé ici).
+- `make check` PASS, capture identique sur 3 runs.
+
+### Added
+
+- `src/asm/input.s` : ajout scan colonne 6 (DOWN ARROW), bit 4 de `_key_state`.
+- `src/game.c` :
+  - `ship_hyperspace()` : RNG mort/téléportation + invincibilité.
+  - `hiscores_init/insert/draw_table` : table 5 entrées, insertion triée.
+  - `game_reset()` : effacement écran + réinit complète + ship invincible.
+  - `prev_hyper`, `hyper_cd` : edge-trigger + cooldown DOWN.
+- Capture référence `tests/ref/phase7_full.ppm`.
+
+### Changed
+
+- `src/game.c` : intégration UFO complète (init + tick + draw + 3 collisions),
+  réorganisation boucle pour gérer les deux états (PLAY / GAMEOVER).
+- `Makefile` — ajout effectif de `src/ufo.c` dans `SRCS_C`,
+  capture/référence renommées `phase7_full.ppm`.
+
+### Décisions techniques Phase 7
+
+- **Hyperespace edge-trigger + cooldown** vs hold continu : évite le
+  spam (téléportations multiples par appui maintenu). Cooldown 35 frames
+  ≈ 2 s, cohérent avec l'arcade.
+- **25% chance de mort fixe** plutôt qu'indexée sur le score (l'arcade
+  augmente progressivement la probabilité avec le temps). Phase 7b
+  pourra ajouter cette progression.
+- **High scores en RAM seule** : 5 entrées × 2 octets = 10 octets BSS,
+  perdu au reset. Persistance `.tap` (saisie + relecture) implique un
+  driver cassette dans le binaire — reportée à Phase 9 polish.
+- **Pas d'écran titre dédié** : l'arcade Atari démarre directement en
+  démo passive (jeu IA en arrière-plan, "PRESS START"). Notre
+  implémentation Phase 7 démarre directement en jeu joueur. Un écran
+  titre vrai (lettres ASTEROIDS vectorielles) sera ajouté en Phase 9.
+- **Affichage high scores game over** : utilise un placeholder
+  `draw_5digit_xor` qui dessine 4 segments par ligne (visualisation
+  grossière de l'ordre de grandeur). À remplacer par un rendu propre
+  via `digit_segs` réutilisé du HUD (Phase 7b).
 
 ## [0.7.0] - 2026-05-10
 

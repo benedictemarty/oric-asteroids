@@ -16,8 +16,8 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 4 | Astéroïdes (4 formes × 3 tailles, mouvement, fragmentation, wraparound safe) | 2 sem. | 3 sem. |
 | ✅ | 5 | Collisions L∞ + score 7-seg + vies + HUD + respawn invincible | 1 sem. | 2 sem. |
 | ✅ | 6 | Soucoupe grande/petite + IA tir 8-way / ship-tracking + spawn cyclique | 1 sem. | 2 sem. |
-| 🔜 | 7 | Hyperespace + écran titre + high scores | 1 sem. | 2 sem. |
-| ⏳ | 8 | Son AY‑3‑8912 (effets + thump) | 1 sem. | 3 sem. |
+| ✅ | 7 | Hyperespace + restart + high scores top 5 (RAM) | 1 sem. | 2 sem. |
+| 🔜 | 8 | Son AY‑3‑8912 (effets + thump) | 1 sem. | 3 sem. |
 | ⏳ | 9 | Synchro VSync « propre » + polish + `.dsk` final | 1 sem. | 2 sem. |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
@@ -172,13 +172,28 @@ si la rangée 4 ne suffit pas (ex: ESC pour pause).
 - Multiple UFO simultanés (Atari original = 1 max, mais variantes possibles).
 - Investigation racine du bug BSS clear (Phase 9 polish).
 
-### Phase 7 — Hyperespace + écran titre + high scores
+### Phase 7 — Hyperespace + restart + high scores ✅
 
-**Définition de fin** :
-- Hyperespace : disparition, téléportation aléatoire, probabilité de mort.
-- Écran titre vectoriel avec démo passive (RAM seedée).
-- Table de 10 high scores avec saisie initiales (3 lettres) au clavier.
-- Persistance high scores en `.tap` (saisie + relecture).
+**Définition de fin validée (2026-05-10)** :
+- Hyperespace via touche `↓` (DOWN, row 4 col 6), edge-trigger + cooldown
+  35 frames. 25% chance de mort, sinon téléportation aléatoire +
+  mini-invincibilité.
+- Game state implicite (`gameover` flag du HUD) : inputs/UFO/physique
+  ship gelés, seul SPACE déclenche `game_reset()` complet.
+- High scores top 5 en RAM (16-bit, 10 octets BSS), insertion triée
+  au passage en game over, affichage table en game over.
+- **Phase 6 réellement complétée** ici (intégration UFO dans game_run).
+
+**Hors scope Phase 7 (différé Phase 9)** :
+- Persistance high scores en `.tap` (besoin driver cassette résident).
+- Écran titre vectoriel (lettres "ASTEROIDS" en segments).
+- Table 10 entrées (limitée à 5 par budget BSS Phase 6/7).
+- Saisie initiales 3 lettres (sans alphabet en font 7-seg, complexe).
+
+**Phase 7b (future, optionnelle)** :
+- Probabilité hyperespace progressive avec score (table arcade).
+- Rendu propre de la table high scores (digits 7-seg réutilisés).
+- Démo passive en écran d'attente (IA simple jouant la frame 0).
 
 ### Phase 8 — Son AY‑3‑8912
 
