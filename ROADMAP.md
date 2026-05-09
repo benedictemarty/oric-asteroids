@@ -12,9 +12,8 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 |---|---|---|---|---|
 | ✅ | 1 | Squelette sans OSDK + HIRES + triangle statique | 1 sem. | 2 sem. |
 | ✅ | 2 | Bresenham XOR + benchmark (97 c/px, 25 Hz acté) | 2 sem. | 4–6 sem. |
-| 🔜 | 3 | Vaisseau rotatif + tirs + input clavier | 2 sem. | 3 sem. |
-| ⏳ | 3 | Vaisseau rotatif + tirs + input clavier | 2 sem. | 3 sem. |
-| ⏳ | 4 | Astéroïdes (formes, mouvement, fragmentation, wraparound) | 2 sem. | 3 sem. |
+| ✅ | 3 | Vaisseau rotatif (32 angles) + tirs + scan clavier VIA direct | 2 sem. | 3 sem. |
+| 🔜 | 4 | Astéroïdes (formes, mouvement, fragmentation, wraparound) | 2 sem. | 3 sem. |
 | ⏳ | 5 | Collisions + gestion vies/score | 1 sem. | 2 sem. |
 | ⏳ | 6 | Soucoupe (grande/petite) + IA de tir | 1 sem. | 2 sem. |
 | ⏳ | 7 | Hyperespace + écran titre + high scores | 1 sem. | 2 sem. |
@@ -62,15 +61,31 @@ Pour un développeur **débutant en 6502**, doubler l'estimation réaliste
 **Phase 2b (future)** : SMC + déroulage boucle pour atteindre 40-50 c/px
 et permettre 30 segments × 20 px à 25 Hz (scènes arcade complètes).
 
-### Phase 3 — Vaisseau rotatif + tirs + input clavier
+### Phase 3 — Vaisseau rotatif + tirs + input clavier ✅
 
-**Définition de fin** :
-- Vaisseau triangulaire à rotation continue (table sin/cos 256 entrées),
-  thrust, friction lente, wraparound aux bords.
-- Tirs : ≤ 4 simultanés, durée de vie limitée, vélocité fixée.
-- Lecture clavier VIA directe (pas de ROM Atmos) : rotation, thrust, tir,
-  hyperespace, pause.
-- Maintien du framerate cible avec ~5 entités à l'écran.
+**Définition de fin validée (2026-05-09)** :
+- Vaisseau triangulaire 32 angles (résolution 11.25°), tables précalculées
+  192 octets en RODATA. Rotation horaire visuelle par incrément ±1.
+- Thrust dans la direction de la pointe, friction × 15/16 par frame
+  (cc65 `>>4` en signed = ASR), clamp |v| ≤ 16 px/frame.
+- Wraparound limité à zone sûre [14,226] × [14,186] (anti-overflow vertices).
+- Tirs : 4 simultanés en BSS, vélocité ±6 px/frame fixe, TTL 35 frames,
+  edge-trigger SPACE + cooldown 4 frames.
+- Lecture clavier VIA directe (PB3 + PSG reg 14 = $EF), 4 colonnes :
+  ← (col 5) / → (col 7) / ↑ (col 3, thrust) / SPACE (col 0, tir).
+- Synchro 25 Hz via VIA Timer 1 one-shot (39 999 cycles = $9C3F),
+  IFR bit 6 polling. Pas de gestion IRQ.
+- `make check` PASS (capture statique vaisseau centré).
+
+**Bugs Phase 3 documentés** :
+- DDRA = $00 (laissé en input par la ROM) rendait les écritures PSG
+  invisibles. Forcé $FF dans `_key_scan` avec save/restore.
+- Convention PB3 inversée vs intuition : PB3 = 1 = touche pressée
+  (cf. `portb_read_callback` Phosphoric). `bne`/`beq` corrigés.
+
+**Phase 3b (future, optionnelle)** : ajout flame de thrust visible,
+support touches HOLD via debouncing logiciel, détection touche multiple
+si la rangée 4 ne suffit pas (ex: ESC pour pause).
 
 ### Phase 4 — Astéroïdes
 

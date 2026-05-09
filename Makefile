@@ -13,34 +13,50 @@ EXEC_ADDR = 1280
 CFG       = cfg/oric1.cfg
 BUILD     = build
 
-SRCS_C    = src/main.c
-SRCS_ASM  = src/asm/crt0.s src/asm/line.s
+SRCS_C    = src/main.c src/game.c
+SRCS_ASM  = src/asm/crt0.s src/asm/line.s src/asm/ship.s \
+            src/asm/ship_verts.s src/asm/input.s
 
-OBJ_CRT0  = $(BUILD)/crt0.o
-OBJ_LINE  = $(BUILD)/line.o
-OBJ_MAIN  = $(BUILD)/main.o
-OBJS      = $(OBJ_CRT0) $(OBJ_LINE) $(OBJ_MAIN)
+OBJ_CRT0   = $(BUILD)/crt0.o
+OBJ_LINE   = $(BUILD)/line.o
+OBJ_SHIP   = $(BUILD)/ship.o
+OBJ_VERTS  = $(BUILD)/ship_verts.o
+OBJ_INPUT  = $(BUILD)/input.o
+OBJ_MAIN   = $(BUILD)/main.o
+OBJ_GAME   = $(BUILD)/game.o
+OBJS       = $(OBJ_CRT0) $(OBJ_LINE) $(OBJ_SHIP) $(OBJ_VERTS) \
+             $(OBJ_INPUT) $(OBJ_MAIN) $(OBJ_GAME)
 
 BIN       = $(BUILD)/$(PROJECT).bin
 TAP       = $(BUILD)/$(PROJECT).tap
 
 # Fast load injecte le binaire après ~3M cycles (RAM test Oric BASIC 1.0).
-# CALL_CYCLES = instant d'envoi de "CALL 1280" : assez tard pour que le code
-# soit en RAM, assez tôt pour laisser TIME_AFTER cycles de jeu avant capture.
 FASTLOAD_DONE  = 3500000
-TIME_AFTER     = 2500000
+TIME_AFTER     = 4000000
 TEST_CYCLES    = $(shell echo $$(($(FASTLOAD_DONE) + $(TIME_AFTER))))
-SCREENSHOT     = tests/out/phase2_lines.ppm
-REF_SHOT       = tests/ref/phase2_lines.ppm
+SCREENSHOT     = tests/out/phase3_ship.ppm
+REF_SHOT       = tests/ref/phase3_ship.ppm
 BENCH_CYCLES   = $(shell echo $$(($(FASTLOAD_DONE) + 25000000)))
-BENCH_PROF     = tests/out/phase2_bench.prof
+BENCH_PROF     = tests/out/phase3_bench.prof
 
-.PHONY: all clean run test ref check bench
+# Inputs scriptés Phase 3 :
+#   après 3.5M cycles : CALL 1280 (lance le jeu)
+#   après 4.0M cycles : appui RIGHT ARROW (tourne 0.5 s)
+#   après 4.5M cycles : appui UP ARROW (thrust)
+#   après 5.5M cycles : appui SPACE (tir)
+TEST_INPUT     = "$(FASTLOAD_DONE):CALL $(LOAD_ADDR)\n"
+
+.PHONY: all clean run test ref check bench gen_ship
 
 all: $(TAP)
 
 $(BUILD):
 	mkdir -p $(BUILD)
+
+# Régénération des tables vaisseau (32 angles précalculés)
+gen_ship: tools/gen_ship.py
+	python3 tools/gen_ship.py > src/asm/ship_verts.s
+	@echo ">>> src/asm/ship_verts.s régénéré"
 
 $(OBJ_CRT0): src/asm/crt0.s | $(BUILD)
 	$(CA65) -t none -o $@ $<
@@ -48,10 +64,25 @@ $(OBJ_CRT0): src/asm/crt0.s | $(BUILD)
 $(OBJ_LINE): src/asm/line.s | $(BUILD)
 	$(CA65) -t none -o $@ $<
 
-$(BUILD)/main.s: $(SRCS_C) | $(BUILD)
+$(OBJ_SHIP): src/asm/ship.s | $(BUILD)
+	$(CA65) -t none -o $@ $<
+
+$(OBJ_VERTS): src/asm/ship_verts.s | $(BUILD)
+	$(CA65) -t none -o $@ $<
+
+$(OBJ_INPUT): src/asm/input.s | $(BUILD)
+	$(CA65) -t none -o $@ $<
+
+$(BUILD)/main.s: src/main.c | $(BUILD)
 	$(CC65) -t none -O -o $@ $<
 
 $(OBJ_MAIN): $(BUILD)/main.s
+	$(CA65) -t none -o $@ $<
+
+$(BUILD)/game.s: src/game.c | $(BUILD)
+	$(CC65) -t none -O -o $@ $<
+
+$(OBJ_GAME): $(BUILD)/game.s
 	$(CA65) -t none -o $@ $<
 
 $(BIN): $(OBJS) $(CFG)
@@ -64,12 +95,12 @@ $(TAP): $(BIN)
 
 run: $(TAP)
 	$(EMU) -m oric1 -r $(ROM) -t $(TAP) -f \
-	       --type-keys "$(FASTLOAD_DONE):CALL $(LOAD_ADDR)\n"
+	       --type-keys $(TEST_INPUT)
 
 test: $(TAP)
 	@mkdir -p tests/out
 	$(EMU) --headless -m oric1 -r $(ROM) -t $(TAP) -f \
-	       --type-keys "$(FASTLOAD_DONE):CALL $(LOAD_ADDR)\n" \
+	       --type-keys $(TEST_INPUT) \
 	       --cycles $(TEST_CYCLES) \
 	       --screenshot $(SCREENSHOT)
 	@echo ">>> capture : $(SCREENSHOT)"
@@ -86,7 +117,7 @@ check: test
 bench: $(TAP)
 	@mkdir -p tests/out
 	$(EMU) --headless -m oric1 -r $(ROM) -t $(TAP) -f \
-	       --type-keys "$(FASTLOAD_DONE):CALL $(LOAD_ADDR)\n" \
+	       --type-keys $(TEST_INPUT) \
 	       --cycles $(BENCH_CYCLES) \
 	       --profile $(BENCH_PROF)
 	@echo "=== Rapport profiler ==="

@@ -7,7 +7,72 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir : Phase 3 (vaisseau rotatif + tirs + input clavier).
+À venir : Phase 4 (astéroïdes : formes, mouvement, fragmentation, wraparound).
+
+## [0.4.0] - 2026-05-09
+
+### Phase 3 — Vaisseau rotatif + tirs + input clavier ✅
+
+**Définition de fin validée :**
+- Vaisseau triangulaire rotatif (32 angles précalculés, résolution 11.25°),
+  thrust dans la direction de la pointe, friction × 15/16 par frame.
+- Tirs : ≤ 4 simultanés, durée de vie 35 frames (~1.4 s), vélocité ±6 px/frame
+  fixée à l'angle du vaisseau au moment du tir.
+- Lecture clavier VIA directe (PB3 + PSG reg 14 = $EF, rangée 4) :
+  ←/→/↑ (flèches) + SPACE (tir).
+- Boucle 25 Hz via VIA Timer 1 one-shot (latch 39 999 = $9C3F).
+- `make check` PASS — capture statique vaisseau centré identique à la référence.
+
+### Added
+
+- `tools/gen_ship.py` — génère `src/asm/ship_verts.s` (192 octets RODATA) :
+  3 sommets × 32 angles précalculés + vecteurs de thrust (x = sin, y = -cos).
+- `src/asm/ship.s` — état ZP (`_ship_x/_y/_vx/_vy/_angle/_key_state`),
+  routines `_ship_init`, `_ship_draw`/`_ship_erase` (XOR idempotent),
+  `_ship_rotate`. Tail-call sur `_draw_line_xor` pour le 3e segment.
+- `src/asm/input.s` — `_key_scan` : SEI, sauvegarde PCR/DDRA, écrit PSG
+  reg 14 = $EF via séquence BC1/BDIR (PCR $EE/$CC/$EC/$CC), scanne 4
+  colonnes (5/7/3/0), restaure et CLI.
+- `src/game.c` — `game_run()` : init Timer 1, ship_update (friction +
+  intégration 16-bit + wraparound zone sûre [14,226]×[14,186]), bullets
+  (4 max, edge-trigger sur SPACE, cooldown 4 frames), frame_wait par
+  polling IFR T1 bit 6.
+- `tests/ref/phase3_ship.ppm` — capture de référence (vaisseau statique
+  au centre, 3075 pixels blancs).
+
+### Changed
+
+- `src/main.c` — simplifié : appelle `game_run()` uniquement.
+- `Makefile` — cibles `gen_ship`, ajout `src/game.c` + 3 sources asm,
+  `TEST_CYCLES` étendu à 4 s post-fastload (capture après stabilisation).
+
+### Fixed (bugs Phase 3)
+
+- `input.s` : DDRA était laissé à $00 (input) par la ROM après son scan
+  VSync, rendant nos écritures `sta VIA_ORA` invisibles côté PSG. Force
+  DDRA = $FF avant chaque write PSG, restauré ensuite.
+- `input.s` : convention PB3 inversée. Sur Oric-1 (cf. `portb_read_callback`
+  Phosphoric), **PB3 = 1 si touche pressée**, 0 sinon. Notre code testait
+  `bne` après `and #$08` ; corrigé en `beq` pour les 4 colonnes.
+
+### Décisions techniques Phase 3
+
+- **Rotation par tables précalculées** (32 angles, 192 octets) plutôt
+  qu'une multiplication signée 8×8 → 16 bits en temps réel : plus rapide,
+  plus simple, résolution suffisante (11.25°) pour la jouabilité arcade.
+- **Position en pixels entiers + vitesse signée 8-bit** plutôt que 8.8
+  fixed-point : la friction × 15/16 et le clamp |v| ≤ 16 suffisent pour
+  Phase 3 ; la précision 8.8 sera ajoutée si nécessaire en Phase 4-5.
+- **Frame timing par VIA Timer 1 one-shot** au lieu de VSync ULA :
+  déterministe, pas d'IRQ à gérer, démarrage explicite par frame. Le
+  vrai VSync ULA reste prévu pour Phase 9 (polish anti-tearing).
+- **Scan clavier VIA direct** (pas de buffer ROM Atmos $0265) :
+  - répond immédiatement (pas de délai key-repeat ROM 30 frames)
+  - détecte plusieurs touches simultanément (ex : ← + ↑ pour rotation
+    pendant thrust)
+  - portable Oric-1 / Atmos (pas dépendant de variables BASIC)
+- **4 tirs max, edge-trigger SPACE + cooldown 4 frames** : limite arcade
+  fidèle (Asteroids original = 4 tirs simultanés).
 
 ## [0.3.0] - 2026-05-09
 
