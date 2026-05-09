@@ -26,6 +26,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 9f | FX_THRUST + FX_LIFE (6 effets sons total) (v1.0.5) | — | 1 j |
 | ✅ | 9g | Fix bug XOR sommets partagés (ship/lettres/asteroids/UFO) (v1.0.6) | — | 1 j |
 | ✅ | 10a | Shapes asteroids ATARI ARCADE rev 4 authentiques (v1.1.0) | — | 1 j |
+| ✅ | 10b | Shapes Atari N sommets variables (11-13) sans décimation (v1.1.1) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.

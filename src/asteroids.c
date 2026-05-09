@@ -20,11 +20,15 @@ extern unsigned char lx0, ly0, lx1, ly1;
 
 void draw_line_xor(void);
 
-/* Tables de sommets générées par tools/gen_shapes.py — index flat.
- * cc65 préfixe automatiquement les symboles C avec '_', donc le label
- * asm 'shape_x' correspond au C 'shape_x'. */
-extern const signed char shape_x[96];
-extern const signed char shape_y[96];
+/* Tables de sommets générées par tools/gen_shapes.py — Phase 10b N variable.
+ *   shape_off[size*4+shape]  : offset (uint8) dans shape_x/y
+ *   shape_len[size*4+shape]  : N sommets pour cette shape
+ *   shape_x/y[total]         : 147 sommets (4 shapes × 3 tailles, N variable)
+ */
+extern const signed char shape_x[];
+extern const signed char shape_y[];
+extern const unsigned char shape_off[12];
+extern const unsigned char shape_len[12];
 extern const unsigned char shape_radii[3];
 
 /* État des astéroïdes (BSS, zéro à l'init via bullets_init logique) */
@@ -102,34 +106,39 @@ void asteroids_update(void)
     }
 }
 
-/* Tracé d'un astéroïde donné (XOR — appel pair = état initial).
- *   base = (size * 4 + shape) * 8 = offset dans shape_x / shape_y.
- *   Boucle 0..7 : tracer segment vertex_i → vertex_(i+1)&7. */
+/* Tracé d'un astéroïde — Phase 10b : N sommets variables.
+ *   shape_idx = size * 4 + shape
+ *   base      = shape_off[shape_idx]
+ *   n         = shape_len[shape_idx]
+ *   trace n segments vertex_i → vertex_((i+1) mod n) puis replot des
+ *   n sommets (Phase 9g — polygone fermé, sommets partagés). */
 static void asteroid_draw_one(unsigned char idx)
 {
-    unsigned char i, base;
+    unsigned char i, base, n, next;
+    unsigned char shape_idx;
     unsigned char ax, ay;
     signed char dx0, dy0, dx1, dy1;
 
     ax = asteroids[idx].x;
     ay = asteroids[idx].y;
-    /* base = size*32 + shape*8 (équivalent à (size*4+shape)*8) */
-    base = (asteroids[idx].size << 5) + (asteroids[idx].shape << 3);
+    shape_idx = (asteroids[idx].size << 2) + asteroids[idx].shape;
+    base = shape_off[shape_idx];
+    n    = shape_len[shape_idx];
 
-    for (i = 0; i < 8; i++) {
+    for (i = 0; i < n; i++) {
+        next = (i + 1 == n) ? 0 : (i + 1);
         dx0 = shape_x[base + i];
         dy0 = shape_y[base + i];
-        dx1 = shape_x[base + ((i + 1) & 7)];
-        dy1 = shape_y[base + ((i + 1) & 7)];
+        dx1 = shape_x[base + next];
+        dy1 = shape_y[base + next];
         lx0 = (unsigned char)((signed char)ax + dx0);
         ly0 = (unsigned char)((signed char)ay + dy0);
         lx1 = (unsigned char)((signed char)ax + dx1);
         ly1 = (unsigned char)((signed char)ay + dy1);
         draw_line_xor();
     }
-    /* Phase 9g : replot des 8 sommets (polygone fermé → chaque sommet est
-     * partagé entre 2 segments adjacents → XOR 2× = effacé sans replot). */
-    for (i = 0; i < 8; i++) {
+    /* Phase 9g : replot des N sommets (polygone fermé) */
+    for (i = 0; i < n; i++) {
         dx0 = shape_x[base + i];
         dy0 = shape_y[base + i];
         lx0 = (unsigned char)((signed char)ax + dx0);

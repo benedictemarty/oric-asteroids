@@ -7,14 +7,62 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10b+ :
-- Shapes Atari avec N sommets variables (11-13 au lieu de décimés à 8).
-- Logique de jeu portée du désasm (variables `statusShip`, table `astWaveTimerReload`,
-  IA soucoupe rev 4, etc.).
+À venir Phase 10c+ :
+- Logique de jeu portée du désasm (variables `statusShip`, `horzVelShip`,
+  table `astWaveTimerReload`, IA soucoupe rev 4, séquence spawn arcade).
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
 - Démo passive en écran titre.
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.1.1] - 2026-05-10
+
+### Phase 10b — Shapes Atari N sommets variables (11-13) ✅
+
+**Plus de décimation** : les 4 shapes asteroids Atari rev 4 sont
+maintenant utilisées avec **leur nombre original de sommets** (11, 13,
+12, 13). Visuellement les silhouettes rocheuses arcade authentiques
+sont rendues avec toutes leurs concavités.
+
+### Format des données
+
+Nouveau format `shapes.s` :
+- `shape_off[12]` : offset (uint8) dans `shape_x/y`, par `(size*4 + shape)`
+- `shape_len[12]` : nombre de sommets (uint8) par shape
+- `shape_x[147]`, `shape_y[147]` : sommets cumulés (4 shapes × 3 tailles
+  × 11-13 sommets = 49 sommets/taille × 3 = 147 total)
+- `shape_radii[3]` : rayons collision
+
+Total RODATA shapes : 12 + 12 + 147×2 + 3 = **321 octets** (vs 195 avant
+en Phase 10a). +126 octets pour la fidélité visuelle.
+
+### Changed
+
+- `tools/gen_shapes.py` : émet `shape_off` et `shape_len` ; pas de
+  décimation. Les 49 sommets/taille proviennent du décodage SVEC complet.
+- `src/asteroids.c` :
+  - `asteroid_draw_one` lit `shape_off[shape_idx]` + `shape_len[shape_idx]`
+    et trace N segments avec wrap modulo N.
+  - Replot des N sommets après les segments (XOR).
+  - `shape_idx = size * 4 + shape` (au lieu de `(size << 5) + (shape << 3)`).
+- `tests/ref/phase9_release.ppm` mis à jour.
+
+### Décisions techniques Phase 10b
+
+- **Format flat indexé** plutôt que tableau de pointeurs (`(uint8*)[12]`) :
+  économise 12 octets de pointeurs et évite l'indirection. L'offset 8-bit
+  suffit pour 49 sommets/taille (max < 256).
+- **Pas de réduction au strict minimum (8 sommets)** comme en Phase 10a :
+  certaines shapes Atari ont des concavités importantes (creux dans la
+  pierre) qui disparaissent à 8 sommets décimés. La fidélité l'emporte.
+- **Wrap modulo N** via test `(i+1 == n) ? 0 : (i+1)` plutôt que `% n` :
+  cc65 implémente `%` via une routine logicielle coûteuse pour `int` ;
+  le test conditionnel est plus rapide.
+
+### Tag
+
+`v1.1.1` — bump patch (changement format données interne, comportement
+inchangé visuellement par rapport à v1.1.0 sauf rendu plus fidèle).
 
 ## [1.1.0] - 2026-05-10
 
