@@ -13,8 +13,8 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 1 | Squelette sans OSDK + HIRES + triangle statique | 1 sem. | 2 sem. |
 | ✅ | 2 | Bresenham XOR + benchmark (97 c/px, 25 Hz acté) | 2 sem. | 4–6 sem. |
 | ✅ | 3 | Vaisseau rotatif (32 angles) + tirs + scan clavier VIA direct | 2 sem. | 3 sem. |
-| 🔜 | 4 | Astéroïdes (formes, mouvement, fragmentation, wraparound) | 2 sem. | 3 sem. |
-| ⏳ | 5 | Collisions + gestion vies/score | 1 sem. | 2 sem. |
+| ✅ | 4 | Astéroïdes (4 formes × 3 tailles, mouvement, fragmentation, wraparound safe) | 2 sem. | 3 sem. |
+| 🔜 | 5 | Collisions + gestion vies/score | 1 sem. | 2 sem. |
 | ⏳ | 6 | Soucoupe (grande/petite) + IA de tir | 1 sem. | 2 sem. |
 | ⏳ | 7 | Hyperespace + écran titre + high scores | 1 sem. | 2 sem. |
 | ⏳ | 8 | Son AY‑3‑8912 (effets + thump) | 1 sem. | 3 sem. |
@@ -87,15 +87,35 @@ et permettre 30 segments × 20 px à 25 Hz (scènes arcade complètes).
 support touches HOLD via debouncing logiciel, détection touche multiple
 si la rangée 4 ne suffit pas (ex: ESC pour pause).
 
-### Phase 4 — Astéroïdes
+### Phase 4 — Astéroïdes ✅
 
-**Définition de fin** :
-- 4 formes × 3 tailles d'astéroïdes extraites du disasm Atari (Nick Mikstas),
-  reformatées en `data/shapes.h`.
-- Mouvement linéaire avec wraparound par duplication d'instance.
-- Fragmentation : taille N → 2 × taille N‑1, angles ±θ.
-- Spawn de la vague initiale selon table Atari.
-- Maintien du framerate cible avec ~10 entités.
+**Définition de fin validée (2026-05-09)** :
+- 4 formes octogonales × 3 tailles (rayons 5/9/14), 8 sommets/forme.
+  Tables précalculées 195 octets RODATA (gen_shapes.py — perturbations
+  radiales propres au projet, en remplacement du désasm Atari pour Phase 4).
+- Mouvement linéaire entier (vx, vy ∈ {-2..+2}) + wraparound zone safe
+  [16,224] × [16,184]. La duplication d'instance vraie est reportée en
+  Phase 4b (nécessite tracé en coordonnées 16-bit).
+- Fragmentation implémentée (`asteroids_fragment(idx)`) : casse en 2
+  enfants size-1, vélocités = ±90° du parent (1 boost ×2 aléatoire).
+- Spawn vague initiale = 4 grands aux 4 coins (positions/vélocités
+  déterministes, RNG seed fixe = 0x42 pour reproductibilité tests).
+- Framerate observé ~15-18 Hz avec 4 grands actifs (rendu = ~62k cycles
+  > budget 25 Hz). Accepté en Phase 4 ; SMC + déroulage Bresenham
+  (Phase 2b) restaureront 25 Hz.
+
+**Bugs Phase 4 documentés** :
+- cc65 préfixe les symboles C avec `_` ; `extern const signed char _shape_x[]`
+  cherchait `__shape_x` (deux underscores). Corrigé en utilisant `shape_x`
+  côté C (cc65 → `_shape_x`, matche le label asm).
+
+**Phase 4b (future, optionnelle)** :
+- Wraparound par duplication d'instance (tracé entité 2× ou 4× près des
+  bords avec coords 16-bit signées).
+- Format 8.8 fixed-point pour les enfants de fragmentation (vitesses
+  fractionnaires plus douces).
+- Extraction des shapes Atari authentiques (Nick Mikstas) en remplacement
+  des octogones génériques actuels.
 
 ### Phase 5 — Collisions + vies + score
 

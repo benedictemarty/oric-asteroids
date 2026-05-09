@@ -13,19 +13,22 @@ EXEC_ADDR = 1280
 CFG       = cfg/oric1.cfg
 BUILD     = build
 
-SRCS_C    = src/main.c src/game.c
+SRCS_C    = src/main.c src/game.c src/asteroids.c
 SRCS_ASM  = src/asm/crt0.s src/asm/line.s src/asm/ship.s \
-            src/asm/ship_verts.s src/asm/input.s
+            src/asm/ship_verts.s src/asm/input.s src/asm/shapes.s
 
-OBJ_CRT0   = $(BUILD)/crt0.o
-OBJ_LINE   = $(BUILD)/line.o
-OBJ_SHIP   = $(BUILD)/ship.o
-OBJ_VERTS  = $(BUILD)/ship_verts.o
-OBJ_INPUT  = $(BUILD)/input.o
-OBJ_MAIN   = $(BUILD)/main.o
-OBJ_GAME   = $(BUILD)/game.o
-OBJS       = $(OBJ_CRT0) $(OBJ_LINE) $(OBJ_SHIP) $(OBJ_VERTS) \
-             $(OBJ_INPUT) $(OBJ_MAIN) $(OBJ_GAME)
+OBJ_CRT0    = $(BUILD)/crt0.o
+OBJ_LINE    = $(BUILD)/line.o
+OBJ_SHIP    = $(BUILD)/ship.o
+OBJ_VERTS   = $(BUILD)/ship_verts.o
+OBJ_INPUT   = $(BUILD)/input.o
+OBJ_SHAPES  = $(BUILD)/shapes.o
+OBJ_MAIN    = $(BUILD)/main.o
+OBJ_GAME    = $(BUILD)/game.o
+OBJ_ASTER   = $(BUILD)/asteroids.o
+OBJS        = $(OBJ_CRT0) $(OBJ_LINE) $(OBJ_SHIP) $(OBJ_VERTS) \
+              $(OBJ_INPUT) $(OBJ_SHAPES) $(OBJ_MAIN) $(OBJ_GAME) \
+              $(OBJ_ASTER)
 
 BIN       = $(BUILD)/$(PROJECT).bin
 TAP       = $(BUILD)/$(PROJECT).tap
@@ -34,10 +37,10 @@ TAP       = $(BUILD)/$(PROJECT).tap
 FASTLOAD_DONE  = 3500000
 TIME_AFTER     = 4000000
 TEST_CYCLES    = $(shell echo $$(($(FASTLOAD_DONE) + $(TIME_AFTER))))
-SCREENSHOT     = tests/out/phase3_ship.ppm
-REF_SHOT       = tests/ref/phase3_ship.ppm
+SCREENSHOT     = tests/out/phase4_field.ppm
+REF_SHOT       = tests/ref/phase4_field.ppm
 BENCH_CYCLES   = $(shell echo $$(($(FASTLOAD_DONE) + 25000000)))
-BENCH_PROF     = tests/out/phase3_bench.prof
+BENCH_PROF     = tests/out/phase4_bench.prof
 
 # Inputs scriptés Phase 3 :
 #   après 3.5M cycles : CALL 1280 (lance le jeu)
@@ -58,6 +61,11 @@ gen_ship: tools/gen_ship.py
 	python3 tools/gen_ship.py > src/asm/ship_verts.s
 	@echo ">>> src/asm/ship_verts.s régénéré"
 
+# Régénération des tables d'astéroïdes (4 formes × 3 tailles)
+gen_shapes: tools/gen_shapes.py
+	python3 tools/gen_shapes.py > src/asm/shapes.s
+	@echo ">>> src/asm/shapes.s régénéré"
+
 $(OBJ_CRT0): src/asm/crt0.s | $(BUILD)
 	$(CA65) -t none -o $@ $<
 
@@ -73,16 +81,25 @@ $(OBJ_VERTS): src/asm/ship_verts.s | $(BUILD)
 $(OBJ_INPUT): src/asm/input.s | $(BUILD)
 	$(CA65) -t none -o $@ $<
 
+$(OBJ_SHAPES): src/asm/shapes.s | $(BUILD)
+	$(CA65) -t none -o $@ $<
+
 $(BUILD)/main.s: src/main.c | $(BUILD)
-	$(CC65) -t none -O -o $@ $<
+	$(CC65) -t none -O -I src -o $@ $<
 
 $(OBJ_MAIN): $(BUILD)/main.s
 	$(CA65) -t none -o $@ $<
 
-$(BUILD)/game.s: src/game.c | $(BUILD)
-	$(CC65) -t none -O -o $@ $<
+$(BUILD)/game.s: src/game.c src/asteroids.h | $(BUILD)
+	$(CC65) -t none -O -I src -o $@ $<
 
 $(OBJ_GAME): $(BUILD)/game.s
+	$(CA65) -t none -o $@ $<
+
+$(BUILD)/asteroids.s: src/asteroids.c src/asteroids.h | $(BUILD)
+	$(CC65) -t none -O -I src -o $@ $<
+
+$(OBJ_ASTER): $(BUILD)/asteroids.s
 	$(CA65) -t none -o $@ $<
 
 $(BIN): $(OBJS) $(CFG)

@@ -7,7 +7,68 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir : Phase 4 (astéroïdes : formes, mouvement, fragmentation, wraparound).
+À venir : Phase 5 (collisions cercle-cercle, vies, score, HUD).
+
+## [0.5.0] - 2026-05-09
+
+### Phase 4 — Astéroïdes (formes, mouvement, fragmentation, wraparound) ✅
+
+**Définition de fin validée :**
+- 4 formes octogonales × 3 tailles (5/9/14 px de rayon), 8 sommets chacune,
+  192 octets de tables RODATA (`tools/gen_shapes.py` → `src/asm/shapes.s`).
+- Mouvement linéaire entier avec wraparound zone safe [16,224] × [16,184]
+  (la duplication d'instance est différée à Phase 4b — voir hors-roadmap).
+- Fragmentation : grand → 2 moyens, moyen → 2 petits, petit → disparu ;
+  vélocités enfants = rotation 90° du parent ± boost 2× (RNG).
+- Spawn vague initiale : 4 grands asteroids aux 4 coins, vélocités fixes
+  orientées vers le centre.
+- 12 asteroids max simultanés (BSS, 84 octets).
+- `make check` PASS — capture stable identique sur 3 runs successifs.
+
+### Added
+
+- `tools/gen_shapes.py` — générateur 4 formes × 3 tailles + rayons
+  collision (Phase 5). 195 octets de tables RODATA total.
+- `src/asm/shapes.s` — auto-généré : `shape_x[96]`, `shape_y[96]` (flat,
+  index = `(size*4+shape)*8 + vertex`), `shape_radii[3]`.
+- `src/asteroids.h` + `src/asteroids.c` — module `Asteroid`,
+  fonctions `asteroids_init/spawn_wave/update/draw/fragment/count`,
+  RNG LFSR 8-bit Galois (polynôme x^8+x^6+x^5+x^4+1, seed = 0x42).
+- `tests/ref/phase4_field.ppm` — capture de référence (vaisseau centré
+  + 4 grands asteroids dans la zone safe, ~3000 pixels blancs).
+
+### Changed
+
+- `src/game.c` — boucle de jeu intègre `asteroids_init/spawn_wave` avant
+  la boucle ; `asteroids_draw` (XOR) et `asteroids_update` dans chaque
+  itération, dans le bon ordre (effacer ↔ position cohérente).
+- `Makefile` — ajout sources `src/asteroids.c` + `src/asm/shapes.s`,
+  cible `gen_shapes`, option `-I src` pour cc65 (asteroids.h),
+  capture/référence renommées en `phase4_field.ppm`.
+
+### Décisions techniques Phase 4
+
+- **Format flat des shapes** (1 tableau plat indexé par
+  `(size*4+shape)*8 + vertex`) plutôt que tables de pointeurs : accès
+  direct via `_shape_x[base + i]` en C, pas de double indirection,
+  surcoût mémoire négligeable (192 vs 24 octets de pointeurs + 192).
+- **Position entière 8-bit + vélocité signée 8-bit** par astéroïde au
+  lieu du 8.8 fixed-point : les vélocités initiales (±1 à ±2 px/frame)
+  ne nécessitent pas de fraction. Format 8.8 sera ajouté en Phase 4b
+  pour les enfants de fragmentation rapides.
+- **Wraparound zone safe** [16,224] × [16,184] (pas de duplication
+  d'instance) : compromis Phase 4. La duplication propre nécessite un
+  format de coordonnées 16-bit pour le tracé hors zone (Phase 4b).
+- **12 asteroids max** dans le pool BSS : compromis budget cycles
+  vs cas extrême de fragmentation (4 grands → 8 moyens → 16 petits,
+  mais en pratique la collision détruit les petits avant qu'ils ne
+  s'accumulent — Phase 5).
+- **RNG LFSR 8-bit déterministe** avec seed fixe pour reproductibilité
+  des tests CI ; Phase 7+ utilisera la position des touches comme entropie.
+- **Framerate observé** : ~15-18 Hz avec 4 grands asteroids actifs
+  (4 × 8 segments × ~10 px × 97 c/px × 2 = ~62 000 cycles, dépasse le
+  budget 25 Hz à 40 000 cycles). Acceptable pour Phase 4 ; les
+  optimisations SMC/déroulage ligne (Phase 2b) restaureront 25 Hz.
 
 ## [0.4.0] - 2026-05-09
 

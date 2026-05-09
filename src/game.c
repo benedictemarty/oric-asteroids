@@ -1,15 +1,20 @@
 /*
- * game.c — Boucle de jeu Phase 3
+ * game.c — Boucle de jeu Phase 3 + Phase 4
  *
- * Gère :
+ * Phase 3 :
  *   - timing 25 Hz via VIA Timer 1 one-shot (40 000 cycles)
  *   - physique vaisseau (friction + intégration + wraparound)
- *   - 4 tirs simultanés (édge-trigger sur SPACE)
+ *   - 4 tirs simultanés (edge-trigger sur SPACE)
  *   - dispatch input → actions
  *
+ * Phase 4 :
+ *   - intégration asteroids (spawn vague initiale, draw/update XOR)
+ *
  * L'état du vaisseau est en ZP (déclaré dans ship.s).
- * Les tirs sont en RAM/BSS (peu accédés, taille modeste).
+ * Les tirs et asteroids sont en RAM/BSS.
  */
+
+#include "asteroids.h"
 
 /* ------------------------------------------------------------------ */
 /* Symboles importés depuis l'asm                                      */
@@ -227,13 +232,19 @@ void game_run(void)
     timer_init();
     ship_init();
     bullets_init();
+    asteroids_init(0x42);
+    asteroids_spawn_wave();
+
+    /* Première frame : tout dessiner */
     ship_draw();
+    asteroids_draw();
 
     for (;;) {
         key_scan();
 
-        /* Effacer (XOR avec l'état précédent) */
+        /* Effacer (XOR avec l'état précédent) — ordre inverse du tracé */
         bullets_render();
+        asteroids_draw();
         ship_erase();
 
         /* Input → actions */
@@ -248,9 +259,11 @@ void game_run(void)
         /* Mise à jour physique */
         ship_update();
         bullets_update();
+        asteroids_update();
 
-        /* Redessiner */
+        /* Redessiner aux nouvelles positions */
         ship_draw();
+        asteroids_draw();
         bullets_render();
 
         /* Synchro frame 25 Hz */
