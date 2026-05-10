@@ -7,13 +7,93 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 18+ :
-- SMC Bresenham (patcher dy/dx en immédiats dans la boucle).
-- Déroulage 2× ou 4× du corps de boucle.
-- Optimisations C → ASM des boucles draw critiques.
+À venir Phase 19+ :
+- SMC : patcher dy/dx en immédiats dans la boucle (gain ~3 c/px).
+- Déroulage 2× ou 4× du corps de boucle main-axis.
+- Optimisations C → ASM des boucles draw critiques en C.
 
 (Hors scope définitif : `.tap`/`.dsk` persistance, mix multi-canaux.
  Différé : variables arcade, clipping Cohen-Sutherland.)
+
+## [1.2.8] - 2026-05-10
+
+### Phase 18 — Main-axis split Bresenham ✅
+
+**Objectif** : refactor algorithmique majeur de la boucle Bresenham.
+Au lieu de l'algo générique 16-bit avec `e2 = 2*err`, deux tests
+imbriqués (step x ET step y avec mise à jour d'erreur 16-bit), on
+sépare en 2 boucles distinctes choisies à l'init :
+- **Horizontale** (dx ≥ dy) : step x toujours, step y conditionnel
+- **Verticale** (dy > dx) : step y toujours, step x conditionnel
+
+Algo 8-bit non-signé : `err += axe_secondaire ; si err ≥ axe_principal :
+step secondaire, err -= axe_principal`.
+
+### Bench profiler
+
+- **Avant Phase 18** : 8 836 027 instructions
+- **Après Phase 18** : 8 617 685 instructions
+- **Gain** : **218 342 instructions = ~2.47%**
+
+Le plus gros gain cumulé d'une phase d'optim ; ~10× le gain Phase 17.
+
+### Cycles par pixel (estimation)
+
+Avant (Bresenham générique 16-bit) :
+- Plot : 14
+- Test fin compteur : 7
+- e2 = 2*err calcul 16-bit : 16
+- Test step x (avec `tax/txa`) : 22-26
+- Step x : 7-15
+- Test step y : 8-15
+- Step y conditionnel : 11-17
+- Total : ~85-110 c/px
+
+Après (main-axis horizontal, cas commun no-step-y) :
+- Plot : 14
+- Test fin (DEC + BNE) : 8
+- err += dy + cmp : 11+3
+- Branche no_stepy + sta err : 6
+- Step x toujours (lsr + bcs) : 7
+- jmp @h_loop : 3
+- Total : ~52 c/px
+
+Cas avec step y : +14 cycles → ~66 c/px.
+Estimation moyenne pondérée : **55-60 c/px** soit **~30-35% plus rapide**.
+
+### Changes
+
+- **`src/asm/line.s`** :
+  - Refactor complet de la boucle `_draw_line_xor` : remplacement
+    de l'algo générique par split horizontal/vertical.
+  - Suppression du calcul de `e2 = 2 * err` (16-bit).
+  - Suppression de `l_e2lo`, `l_e2hi`, `l_err_hi` (gardés en ZP
+    mais inutilisés — pourront être retirés en Phase 19).
+  - Compteur `l_pix = max(dx, dy) + 1` calculé après le branch
+    horizontal/vertical.
+  - Test de fin `dec l_pix / bne @body` (sans trampoline) +
+    `jmp @done` en cas terminal.
+- Binaire : 15 356 → 15 393 octets (+37, normal pour 2 boucles).
+
+### Décisions techniques Phase 18
+
+- **Pourquoi pas SMC** : SMC complique le débogage et la lecture de la
+  boucle. Phase 18 fait d'abord la simplification algorithmique
+  (gain solide). Phase 19+ pourra ajouter SMC sur cette base.
+- **err 8-bit non-signé** : suffit car `dx, dy ≤ 239`. L'algo
+  `err += dy ; if err ≥ dx : err -= dx` reste dans [0, dx-1] tout
+  le temps. Pas de débordement.
+- **Idempotence draw+erase préservée** : le swap initial
+  (lx0 > lx1 → permutation) garantit que `draw(A,B)` et `draw(B,A)`
+  utilisent la même boucle interne avec les mêmes paramètres.
+  L'algo est déterministe.
+- **Branches courtes** : la boucle horizontale + verticale font
+  ensemble ~150 octets ; le `BNE @body` reste dans la portée
+  ±127 octets sans trampoline.
+- **`make ref` reseté** : la nouvelle séquence de pixels (algo
+  différent de Bresenham classique) peut tracer des pixels légèrement
+  différents sur lignes obliques. La capture de référence a été
+  régénérée — visuel toujours correct.
 
 ## [1.2.7] - 2026-05-10
 

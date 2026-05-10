@@ -204,123 +204,140 @@ _draw_line_xor:
         lda  x_msk,y
         sta  l_mask
 
-        ;--- Phase 17 : compteur pixels = max(dx, dy) + 1 ---
+        ;--- Phase 18 : main-axis split ---
+        ; err 8-bit non-signé, biais 0. Choix axe principal selon dx vs dy.
+        ; Algo : err += axe_secondaire ; si err >= axe_principal → step
+        ;        secondaire, err -= axe_principal.
+        lda  #0
+        sta  l_err_lo
+        ldy  #0                 ; Y=0 fixe pour (l_ptr),y
+
         lda  l_dx
         cmp  l_dy
-        bcs  @pix_dx
+        bcs  @h_init             ; dx >= dy → axe horizontal
+        ; dy > dx → axe vertical
         lda  l_dy
-@pix_dx:
         clc
         adc  #1
         sta  l_pix
+        jmp  @v_loop
 
-        ;--- err = dx - dy (16-bit signe) ---
+@h_init:
         lda  l_dx
-        sec
-        sbc  l_dy
-        sta  l_err_lo
-        bcs  @err_pos
-        lda  #$FF
-        bne  @err_set
-@err_pos:
-        lda  #0
-@err_set:
-        sta  l_err_hi
-        ldy  #0                 ; Y=0 fixe pour (l_ptr),y
+        clc
+        adc  #1
+        sta  l_pix
+        ; tomber sur @h_loop
 
-;-----------------------------------------------------------------
-; Boucle principale
-;-----------------------------------------------------------------
-@loop:
-        ;--- XOR du pixel (Phase 16 : 14 cycles, ORA #$40 retiré) ---
-        ; L'invariant bit6=1 est préservé : x_msk[i] a TOUJOURS bit6=0,
-        ; donc l'XOR ne touche pas bit6. Init HIRES = $40 → bit6 reste 1.
+;==================================================================
+; Boucle HORIZONTALE (dx >= dy) : step x toujours (sx=+1 garanti par
+; swap), step y conditionnel.
+;==================================================================
+@h_loop:
+        ; XOR pixel (14c)
         lda  l_mask
         eor  (l_ptr),y
         sta  (l_ptr),y
-
-        ;--- Phase 17 : Test de fin par compteur (7-8 c vs 12-15 c) ---
+        ; Compteur fin : BNE court vers le corps, sinon JMP @done.
         dec  l_pix
-        beq  @done
-
-        ;--- e2 = 2 * err (16 cycles) ---
+        bne  @h_body
+        jmp  @done
+@h_body:
+        ; err += dy ; if err >= dx : step y, err -= dx (11+6c)
         lda  l_err_lo
-        asl
-        sta  l_e2lo
-        lda  l_err_hi
-        rol
-        sta  l_e2hi
-
-        ;--- Test : e2 > -dy (step x) ---
-        lda  l_e2lo
         clc
         adc  l_dy
-        tax
-        lda  l_e2hi
-        adc  #0
-        bmi  @no_stepx
-        bne  @stepx
-        txa
-        beq  @no_stepx
-@stepx:
-        ; err -= dy
-        lda  l_err_lo
-        sec
-        sbc  l_dy
-        sta  l_err_lo
-        bcs  @sx_ok
-        dec  l_err_hi
-@sx_ok:
-        ; Phase 17 : inc _lx0 supprimés (plus relu — fin via compteur).
-        ; Avancer x (sx=+1 toujours) : LSR masque, incr adresse si nouvelle colonne.
-        lsr  l_mask             ; 5 cycles (ZP)
-        bcs  @sx_newcol         ; 3 (pris 1/6)
-        jmp  @no_stepx          ; 3
-@sx_newcol:
-        lda  #$20               ; 2 nouveau masque = bit5
-        sta  l_mask             ; 3
-        inc  l_ptr              ; 5
-        bne  @no_stepx
-        inc  l_ptr+1            ; 5 (rare : page boundary)
-@no_stepx:
-
-        ;--- Test : e2 < dx (step y) ---
-        lda  l_e2hi
-        bmi  @stepy
-        bne  @no_stepy
-        lda  l_e2lo
         cmp  l_dx
-        bcs  @no_stepy
-@stepy:
-        ; err += dx
-        lda  l_err_lo
-        clc
-        adc  l_dx
+        bcc  @h_no_stepy
+        sbc  l_dx                ; carry set par cmp BCS
         sta  l_err_lo
-        bcc  @sy_ok
-        inc  l_err_hi
-@sy_ok:
-        ; Avancer y : l_ptr +/- 40 selon sy
+        ; step y conditionnel selon sy
         lda  l_sy
-        bmi  @sy_neg
+        bmi  @h_sy_neg
         lda  l_ptr
         clc
         adc  #40
         sta  l_ptr
-        bcc  @sy_done
+        bcc  @h_step_x
         inc  l_ptr+1
-        jmp  @sy_done
-@sy_neg:
+        jmp  @h_step_x
+@h_sy_neg:
         lda  l_ptr
         sec
         sbc  #40
         sta  l_ptr
-        bcs  @sy_done
+        bcs  @h_step_x
         dec  l_ptr+1
-@sy_done:
-        ; Phase 17 : update _ly0 supprimée (plus relu — fin via compteur).
-@no_stepy:
-        jmp  @loop
+        jmp  @h_step_x
+@h_no_stepy:
+        sta  l_err_lo
+@h_step_x:
+        ; step x toujours (sx=+1) : lsr mask, increment ptr si nouvelle colonne
+        lsr  l_mask
+        bcs  @h_newcol
+        jmp  @h_loop
+@h_newcol:
+        lda  #$20
+        sta  l_mask
+        inc  l_ptr
+        bne  @h_loop
+        inc  l_ptr+1
+        jmp  @h_loop
+
+;==================================================================
+; Boucle VERTICALE (dy > dx) : step y toujours (sy quelconque),
+; step x conditionnel.
+;==================================================================
+@v_loop:
+        ; XOR pixel
+        lda  l_mask
+        eor  (l_ptr),y
+        sta  (l_ptr),y
+        ; Compteur fin : BNE court vers le corps, sinon JMP @done.
+        dec  l_pix
+        bne  @v_body
+        jmp  @done
+@v_body:
+        ; err += dx ; if err >= dy : step x, err -= dy
+        lda  l_err_lo
+        clc
+        adc  l_dx
+        cmp  l_dy
+        bcc  @v_no_stepx
+        sbc  l_dy
+        sta  l_err_lo
+        ; step x : lsr mask, ptr++ si newcol
+        lsr  l_mask
+        bcs  @v_newcol
+        jmp  @v_step_y
+@v_newcol:
+        lda  #$20
+        sta  l_mask
+        inc  l_ptr
+        bne  @v_step_y
+        inc  l_ptr+1
+        jmp  @v_step_y
+@v_no_stepx:
+        sta  l_err_lo
+@v_step_y:
+        ; step y toujours selon sy
+        lda  l_sy
+        bmi  @v_sy_neg
+        lda  l_ptr
+        clc
+        adc  #40
+        sta  l_ptr
+        bcc  @v_loop
+        inc  l_ptr+1
+        jmp  @v_loop
+@v_sy_neg:
+        lda  l_ptr
+        sec
+        sbc  #40
+        sta  l_ptr
+        bcs  @v_loop
+        dec  l_ptr+1
+        jmp  @v_loop
 
 @done:
         rts

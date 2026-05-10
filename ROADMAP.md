@@ -47,6 +47,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 15 | Lettre H + label "HIGH SCORES" en game over (v1.2.5) | — | 1 j |
 | ✅ | 16 | Optimisations framerate (`_plot_dot` + `ORA #$40` retiré) (v1.2.6) | — | 1 j |
 | ✅ | 17 | Compteur pixels Bresenham + suppression updates _lx0/_ly0 (v1.2.7) | — | 1 j |
+| ✅ | 18 | Main-axis split Bresenham (refactor algo, gain 2.47%) (v1.2.8) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.
