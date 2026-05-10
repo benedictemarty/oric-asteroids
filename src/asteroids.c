@@ -187,56 +187,83 @@ void asteroids_draw(void)
     }
 }
 
-/* Fragmentation (Phase 5 utilisera : tir+collision → fragment).
- * Indice idx vers un astéroïde actif :
- *   size > 0 → désactive et crée 2 enfants taille-1 avec vélocités
- *              perturbées dans le RNG (angles ±θ approximation).
- *   size = 0 → désactive simplement (petit détruit). */
+/* RNG signé dans [-15, +15] — port de SetAstVel ($7203) :
+ *   AND #$8F garde sign + 4 bits magnitude
+ *   Si négatif : ORA #$F0 (sign extension) → range complète.  */
+static signed char rand_offset(void)
+{
+    unsigned char r = rng8() & 0x8F;
+    if (r & 0x80) r |= 0xF0;
+    return (signed char)r;
+}
+
+/* Clamp arcade GetAstVelocity ($7233) adapté au format vx/vy 8-bit Oric :
+ *   - max |v| = 15 (arcade : 31, divisé par 2 pour notre échelle)
+ *   - min |v| = 3 (arcade : 6, idem)
+ *   - signe préservé (asteroid ne peut pas s'arrêter)
+ */
+static signed char clamp_vel(int v)
+{
+    if (v > 15)  v = 15;
+    if (v < -15) v = -15;
+    if (v > 0  && v < 3)  v = 3;
+    if (v < 0  && v > -3) v = -3;
+    return (signed char)v;
+}
+
+/* Fragmentation arcade-fidèle — Phase 10f.
+ * Port de BreakAsteroid ($75EC) + SplitAsteroid ($761D) + SetAstVel ($7203).
+ *
+ * 1. Petit détruit (size==0) : désactivation, fini.
+ * 2. Sinon : taille -- en place, parent reste actif (slot conservé).
+ * 3. SplitAsteroid : crée 2 nouveaux asteroids même taille à la même position.
+ * 4. SetAstVel pour chaque enfant + parent : nouvelle_vel = parent_vel + RNG(-15..+15),
+ *    clampé [-15,+15] avec |v|≥3.
+ * Total : 1 parent réduit + 2 nouveaux = **3 fragments** par hit (vs 2 avant). */
 void asteroids_fragment(unsigned char idx)
 {
     unsigned char child_size;
-    unsigned char i, found;
-    signed char vx, vy;
-    unsigned char ax, ay, sh;
+    unsigned char i, found, sh;
+    signed char vx_p, vy_p;
+    unsigned char ax, ay;
 
     if (!asteroids[idx].active) return;
 
-    /* Sauver les attributs avant désactivation */
-    ax = asteroids[idx].x;
-    ay = asteroids[idx].y;
-    vx = asteroids[idx].vx;
-    vy = asteroids[idx].vy;
-    sh = asteroids[idx].shape;
-    asteroids[idx].active = 0;
+    /* Petit détruit complètement (cf. arcade : size devient 0, asteroid disparu) */
+    if (asteroids[idx].size == SIZE_SMALL) {
+        asteroids[idx].active = 0;
+        return;
+    }
 
-    if (asteroids[idx].size == SIZE_SMALL) return;
+    /* Conserver les attributs du parent avant modification */
+    ax   = asteroids[idx].x;
+    ay   = asteroids[idx].y;
+    vx_p = asteroids[idx].vx;
+    vy_p = asteroids[idx].vy;
+    sh   = asteroids[idx].shape;
     child_size = asteroids[idx].size - 1;
 
-    /* Créer 2 enfants : enfant[0] perturbe (vx, vy) → (vx', vy')
-     *                  enfant[1] perturbe → (vy, -vx) (rotation 90°)
-     * Les enfants sont plus rapides : multiplier vx/vy par 2 (max ±2). */
+    /* 1. Parent : taille réduite, slot conservé, vélocité perturbée */
+    asteroids[idx].size  = child_size;
+    asteroids[idx].shape = (sh + 1) & 3;
+    asteroids[idx].vx    = clamp_vel((int)vx_p + (int)rand_offset());
+    asteroids[idx].vy    = clamp_vel((int)vy_p + (int)rand_offset());
+
+    /* 2. Créer 2 NOUVEAUX asteroids dans des slots libres */
     found = 0;
     for (i = 0; i < MAX_ASTEROIDS && found < 2; i++) {
-        if (asteroids[i].active) continue;
+        if (i == idx || asteroids[i].active) continue;
         asteroids[i].active = 1;
         asteroids[i].size   = child_size;
-        asteroids[i].shape  = (sh + found + 1) & 3;
+        asteroids[i].shape  = (sh + 2 + found) & 3;
         asteroids[i].x      = ax;
         asteroids[i].y      = ay;
-        if (found == 0) {
-            asteroids[i].vx =  (signed char)(vy);
-            asteroids[i].vy = -(signed char)(vx);
-        } else {
-            asteroids[i].vx = -(signed char)(vy);
-            asteroids[i].vy =  (signed char)(vx);
-        }
-        /* Accélérer un peu (taille -1 = plus rapide) en ajoutant un peu de RNG */
-        if (rng8() & 1) {
-            asteroids[i].vx = (signed char)(asteroids[i].vx * 2);
-            asteroids[i].vy = (signed char)(asteroids[i].vy * 2);
-        }
+        asteroids[i].vx     = clamp_vel((int)vx_p + (int)rand_offset());
+        asteroids[i].vy     = clamp_vel((int)vy_p + (int)rand_offset());
         found++;
     }
+    /* Si pas assez de slots libres : pool plein, on accepte la perte
+     * (arcade fait pareil via GetFreeAstSlot qui retourne BMI). */
 }
 
 unsigned char asteroids_count(void)

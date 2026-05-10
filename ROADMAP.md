@@ -30,6 +30,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 10c | Spawn arcade-fidèle (vagues progressives, RNG positions/vél.) (v1.1.2) | — | 1 j |
 | ✅ | 10d | Lettre W + affichage "WAVE n" dans HUD (v1.1.3) | — | 1 j |
 | ✅ | 10e | Démo passive arcade-style en écran titre (v1.1.4) | — | 1 j |
+| ✅ | 10f | Fragmentation arcade authentique (3 fragments, RNG vél.) (v1.1.5) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.

@@ -7,12 +7,67 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10f+ :
+À venir Phase 10g+ :
 - Variables Atari arcade (`statusShip`, `horzVelShip`, etc.) côté code.
 - IA soucoupe rev 4 (table de précision indexée par score).
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
+- Wraparound par duplication d'instance (vrai cylindre arcade).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.1.5] - 2026-05-10
+
+### Phase 10f — Fragmentation arcade authentique ✅
+
+**Port de la logique arcade rev 4** depuis le désasm :
+- `BreakAsteroid` ($75EC)
+- `SplitAsteroid` ($761D)
+- `SetAstVel` ($7203) + `GetAstVelocity` ($7233)
+
+### Changements de comportement
+
+| Aspect | Avant (Phase 4) | Après (Phase 10f / arcade) |
+|---|---|---|
+| Nb fragments | **2 enfants** (parent désactivé) | **3 fragments** (parent réduit + 2 nouveaux) |
+| Vélocité enfants | Rotation fixe ±90° du parent | parent_vel + RNG(-15..+15), clamp [-15,+15], min |v|≥3 |
+| Slot parent | Désactivé après hit | **Conservé**, taille réduite |
+| Petit (size 0) | Disparu | Idem (inchangé) |
+
+### Conséquences gameplay
+
+- **Plus d'asteroids** à l'écran après chaque hit (3 vs 2) → tension croissante plus marquée
+- **Trajectoires moins prévisibles** : les enfants ne partent plus en équerre fixe mais avec un héritage de la direction du parent + perturbation RNG
+- **Toujours en mouvement** : `clamp_vel` impose `|v| ≥ 3` → un fragment ne peut pas s'arrêter au point de hit
+- **Au pire** : 4 grands → 12 moyens → 36 petits = **52 fragments potentiels** par vague (vs 16 en Phase 4)
+  - Limité en pratique par `MAX_ASTEROIDS = 12` : on perd les fragments excédentaires
+  - Cohérent avec arcade : `GetFreeAstSlot` retourne BMI si pool plein
+
+### Added
+
+- `rand_offset()` : RNG signé `[-15, +15]` (port `AND #$8F` + sign-extend `ORA #$F0`).
+- `clamp_vel(int v)` : clamp `[-15, +15]` avec minimum `|v| ≥ 3` (port `GetAstVelocity`).
+
+### Changed
+
+- `src/asteroids.c` : `asteroids_fragment` réécrit selon la logique arcade.
+- `tests/ref/phase9_release.ppm` : régénérée (capture en écran titre + démo passive,
+  reproductibilité conservée via RNG seed `0x42`).
+
+### Décisions techniques Phase 10f
+
+- **Échelle vélocité divisée par 2** vs arcade : notre format `vx/vy` est
+  un signed char direct (8-bit), l'arcade utilise du 8.8 fixed-point.
+  Garder `|v| ≤ 15` (vs `≤ 31` arcade) maintient des trajectoires lisibles
+  sans déborder la zone safe wraparound `[16, 224]`.
+- **MAX_ASTEROIDS = 12** non augmenté : avec fragmentation 3-enfants,
+  on peut atteindre 52 fragments théoriques. Mais le budget cycles/frame
+  limite l'affichage à ~10 entités fluides. Le pool de 12 est un
+  compromis budget/intensité.
+- **Pas de tracking du `tueur`** (ship vs UFO) pour l'attribution du score :
+  l'arcade ne crédite pas si la collision vient d'un saucer/saucer-bullet.
+  Notre code crédite déjà uniquement via `collisions_bullets_asteroids` →
+  comportement équivalent (UFO bullet vs asteroid n'attribue pas de score
+  via `collisions_ufobullet_asteroids`).
 
 ## [1.1.4] - 2026-05-10
 
