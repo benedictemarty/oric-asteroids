@@ -853,9 +853,9 @@ void game_run(void)
         if (ship_was_drawn) ship_erase();    /* erase à pos/angle N-1 */
 
         if (!gameover) {
-            /* Rotation : 1 angle/frame = 25 angles/s = tour en 1.3 s. */
-            if (key_state & 0x01) ship_rotate((signed char)-1);
-            if (key_state & 0x02) ship_rotate((signed char)+1);
+            /* Rotation : 2 angles/frame = 50 angles/s = tour en 0.64 s. */
+            if (key_state & 0x01) ship_rotate((signed char)-2);
+            if (key_state & 0x02) ship_rotate((signed char)+2);
             if (key_state & 0x04) {
                 ship_apply_thrust();
                 if (sfx_id == FX_NONE) sound_play_fx(FX_THRUST);
