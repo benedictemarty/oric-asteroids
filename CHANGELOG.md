@@ -134,6 +134,23 @@ Période du toggle réduite de 24 à 8 frames (de ~1.4 s à ~0.5 s à
   attendus : timing changé par `asteroids_render` + cadence du
   toggle PRESS SPACE).
 
+### Fix — DDRB pendant scan clavier ✅
+
+**Symptôme** : tirs SPACE ratés dans le jeu, rotation incohérente
+(certaines flèches ne déclenchent rien).
+
+**Cause** : sur la VIA 6522, `lda VIA_ORB` retourne
+`(orb & ddrb) | (pin & ~ddrb)`. Si DDRB[3] = 1 (output), on relit
+ce qu'on a précédemment écrit sur ORB[3], pas l'état réel de la
+ligne PB3 (= sortie du scan clavier matriciel). La ROM Oric peut
+laisser DDRB = $FF après ses propres opérations, rendant la
+lecture du scan clavier non fiable.
+
+**Correctif** : `key_scan` sauvegarde DDRB et force `$F7`
+(PB3 = input, autres bits = output) pendant la durée du scan,
+puis restaure la valeur d'origine. Symétrique à ce qu'on faisait
+déjà pour DDRA.
+
 À venir Phase 19 (planifiée) :
 - **Vaisseau arcade-fidèle** : passer de 3 à **5 segments** pour
   reproduire la forme exacte de l'Atari rev 4 (pointe + 2 côtés

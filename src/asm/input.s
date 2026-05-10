@@ -36,6 +36,7 @@
 
         VIA_ORB    = $0300
         VIA_ORA    = $0301
+        VIA_DDRB   = $0302
         VIA_DDRA   = $0303
         VIA_PCR    = $030C
 
@@ -50,6 +51,7 @@
         .zeropage
 kb_pcr_save: .res 1     ; bits préservés du PCR (0 et 4)
 kb_ddra_save: .res 1    ; DDRA d'origine (à restaurer après)
+kb_ddrb_save: .res 1    ; DDRB d'origine (à restaurer après)
 kb_tmp:      .res 1
 
 ;-----------------------------------------------------------------
@@ -110,6 +112,15 @@ _key_scan:
         sta  kb_ddra_save
         lda  #$FF
         sta  VIA_DDRA
+
+        ; Sauvegarder DDRB et forcer PB3 = input (bits 0-2 et 4-7 = output).
+        ; Sur la VIA 6522, lda VIA_ORB retourne (orb & ddrb) | (pin & ~ddrb) :
+        ; si DDRB[3] = 1 (output), on relit ce qu'on a écrit, pas l'état clavier.
+        ; La ROM peut laisser DDRB = $FF — on impose $F7 pour le scan.
+        lda  VIA_DDRB
+        sta  kb_ddrb_save
+        lda  #$F7
+        sta  VIA_DDRB
 
         ; PSG reg14 = $EF (rangée 4 active, autres désactivées)
         lda  #$EF
@@ -214,6 +225,10 @@ _key_scan:
         ; Restaurer DDRA (laisser la ROM dans son état attendu)
         lda  kb_ddra_save
         sta  VIA_DDRA
+
+        ; Restaurer DDRB
+        lda  kb_ddrb_save
+        sta  VIA_DDRB
 
         cli
         rts
