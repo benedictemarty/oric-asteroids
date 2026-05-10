@@ -263,8 +263,9 @@ void presspace_erase(unsigned char py)
     presspace_draw(py);
 }
 
-/* Phase 10d — affichage "WAVE n" en haut-centre.
- * 5 caractères ("WAVE ") + 1 chiffre = 6 × 12 = 72 px, x = 80.  */
+/* Phase 10d/10j — affichage "WAVE nn" en haut-centre.
+ * 5 caractères ("WAVE ") + 1 ou 2 chiffres.
+ * Phase 10j : si wave > 9, afficher 2 chiffres (10, 11). */
 void wave_label_draw(unsigned char py, unsigned char digit)
 {
     extern void hud_xor_digit(unsigned char d, unsigned char px, unsigned char py);
@@ -274,8 +275,13 @@ void wave_label_draw(unsigned char py, unsigned char digit)
     draw_letter(letter_V, x +  24, py);
     draw_letter(letter_E, x +  36, py);
     /* (espace en x+48) */
-    if (digit > 9) digit = 9;       /* clamp à 1 chiffre pour l'instant */
-    hud_xor_digit(digit, x + 56, py);
+    if (digit > 99) digit = 99;
+    if (digit < 10) {
+        hud_xor_digit(digit, x + 56, py);
+    } else {
+        hud_xor_digit(digit / 10, x + 56, py);
+        hud_xor_digit(digit % 10, x + 62, py);
+    }
 }
 
 void wave_label_erase(unsigned char py, unsigned char digit)

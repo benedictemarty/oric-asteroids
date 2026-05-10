@@ -7,12 +7,31 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10j+ :
+À venir Phase 10k+ :
 - Variables Atari arcade (`statusShip`, `horzVelShip`, etc.) côté code.
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
 - Wraparound par duplication d'instance (vrai cylindre arcade).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.1.9] - 2026-05-10
+
+### Phase 10j — WAVE 2 chiffres ✅
+
+- `wave_label_draw` étendu : affiche `nn` (2 chiffres) si `wave ≥ 10`,
+  via 2 appels à `hud_xor_digit` espacés de 6 px.
+- Limite à `wave ≤ 99` (le pool d'asteroids plafonne à 11 par vague,
+  on ne dépassera pas 99 vagues en pratique mais clamp défensif).
+- Préserve l'affichage 1 chiffre pour `wave 1..9` (espacement 56 px,
+  position centrée).
+
+### Décisions techniques Phase 10j
+
+- **Chiffres 4 px de large + 2 px d'espace** : `digit / 10` à `x + 56`,
+  `digit % 10` à `x + 62`. Légèrement décentré à droite mais lisible.
+- **Division `/ 10` et `% 10` en cc65** : routines logicielles
+  ~150 cycles. Acceptable car appelé uniquement quand `current_wave`
+  change (1× par vague, pas chaque frame).
 
 ## [1.1.8] - 2026-05-10
 
