@@ -690,31 +690,12 @@ void game_run(void)
         unsigned char i;
         unsigned char prev_space = 0;
         unsigned char ps_visible = 1;     /* PRESS SPACE actuellement affiché */
-        /* Mélodie LAYTUNE Mine Storm Vectrex (port direct).
-         * Format : couples (note_idx, dur_frames).
-         * Notes : 0=G2 1=GS2 2=A2 3=AS2 4=B2 5=C3 6=CS3 ; 0xFF = boucle.
-         * Durées originales Vectrex (SC8=25, QSC=50) divisées par ~6
-         * pour adapter à notre rate frame ~17 Hz. */
-        static const unsigned char title_tune[] = {
-            0, 4,   /* G2 SC8  */
-            1, 4,   /* GS2 SC8 */
-            0, 4,   /* G2 SC8  */
-            1, 8,   /* GS2 QSC */
-            0, 4,   /* G2 SC8  */
-            1, 4,   /* GS2 SC8 */
-            0, 4,   /* G2 SC8  */
-            6, 4,   /* CS3 SC8 */
-            5, 4,   /* C3 SC8  */
-            0, 14,  /* G2 hold */
-            0xFF, 0 /* loop    */
-        };
-        unsigned char tune_pos = 0;
-        unsigned char tune_dur_left = 0;
-
-        for (i = 0; i < 96; i++) {
-            /* Double-scan par frame pour rattraper les appuis brefs.
-             * La frame du titre dure ~60 ms (17 Hz) : un appui SPACE
-             * < 60 ms tombant entre deux scans serait sinon manqué. */
+        /* Option C : aucune musique en écran titre — silence, comme
+         * l'arcade Atari Asteroids originale (le thump cadencé commence
+         * uniquement quand le jeu démarre). Le timeout sans appui est
+         * réduit à 32 frames (~2 s à 17 Hz) : pour démarrer rapidement
+         * il suffit d'appuyer sur SPACE, le double-scan le capte. */
+        for (i = 0; i < 32; i++) {
             key_scan();
             if ((key_state & 0x08) && !prev_space) break;
             prev_space = key_state & 0x08;
@@ -723,11 +704,7 @@ void game_run(void)
             key_scan();
             if ((key_state & 0x08) && !prev_space) break;
             prev_space = key_state & 0x08;
-            /* Toggle PRESS SPACE tous les 8 frames (~0.5 s à 17 Hz).
-             * Bug originel : `erase(); if(visible) draw();` faisait XOR XOR
-             * = identité aux toggles impairs → texte effectivement caché 100 %
-             * du temps après le 2e toggle, et état `ps_visible` désynchronisé.
-             * Fix : un seul XOR par toggle (erase si visible, draw si caché). */
+            /* Toggle PRESS SPACE tous les 8 frames (~0.5 s à 17 Hz). */
             if ((i & 0x07) == 0x07) {
                 if (ps_visible) {
                     presspace_erase(110);
@@ -737,18 +714,8 @@ void game_run(void)
                     ps_visible = 1;
                 }
             }
-            /* Mélodie titre Mine Storm : avance dans title_tune[] */
-            if (tune_dur_left == 0) {
-                if (title_tune[tune_pos] == 0xFF) tune_pos = 0;
-                tune_play_note(title_tune[tune_pos]);
-                tune_dur_left = title_tune[tune_pos + 1];
-                tune_pos += 2;
-            } else {
-                tune_dur_left--;
-            }
             frame_wait();
         }
-        tune_stop();
         /* Garantir l'état "effacé" en sortie (XOR cohérence) */
         if (ps_visible) presspace_erase(110);
     }
@@ -819,8 +786,13 @@ void game_run(void)
                 if (sfx_id == FX_NONE) sound_play_fx(FX_THRUST);
             }
 
+            /* Phase 18d : level-trigger temporaire pour diagnostiquer
+             * pourquoi le tir ne semble pas répondre. Le cooldown fire_cd
+             * (4 frames) limite la cadence à ~6 tirs/seconde @ 25 Hz —
+             * comportement proche de l'edge-trigger en pratique pour un
+             * appui humain bref. À repasser en edge-trigger si OK. */
             fire_now = key_state & 0x08;
-            if (fire_now && !prev_fire) bullet_fire();
+            if (fire_now) bullet_fire();
             prev_fire = fire_now;
 
             hyper_now = key_state & 0x10;
