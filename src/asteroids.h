@@ -5,7 +5,7 @@
 #ifndef ASTEROIDS_H
 #define ASTEROIDS_H
 
-#define MAX_ASTEROIDS 12
+#define MAX_ASTEROIDS 6
 
 #define SIZE_SMALL    0
 #define SIZE_MEDIUM   1

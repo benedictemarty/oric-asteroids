@@ -89,10 +89,10 @@ void asteroids_spawn_wave(void)
 
     if (current_wave == 0) {
         current_wave = 1;
-        ast_per_wave = 4;
+        ast_per_wave = 3;          /* réduit pour cap MAX_ASTEROIDS=6 (fragmentation × 3) */
     } else {
-        ast_per_wave += 2;
-        if (ast_per_wave > 11) ast_per_wave = 11;
+        ast_per_wave++;
+        if (ast_per_wave > 5) ast_per_wave = 5;
         current_wave++;
         /* Phase 10h : ScrSpeedup += 1 (max 11) — saucer plus pressant */
         if (scr_speedup < 11) scr_speedup++;

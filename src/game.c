@@ -853,12 +853,11 @@ void game_run(void)
         if (ship_was_drawn) ship_erase();    /* erase à pos/angle N-1 */
 
         if (!gameover) {
-            /* Rotation : 4 angles/frame. À 25 Hz théoriques = tour en 0.32 s,
-             * mais le framerate effectif chute parfois sous 10 Hz quand
-             * beaucoup d'asteroids → on surclocke la rotation pour rester
-             * réactif visuellement. Chaque pas reste de 11.25° (32 angles). */
-            if (key_state & 0x01) ship_rotate((signed char)-4);
-            if (key_state & 0x02) ship_rotate((signed char)+4);
+            /* Rotation : 2 angles/frame. Avec MAX_ASTEROIDS=6 + shapes
+             * décimées, framerate effectif ~10 Hz → 20 angles/s = tour
+             * en 1.6 s. Pas de 22.5° par tick → moins saccadé qu'à 4. */
+            if (key_state & 0x01) ship_rotate((signed char)-2);
+            if (key_state & 0x02) ship_rotate((signed char)+2);
             if (key_state & 0x04) {
                 ship_apply_thrust();
                 if (sfx_id == FX_NONE) sound_play_fx(FX_THRUST);

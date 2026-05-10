@@ -51,7 +51,21 @@ ATARI_SHAPE_3 = [
     (1, -3), (2, -4), (3, -3), (0, -1),
 ]
 
-ATARI_SHAPES = [ATARI_SHAPE_0, ATARI_SHAPE_1, ATARI_SHAPE_2, ATARI_SHAPE_3]
+# Phase 18h : décimation step=2 pour réduire le coût de tracé d'environ
+# 50% (11-13 sommets → 6-7). Visuellement on perd les "creux" fins de
+# l'arcade authentique mais on gagne en framerate effectif (passage de
+# ~2 Hz à ~5 Hz quand chargé, suffisant pour rotation/jeu fluides).
+DECIMATE_STEP = 2
+
+def _decimate(shape, step):
+    return shape[::step]
+
+ATARI_SHAPES = [
+    _decimate(ATARI_SHAPE_0, DECIMATE_STEP),
+    _decimate(ATARI_SHAPE_1, DECIMATE_STEP),
+    _decimate(ATARI_SHAPE_2, DECIMATE_STEP),
+    _decimate(ATARI_SHAPE_3, DECIMATE_STEP),
+]
 
 SCALES = [0.9, 1.6, 2.6]   # petit, moyen, grand → rayons cibles 5/9/14
 N_SHAPES = 4
