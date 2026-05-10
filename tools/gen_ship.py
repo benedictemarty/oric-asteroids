@@ -20,12 +20,15 @@ import sys
 N = 32      # nombre d'angles
 TMAG = 6    # amplitude max du thrust (px/frame)
 
-# Sommets du triangle vaisseau dans son repère local
+# Sommets du triangle vaisseau dans son repère local.
 # (y positif = bas, donc pointe en y négatif = haut)
+# Phase 18f : taille réduite ~50 % (de 16×20 à 8×10) pour matcher
+# proche de l'arcade Atari (~16 px max) sans tomber sous la limite de
+# visibilité à 240 px de large. Phase 19 prévoit 5 segments authentiques.
 VERTS = [
-    (0,  -12),   # P0: pointe avant
-    (-8,   8),   # P1: arrière gauche
-    (8,    8),   # P2: arrière droite
+    (0,  -6),    # P0: pointe avant
+    (-4,  4),    # P1: arrière gauche
+    (4,   4),    # P2: arrière droite
 ]
 
 

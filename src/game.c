@@ -766,26 +766,19 @@ void game_run(void)
          * le temps pendant lequel un astéroïde est éteint à l'écran.
          * ============================================================ */
 
-        /* 1. Erase entités mobiles SAUF asteroids (XOR à pos N-1).
-         *    Les asteroids ont leur propre bloc compact plus bas pour
-         *    minimiser leur fenêtre flicker (le plus visible). */
+        /* 1. Erase entités mobiles SAUF ship et asteroids (à pos N-1).
+         *    Ship a son propre bloc compact (plus bas) pour minimiser
+         *    son flicker (très visible vs astéroïdes). Asteroids idem
+         *    avec leur bloc per-entity. */
         asteroid_debris_render();
         debris_render();
         ufo_bullet_draw();
         ufo_draw();
         bullets_render();
-        if (ship_was_drawn) ship_erase();
 
-        /* 2. Apply input — modifie ship_angle / vel / spawne bullets.
-         *    Les modifs sont sûres ici : l'erase est terminé. */
+        /* 2. Bullets : input fire (edge-trigger) puis update.
+         *    Hyperespace edge-trigger DOWN. */
         if (!gameover) {
-            if (key_state & 0x01) ship_rotate((signed char)-1);
-            if (key_state & 0x02) ship_rotate((signed char)+1);
-            if (key_state & 0x04) {
-                ship_apply_thrust();
-                if (sfx_id == FX_NONE) sound_play_fx(FX_THRUST);
-            }
-
             fire_now = key_state & 0x08;
             if (fire_now && !prev_fire) bullet_fire();
             prev_fire = fire_now;
@@ -799,8 +792,7 @@ void game_run(void)
             if (hyper_cd) hyper_cd--;
         }
 
-        /* 3. Updates physiques NON-asteroids */
-        if (!gameover) ship_update();
+        /* 3. Updates physiques NON-asteroids NON-ship */
         bullets_update();
         if (!gameover) ufo_tick(ship_x, ship_y, score);
         ufo_bullet_update();
@@ -808,19 +800,33 @@ void game_run(void)
         asteroid_debris_update();
 
         /* 4. ===== ASTEROIDS — étape B per-entity =====
-         * asteroids_update sauve prev_x/prev_y (= pos en sortie de
-         * frame précédente) avant de calculer la nouvelle pos.
-         * asteroids_render fait erase à prev puis draw à curr
-         * consécutivement par entité. Fenêtre pendant laquelle un
-         * astéroïde donné est absent de l'écran = quelques centaines
-         * de cycles (entre les deux appels à asteroid_draw_one pour
-         * cet astéroïde précisément), pas la durée totale du frame. */
+         * asteroids_render fait erase à prev puis draw à curr consécutivement
+         * par entité. Collisions ship-asteroids déplacées dans le bloc ship
+         * ci-dessous (utilisent ship_x/y de la frame N-1, décalage 1 frame
+         * imperceptible à 25 Hz). */
         asteroids_update();
         collisions_bullets_asteroids();
         collisions_ufobullet_asteroids();
-        if (!gameover) collisions_ship_asteroids();
         asteroids_render();
         /* ===== FIN BLOC ASTEROIDS ===== */
+
+        /* 5. ===== SHIP — bloc compact erase → input → update → draw =====
+         * Fenêtre pendant laquelle le ship est absent de l'écran réduite
+         * à ~10 lignes de code (input apply + ship_update +
+         * collisions_ship_asteroids + bookkeeping) au lieu des ~50 du
+         * refactor précédent. */
+        if (ship_was_drawn) ship_erase();    /* erase à pos/angle N-1 */
+
+        if (!gameover) {
+            if (key_state & 0x01) ship_rotate((signed char)-1);
+            if (key_state & 0x02) ship_rotate((signed char)+1);
+            if (key_state & 0x04) {
+                ship_apply_thrust();
+                if (sfx_id == FX_NONE) sound_play_fx(FX_THRUST);
+            }
+            ship_update();
+            collisions_ship_asteroids();
+        }
 
         if (ship_invincible) ship_invincible--;
         check_next_wave();
@@ -828,13 +834,15 @@ void game_run(void)
         ship_visible = !gameover &&
                        (ship_invincible == 0 || (ship_invincible & 2));
 
-        /* 5. Draw entités mobiles non-asteroids à pos N */
         if (ship_visible) {
-            ship_draw();
+            ship_draw();                     /* draw à pos/angle N */
             ship_was_drawn = 1;
         } else {
             ship_was_drawn = 0;
         }
+        /* ===== FIN BLOC SHIP ===== */
+
+        /* 6. Draw entités mobiles restantes à pos N */
         bullets_render();
         ufo_draw();
         ufo_bullet_draw();
