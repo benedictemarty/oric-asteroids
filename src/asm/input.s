@@ -1,18 +1,42 @@
 ;=================================================================
-; input.s — Scan clavier Oric-1 direct (VIA + PSG), Phase 3
+; input.s — Scan clavier Oric-1 direct (VIA + PSG), Phase 18e
 ;
 ; Exporte _key_scan : remplit _key_state avec un bitmask :
-;   bit 0 : ← (LEFT, row 4 col 5)
-;   bit 1 : → (RIGHT, row 4 col 7)
-;   bit 2 : ↑ (UP, row 4 col 3) — thrust
-;   bit 3 : SPACE (row 4 col 0) — tir
-;   bit 4 : ↓ (DOWN, row 4 col 6) — hyperespace (Phase 7)
+;   bit 0 : ← (LEFT, HW row 5 col 4)
+;   bit 1 : → (RIGHT, HW row 7 col 4)
+;   bit 2 : ↑ (UP, HW row 3 col 4) — thrust
+;   bit 3 : SPACE (HW row 0 col 4) — tir
+;   bit 4 : ↓ (DOWN, HW row 6 col 4) — hyperespace
 ;
-; Architecture clavier Oric-1 (cf. sources Phosphoric / Oricutron) :
+; Mapping HW Oric-1 (validé contre Phosphoric corrigé) : TOUTES les
+; touches utilisées sont sur HW colonne 4 (la colonne LSHIFT/FUNCT
+; du 74LS138), différenciées par leur ligne PSG R14 :
+;
+;   ┌────────┬──────────┬─────────────┬─────────┐
+;   │ Touche │ HW col   │ HW row      │ R14     │
+;   │        │ (VIA ORB)│ (mask R14)  │ scan    │
+;   ├────────┼──────────┼─────────────┼─────────┤
+;   │ SPACE  │ 4        │ 0           │ $FE     │
+;   │ UP     │ 4        │ 3           │ $F7     │
+;   │ LEFT   │ 4        │ 5           │ $DF     │
+;   │ DOWN   │ 4        │ 6           │ $BF     │
+;   │ RIGHT  │ 4        │ 7           │ $7F     │
+;   ├────────┼──────────┼─────────────┼─────────┤
+;   │ LSHIFT │ 4        │ 4           │ $EF     │ (non utilisé ici)
+;   └────────┴──────────┴─────────────┴─────────┘
+;
+; Algo : ORB[0:2] = 4 fixé pour toute la séquence. Pour chaque touche,
+; on écrit le R14 correspondant (un seul bit à 0 = ligne active) et on
+; lit PB3 :
+;   - PB3 = 1 → touche pressée à (R14_row, col=4)
+;   - PB3 = 0 → pas de touche pressée
+;
+; Architecture clavier Oric-1 :
 ;   - VIA Port B bits 0-2 ($0300) sélectionnent la colonne (74LS138)
 ;   - PSG (AY-3-8912) Port A en input = lecture des rangées
-;   - Reg PSG 14 = masque de rangées actives (0 = activée)
-;   - VIA PB3 (bit 3 de $0300) = 0 si une rangée active a une touche pressée
+;   - Reg PSG 14 = masque de rangées actives (bit à 0 = activée)
+;   - VIA PB3 = combinatoire : 1 si une rangée active a une touche
+;     pressée sur la colonne sélectionnée
 ;
 ; PSG contrôlé via VIA :
 ;   BC1  = CA2 (PCR bits 1-3 ; mode 6 = low, mode 7 = high)
@@ -24,7 +48,6 @@
 ;   $CC = inactive (BDIR=0, BC1=0)
 ;   $EE = latch address (BDIR=1, BC1=1)
 ;   $EC = write data (BDIR=1, BC1=0)
-;   $CE = read data (BDIR=0, BC1=1) — non utilisé ici
 ;
 ; SEI/CLI encadrent la séquence : la ROM scanne aussi le PSG dans son
 ; IRQ VSync, on ne veut pas être interrompu en plein latch d'adresse.
@@ -49,10 +72,10 @@
 ; Variables ZP
 ;-----------------------------------------------------------------
         .zeropage
-kb_pcr_save: .res 1     ; bits préservés du PCR (0 et 4)
-kb_ddra_save: .res 1    ; DDRA d'origine (à restaurer après)
-kb_ddrb_save: .res 1    ; DDRB d'origine (à restaurer après)
-kb_tmp:      .res 1
+kb_pcr_save:  .res 1     ; bits préservés du PCR (0 et 4)
+kb_ddra_save: .res 1     ; DDRA d'origine (à restaurer après)
+kb_ddrb_save: .res 1     ; DDRB d'origine (à restaurer après)
+kb_tmp:       .res 1
 
 ;-----------------------------------------------------------------
 ; psg_write — écrit la valeur A dans le registre Y du PSG
@@ -91,11 +114,11 @@ psg_write:
         rts
 
 ;-----------------------------------------------------------------
-; _key_scan — lit les 4 touches de jeu, écrit le bitmask dans _key_state
+; _key_scan — lit les 5 touches de jeu, écrit le bitmask dans _key_state
 ;
-; Algo : sélectionne PSG reg14 = $EF (active la rangée 4 uniquement),
-; puis pour chaque colonne d'intérêt : sélectionne via ORB, lit PB3.
-; Si PB3 = 0 → touche (row 4, col) pressée.
+; ORB[0:2] = 4 (col fixe).  Pour chaque touche :
+;   - PSG reg14 = mask avec UN SEUL bit à 0 (ligne active)
+;   - Lecture PB3 → 1 si touche pressée
 ;-----------------------------------------------------------------
 _key_scan:
         sei                   ; pas d'IRQ ROM pendant l'accès PSG
@@ -116,129 +139,117 @@ _key_scan:
         ; Sauvegarder DDRB et forcer PB3 = input (bits 0-2 et 4-7 = output).
         ; Sur la VIA 6522, lda VIA_ORB retourne (orb & ddrb) | (pin & ~ddrb) :
         ; si DDRB[3] = 1 (output), on relit ce qu'on a écrit, pas l'état clavier.
-        ; La ROM peut laisser DDRB = $FF — on impose $F7 pour le scan.
         lda  VIA_DDRB
         sta  kb_ddrb_save
         lda  #$F7
         sta  VIA_DDRB
 
         ; PSG reg 7 = $7F : mixer tout muet + Port A en input (bit 6 = 1).
-        ; CRITIQUE : si bit 6 du reg 7 = 0 (Port A en output côté PSG),
-        ; le matériel ne peut PAS lire la matrice clavier → PB3 reste à 0
-        ; quoi qu'il arrive, et toutes les touches sont vues comme non
-        ; pressées. La ROM Oric peut laisser le PSG dans cet état (ou un
-        ; FX précédent dont le mixer n'aurait pas préservé bit 6).
-        ; On force ici pour garantir le scan ; le prochain sound_play_fx
-        ; restaurera le mixer voulu.
+        ; Si bit 6 = 0 (Port A en output côté PSG), le matériel ne peut
+        ; PAS lire la matrice → PB3 reste à 0 quoi qu'il arrive.
         lda  #$7F
         ldy  #7
         jsr  psg_write
 
-        ; PSG reg14 = $EF (rangée 4 active, autres désactivées)
-        lda  #$EF
-        ldy  #14
-        jsr  psg_write
+        ; Sélectionner HW col 4 sur ORB[0:2] (commun à tous les tests).
+        lda  VIA_ORB
+        and  #$F8
+        ora  #4
+        sta  VIA_ORB
 
         lda  #0
         sta  _key_state
 
         ;------------------------------------------------------------
-        ; Test colonne 5 = LEFT ARROW (bit 0 du _key_state)
+        ; SPACE = HW row 0, col 4 → reg14 = $FE (bit 0)
         ;------------------------------------------------------------
-        lda  VIA_ORB
-        and  #$F8
-        ora  #5
-        sta  VIA_ORB
-        ; Délai de stabilisation (la ligne PB3 est combinatoire mais
-        ; le PSG met 1 cycle à refléter le changement de colonne).
+        lda  #$FE
+        ldy  #14
+        jsr  psg_write
+        ; Délai de stabilisation matériel (le PSG met ~1 cycle à
+        ; refléter le changement de R14 sur PB3).
         nop
         nop
         lda  VIA_ORB
-        and  #$08             ; PB3 = 1 si touche pressée (Phosphoric / 6522 hw)
-        beq  @no_left
+        and  #$08             ; PB3 = 1 si touche pressée
+        beq  @no_fire
         lda  _key_state
-        ora  #$01
+        ora  #$08             ; bit 3 → SPACE
         sta  _key_state
-@no_left:
+@no_fire:
 
         ;------------------------------------------------------------
-        ; Test colonne 7 = RIGHT ARROW (bit 1)
+        ; UP = HW row 3, col 4 → reg14 = $F7 (bit 3)
         ;------------------------------------------------------------
-        lda  VIA_ORB
-        and  #$F8
-        ora  #7
-        sta  VIA_ORB
-        nop
-        nop
-        lda  VIA_ORB
-        and  #$08
-        beq  @no_right
-        lda  _key_state
-        ora  #$02
-        sta  _key_state
-@no_right:
-
-        ;------------------------------------------------------------
-        ; Test colonne 3 = UP ARROW (bit 2 → thrust)
-        ;------------------------------------------------------------
-        lda  VIA_ORB
-        and  #$F8
-        ora  #3
-        sta  VIA_ORB
+        lda  #$F7
+        ldy  #14
+        jsr  psg_write
         nop
         nop
         lda  VIA_ORB
         and  #$08
         beq  @no_up
         lda  _key_state
-        ora  #$04
+        ora  #$04             ; bit 2 → UP
         sta  _key_state
 @no_up:
 
         ;------------------------------------------------------------
-        ; Test colonne 0 = SPACE (bit 3 → tir)
+        ; LEFT = HW row 5, col 4 → reg14 = $DF (bit 5)
         ;------------------------------------------------------------
-        lda  VIA_ORB
-        and  #$F8
-        ora  #0
-        sta  VIA_ORB
+        lda  #$DF
+        ldy  #14
+        jsr  psg_write
         nop
         nop
         lda  VIA_ORB
         and  #$08
-        beq  @no_fire
+        beq  @no_left
         lda  _key_state
-        ora  #$08
+        ora  #$01             ; bit 0 → LEFT
         sta  _key_state
-@no_fire:
+@no_left:
 
         ;------------------------------------------------------------
-        ; Test colonne 6 = DOWN ARROW (bit 4 → hyperespace)
+        ; DOWN = HW row 6, col 4 → reg14 = $BF (bit 6)
         ;------------------------------------------------------------
-        lda  VIA_ORB
-        and  #$F8
-        ora  #6
-        sta  VIA_ORB
+        lda  #$BF
+        ldy  #14
+        jsr  psg_write
         nop
         nop
         lda  VIA_ORB
         and  #$08
         beq  @no_hyper
         lda  _key_state
-        ora  #$10
+        ora  #$10             ; bit 4 → DOWN
         sta  _key_state
 @no_hyper:
+
+        ;------------------------------------------------------------
+        ; RIGHT = HW row 7, col 4 → reg14 = $7F (bit 7)
+        ;------------------------------------------------------------
+        lda  #$7F
+        ldy  #14
+        jsr  psg_write
+        nop
+        nop
+        lda  VIA_ORB
+        and  #$08
+        beq  @no_right
+        lda  _key_state
+        ora  #$02             ; bit 1 → RIGHT
+        sta  _key_state
+@no_right:
 
         ; Restaurer reg14 = $FF (toutes rangées désactivées)
         lda  #$FF
         ldy  #14
         jsr  psg_write
 
-        ; Restaurer DDRA (laisser la ROM dans son état attendu)
+        ; Restaurer DDRA et DDRB
         lda  kb_ddra_save
         sta  VIA_DDRA
-
-        ; Restaurer DDRB
         lda  kb_ddrb_save
         sta  VIA_DDRB
 

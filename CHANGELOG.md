@@ -151,6 +151,35 @@ Période du toggle réduite de 24 à 8 frames (de ~1.4 s à ~0.5 s à
   durées Vectrex SC8/QSC (25/50 frames @ 50 Hz) divisées
   pour matcher 17 Hz écran titre.
 
+### Fix — scan clavier conforme HW Oric (col fixe, R14 mask par touche) ✅
+
+**Symptôme** : aucune touche du jeu (SPACE, flèches) n'était détectée
+dans `key_state` ; seul SHIFT droit produisait un faux positif (bit 1).
+
+**Cause** : convention HW Oric mal interprétée dans `input.s`. Le code
+testait des **colonnes différentes** (5, 7, 3, 0, 6) en gardant
+R14 = $EF (row 4 unique). Or sur le HW Oric réel, toutes les touches
+utilisées (SPACE/UP/LEFT/DOWN/RIGHT) sont sur la **même colonne 4**
+(la colonne LSHIFT/FUNCT du 74LS138) et sont différenciées par leur
+**ligne PSG R14** :
+
+|  Touche | HW col | HW row | R14 (1 bit à 0) |
+|---|---|---|---|
+| SPACE   | 4 | 0 | `$FE` |
+| UP      | 4 | 3 | `$F7` |
+| LEFT    | 4 | 5 | `$DF` |
+| DOWN    | 4 | 6 | `$BF` |
+| RIGHT   | 4 | 7 | `$7F` |
+
+**Correctif** : refactor de `_key_scan` — `ORB[0:2] = 4` est écrit
+une seule fois en début de scan, puis pour chaque touche on écrit
+le R14 correspondant via `psg_write` et on lit PB3. 5 `psg_write`
+par scan au lieu d'1, mais le coût supplémentaire (~5×50 = 250 c)
+est négligeable.
+
+Validé contre Phosphoric (mapping `keyboard.matrix[col_HW]` corrigé
+côté émulateur indépendamment).
+
 ### Fix — DDRB pendant scan clavier ✅
 
 **Symptôme** : tirs SPACE ratés dans le jeu, rotation incohérente
