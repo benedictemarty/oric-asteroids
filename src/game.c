@@ -23,11 +23,14 @@
 /* ------------------------------------------------------------------ */
 
 extern unsigned char ship_x, ship_y;
-extern signed char   ship_vx, ship_vy;
+extern unsigned char ship_x_frac, ship_y_frac;   /* 8.8 fixed-point partie basse */
+extern int           ship_vx, ship_vy;            /* signed 16-bit (8.8 fixed-point) */
 extern unsigned char ship_angle;
 extern unsigned char key_state;
 #pragma zpsym ("ship_x")
 #pragma zpsym ("ship_y")
+#pragma zpsym ("ship_x_frac")
+#pragma zpsym ("ship_y_frac")
 #pragma zpsym ("ship_vx")
 #pragma zpsym ("ship_vy")
 #pragma zpsym ("ship_angle")
@@ -64,7 +67,13 @@ void tune_stop(void);
 #define BULLETS         4
 #define BULLET_TTL      35
 #define FIRE_COOLDOWN   4
-#define V_MAX           16
+
+/* 8.8 fixed-point pour ship_vx/vy (16 bits signed).
+ *   - V_MAX_FIXED = 2048 = 8.00 px/frame max (à 25 Hz = 200 px/s).
+ *   - Thrust accel : ship_thrx[angle] << 6 (= ×64 ; max ±6*64=384/frame).
+ *   - Decay /16 par frame (idem signed shift, conserve l'équilibre arcade). */
+#define V_MAX_FIXED     2048
+#define THRUST_SHIFT    6
 
 #define WX_MIN          14
 #define WX_MAX          226
@@ -264,36 +273,50 @@ static void frame_wait(void)
 
 static void ship_update(void)
 {
-    signed char d;
-    int nx, ny;
+    int d;
+    unsigned int pos16;
 
+    /* Decay (frottement) — 1/16 par frame en 8.8. */
     d = ship_vx >> 4;  ship_vx -= d;
     d = ship_vy >> 4;  ship_vy -= d;
-    if (ship_vx >  V_MAX) ship_vx =  V_MAX;
-    if (ship_vx < -V_MAX) ship_vx = -V_MAX;
-    if (ship_vy >  V_MAX) ship_vy =  V_MAX;
-    if (ship_vy < -V_MAX) ship_vy = -V_MAX;
 
-    nx = (int)ship_x + (int)ship_vx;
-    ny = (int)ship_y + (int)ship_vy;
-    if (nx < WX_MIN) nx += WX_SPAN;
-    if (nx > WX_MAX) nx -= WX_SPAN;
-    if (ny < WY_MIN) ny += WY_SPAN;
-    if (ny > WY_MAX) ny -= WY_SPAN;
-    ship_x = (unsigned char)nx;
-    ship_y = (unsigned char)ny;
+    /* Clamp à la vitesse max (en 8.8 fixed-point). */
+    if (ship_vx >  V_MAX_FIXED) ship_vx =  V_MAX_FIXED;
+    if (ship_vx < -V_MAX_FIXED) ship_vx = -V_MAX_FIXED;
+    if (ship_vy >  V_MAX_FIXED) ship_vy =  V_MAX_FIXED;
+    if (ship_vy < -V_MAX_FIXED) ship_vy = -V_MAX_FIXED;
+
+    /* Position 8.8 : recompose (entier, frac) en 16 bits, ajoute vélocité
+     * signed (cast modulaire unsigned), reséparer. Mouvement sub-pixel
+     * lisse même à 25 Hz. */
+    pos16 = ((unsigned int)ship_x << 8) | ship_x_frac;
+    pos16 += (unsigned int)ship_vx;
+    ship_x      = (unsigned char)(pos16 >> 8);
+    ship_x_frac = (unsigned char)(pos16 & 0xFF);
+    if (ship_x < WX_MIN) ship_x += WX_SPAN;
+    if (ship_x > WX_MAX) ship_x -= WX_SPAN;
+
+    pos16 = ((unsigned int)ship_y << 8) | ship_y_frac;
+    pos16 += (unsigned int)ship_vy;
+    ship_y      = (unsigned char)(pos16 >> 8);
+    ship_y_frac = (unsigned char)(pos16 & 0xFF);
+    if (ship_y < WY_MIN) ship_y += WY_SPAN;
+    if (ship_y > WY_MAX) ship_y -= WY_SPAN;
 }
 
 static void ship_apply_thrust(void)
 {
-    ship_vx += ship_thrx[ship_angle];
-    ship_vy += ship_thry[ship_angle];
+    /* Accel = ship_thrx[angle] × 64 (en 8.8 = 0.25 px/frame par unit). */
+    ship_vx += ((int)ship_thrx[ship_angle]) << THRUST_SHIFT;
+    ship_vy += ((int)ship_thry[ship_angle]) << THRUST_SHIFT;
 }
 
 static void ship_respawn(void)
 {
     ship_x = 120;
     ship_y = 100;
+    ship_x_frac = 0;
+    ship_y_frac = 0;
     ship_vx = 0;
     ship_vy = 0;
     ship_angle = 0;
@@ -409,6 +432,8 @@ static void ship_hyperspace(void)
     /* Survie : téléportation aléatoire dans la zone safe */
     ship_x = WX_MIN + (rng8() % WX_SPAN);
     ship_y = WY_MIN + (rng8() % WY_SPAN);
+    ship_x_frac = 0;
+    ship_y_frac = 0;
     ship_vx = 0;
     ship_vy = 0;
     ship_invincible = SHIP_BLINK_FRAMES;     /* clignotement court — pas d'animation explosion ici */

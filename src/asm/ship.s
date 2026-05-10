@@ -15,7 +15,8 @@
 ;=================================================================
 
         .export   _ship_init, _ship_draw, _ship_erase, _ship_rotate
-        .exportzp _ship_x, _ship_y, _ship_vx, _ship_vy
+        .exportzp _ship_x, _ship_y, _ship_x_frac, _ship_y_frac
+        .exportzp _ship_vx, _ship_vy
         .exportzp _ship_angle, _key_state
 
         .importzp _lx0, _ly0, _lx1, _ly1
@@ -30,12 +31,14 @@
 ;-----------------------------------------------------------------
         .zeropage
 
-_ship_x:     .res 1     ; position X (0..239)
-_ship_y:     .res 1     ; position Y (0..199)
-_ship_vx:    .res 1     ; vitesse X signée
-_ship_vy:    .res 1     ; vitesse Y signée
-_ship_angle: .res 1     ; orientation 0..31
-_key_state:  .res 1     ; bit0=←  bit1=→  bit2=↑(thrust)  bit3=SPACE(tir)
+_ship_x:      .res 1     ; position X entière (0..239)
+_ship_y:      .res 1     ; position Y entière (0..199)
+_ship_x_frac: .res 1     ; sous-pixel X (8.8 fixed-point partie basse)
+_ship_y_frac: .res 1     ; sous-pixel Y idem
+_ship_vx:     .res 2     ; vitesse X signed int 16 bits (8.8 fixed-point)
+_ship_vy:     .res 2     ; vitesse Y idem
+_ship_angle:  .res 1     ; orientation 0..31
+_key_state:   .res 1     ; bit0=←  bit1=→  bit2=↑(thrust)  bit3=SPACE  bit4=↓
 
 ; Coordonnées calculées des 3 sommets après rotation+translation
 sh_tx0:      .res 1
@@ -56,8 +59,12 @@ _ship_init:
         lda  #100
         sta  _ship_y
         lda  #0
+        sta  _ship_x_frac
+        sta  _ship_y_frac
         sta  _ship_vx
+        sta  _ship_vx+1
         sta  _ship_vy
+        sta  _ship_vy+1
         sta  _ship_angle
         sta  _key_state
         rts
