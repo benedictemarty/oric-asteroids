@@ -7,16 +7,54 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 17+ :
-- Phase 2b complète : SMC Bresenham + déroulage (gain 2× potentiel).
+À venir Phase 18+ :
+- SMC Bresenham (patcher dy/dx en immédiats dans la boucle).
+- Déroulage 2× ou 4× du corps de boucle.
 - Optimisations C → ASM des boucles draw critiques.
 
-(Hors scope définitif : `.tap`/`.dsk` persistance, mix multi-canaux.)
-- Persistance high scores en `.tap` / `.dsk`.
-- Variables nommées arcade (`statusShip`, `horzVelShip`, etc.).
-- Mix multi-canaux (thump + UFO simultanés).
-- Optimisation Bresenham (Phase 2b) : SMC + déroulage.
-- Clipping Cohen-Sutherland (segments tronqués propres aux bords).
+(Hors scope définitif : `.tap`/`.dsk` persistance, mix multi-canaux.
+ Différé : variables arcade, clipping Cohen-Sutherland.)
+
+## [1.2.7] - 2026-05-10
+
+### Phase 17 — Compteur de pixels Bresenham ✅
+
+**Objectif** : remplacer le test de fin de ligne (`cmp _lx0/_lx1` +
+`cmp _ly0/_ly1`, 12-15 cycles) par un compteur décrémental
+(`dec l_pix / beq @done`, 7-8 cycles) → -5 c/pixel.
+
+### Bench profiler
+
+- **Avant Phase 17** : 8 856 486 instructions
+- **Après Phase 17** : 8 836 027 instructions
+- **Gain** : 20 459 instructions = **0.23%**
+- Binaire : 15 369 → 15 356 octets (-13)
+
+Modeste mais cohérent avec la nature de l'optim : ne touche que la
+fonction `_draw_line_xor` (~3-4% du runtime hot path).
+
+### Changes
+
+- **`src/asm/line.s`** :
+  - Nouveau symbole ZP `l_pix` : compteur de pixels initialisé à
+    `max(dx, dy) + 1` à l'init de `_draw_line_xor`.
+  - Boucle `@loop` : test de fin via `dec l_pix / beq @done` (-5 c/px).
+  - `inc _lx0` supprimés des deux branches step x (plus relu).
+  - `lda _ly0 / clc / adc l_sy / sta _ly0` supprimé du step y (-11 c).
+  - `_plot_dot` : `ora #$40` retiré pour cohérence (l'invariant
+    bit6=1 est préservé par les masques x_msk[]).
+
+### Décisions techniques Phase 17
+
+- **Sécurité du compteur** : `max(dx, dy) ≤ 239` (HIRES 240×200) → +1
+  reste dans [1, 240], jamais d'overflow 255 → 0 → boucle infinie.
+- **Pas un changement d'API** : `_lx0` et `_ly0` restent les
+  paramètres d'entrée. Ils ne sont plus mis à jour pendant le tracé
+  mais cette mise à jour était purement interne.
+- **Pourquoi pas plus** : la SMC Bresenham (Phase 18) et le déroulage
+  apporteraient des gains beaucoup plus importants (objectif Phase 2b
+  cible : 40-50 c/px vs nos ~90 c/px actuels). Phase 17 prépare le
+  terrain en simplifiant la boucle.
 
 ## [1.2.6] - 2026-05-10
 
