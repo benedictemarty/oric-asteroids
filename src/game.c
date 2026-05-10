@@ -742,18 +742,7 @@ void game_run(void)
     asteroids_draw();
     hud_draw();
 
-    /* Phase 18d — debug touches : affichage live de key_state au HUD,
-     * centre haut de l'écran (x=100, y=4). Valeurs en décimal :
-     *   00000 = aucune touche       00004 = UP (thrust)
-     *   00001 = LEFT                00008 = SPACE (tir)
-     *   00002 = RIGHT               00016 = DOWN (hyperespace)
-     *   sommes possibles (UP+SPACE = 12, LEFT+SPACE = 9, etc.)
-     * Si tu appuies sur une touche et que le compteur ne change pas,
-     * le scan ne la capte pas (problème côté input.s ou hardware). */
-    hud_xor_5digits(0, 100, 4);    /* amorce affichage à 00000 */
-
     for (;;) {
-        static unsigned char dbg_key_shown = 0;
         key_scan();
 
         /* Restart en game over (avant le bloc render pour éviter
@@ -797,13 +786,8 @@ void game_run(void)
                 if (sfx_id == FX_NONE) sound_play_fx(FX_THRUST);
             }
 
-            /* Phase 18d : level-trigger temporaire pour diagnostiquer
-             * pourquoi le tir ne semble pas répondre. Le cooldown fire_cd
-             * (4 frames) limite la cadence à ~6 tirs/seconde @ 25 Hz —
-             * comportement proche de l'edge-trigger en pratique pour un
-             * appui humain bref. À repasser en edge-trigger si OK. */
             fire_now = key_state & 0x08;
-            if (fire_now) bullet_fire();
+            if (fire_now && !prev_fire) bullet_fire();
             prev_fire = fire_now;
 
             hyper_now = key_state & 0x10;
@@ -925,13 +909,6 @@ void game_run(void)
             gameover_draw();
             presspace_draw(140);
             gameover_text_drawn = 1;
-        }
-
-        /* Phase 18d — refresh debug key_state au HUD (XOR symétrique) */
-        if (key_state != dbg_key_shown) {
-            hud_xor_5digits((unsigned int)dbg_key_shown, 100, 4);  /* erase */
-            hud_xor_5digits((unsigned int)key_state,     100, 4);  /* draw */
-            dbg_key_shown = key_state;
         }
 
         frame_wait();
