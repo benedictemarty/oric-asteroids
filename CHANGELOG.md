@@ -7,12 +7,95 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10o+ :
+À venir Phase 12+ :
+- Persistance high scores en `.tap` / `.dsk`.
+- Variables nommées arcade (`statusShip`, `horzVelShip`, etc.).
+- Mix multi-canaux (thump + UFO simultanés).
+- Optimisation Bresenham (Phase 2b) : SMC + déroulage.
+- Clipping Cohen-Sutherland (segments tronqués propres aux bords).
 - Variables Atari arcade (`statusShip`, `horzVelShip`, etc.) côté code.
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
 - Wraparound par duplication d'instance (vrai cylindre arcade).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.2.0] - 2026-05-10
+
+### Phase 11 — Sons Mine Storm Vectrex authentiques 🛸
+
+**Port direct des tables sound** depuis le code source GCE Mine Storm
+rev C (Vectrex 1982) — possible car **même puce sonore AY-3-8912** que
+l'Oric-1.
+
+Source : [`philspil66/Vectrex-Minestorm/MINESTRM-C.ASM`](https://github.com/philspil66/Vectrex-Minestorm/blob/main/MINESTRM-C.ASM)
+
+### Pourquoi c'est possible
+
+| Composant | Vectrex 1982 | Oric-1 1983 |
+|-----------|--------------|-------------|
+| CPU | Motorola 6809 | MOS 6502 |
+| Sound chip | **AY-3-8912** | **AY-3-8912** |
+| Interface | VIA 6522 | VIA 6522 |
+
+Les **valeurs PSG** (registres 0-15) sont CPU-agnostiques. Mine Storm
+écrit `$1F` dans le registre 6 (noise freq) ; on fait pareil sur Oric.
+Le code 6809 ne se transpose pas, mais **les données sound oui**.
+
+### Tables portées (Mine Storm SS.* → notre FX_*)
+
+| Mine Storm | Notre FX | Description |
+|------------|----------|-------------|
+| `SS.THR` | `FX_THRUST` | tone A grave + noise sur 3 canaux, vol max |
+| `SS.BLT` | `FX_FIRE` | tone B freq $39 + noise A, vol max |
+| `SS.EXP` | `FX_EXPLODE` | noise tous canaux + **enveloppe AY** decay $0038 |
+| `SS.POP` | `FX_THUMP` | tone B grave $30 (adapté pour cadence thump) |
+
+### Ajustement Oric
+
+Le bit 6 du mixer (registre 7) = direction Port A. Sur Oric il **doit**
+être à 1 (port A en input pour le scan clavier matrice). Vectrex utilise
+le port A différemment, donc les valeurs Mine Storm ont bit 6 = 0.
+
+**Adaptation systématique** : `mixer_oric = mixer_minestorm | $40`.
+Exemples : `$05 → $45`, `$06 → $46`, `$07 → $47`, `$3D → $7D`.
+
+### Nouveauté : enveloppe AY pour explosion
+
+Mine Storm utilise les **registres 11/12/13** de l'AY pour piloter
+l'enveloppe matérielle :
+- Reg 11 = `$00` (envelope period lo)
+- Reg 12 = `$38` (envelope period hi)
+- Reg 13 = `$00` (envelope shape `\___` = decay puis hold à 0)
+
+Notre FX_EXPLODE a maintenant un **fade-out doux natif** (decay AY
+sur ~50 ms) au lieu d'un cut net. Plus naturel, plus arcade.
+
+### Changed
+
+- `src/asm/sound.s` : 4 effets (`FX_FIRE`, `FX_EXPLODE`, `FX_THRUST`,
+  `FX_THUMP`) reçoivent les valeurs PSG **identiques bit-pour-bit**
+  à Mine Storm Vectrex rev C (avec `| $40` sur le mixer).
+- `FX_HYPER`, `FX_LIFE`, `FX_UFO` restent en valeurs Oric maison
+  (Mine Storm n'a pas d'équivalent direct pour ces effets).
+
+### Décisions techniques Phase 11
+
+- **Valeurs PSG bit-pour-bit identiques** : on respecte la tonalité
+  exacte de Mine Storm Vectrex 1982. C'est notre premier "port audio"
+  qui n'est pas une recréation maison.
+- **Pas de SS.HYP** dans Mine Storm : Mine Storm n'a pas d'hyperespace
+  (mécanique différente — mines magnétiques + fireballs au lieu de
+  warp). On garde `FX_HYPER` Oric.
+- **Pas de routine `_psg_play_string` générique** : on garde le
+  switch sur `_sfx_id`, juste les valeurs internes changent.
+  Phase 12 pourra introduire un format de tables externes pour
+  charger plus facilement d'autres sons.
+
+### Bump version mineure
+
+`v1.2.0` — premier port "audio" depuis une autre machine (Vectrex).
+Ouvre la voie à un possible portage de plus de sons depuis le catalogue
+Vectrex (qui utilise tous l'AY-3-8912).
 
 ## [1.1.13] - 2026-05-10
 

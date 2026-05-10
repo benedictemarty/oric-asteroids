@@ -149,21 +149,27 @@ _sound_play_fx:
         lda  #$FF
         sta  VIA_DDRA
 
-        ; Cas FX_FIRE
+        ; Cas FX_FIRE — port Mine Storm Vectrex SS.BLT (rev C)
         lda  _sfx_id
         cmp  #FX_FIRE
         bne  @not_fire
-        ; Tir : tone canal A, freq ~$50 (~310 Hz), durée 6 frames
-        lda  #$50
-        ldy  #0
-        jsr  _psg_write       ; freq A lo
+        ; SS.BLT : reg 2=$39 (tone B freq lo), reg 3=$00 (tone B hi),
+        ;          reg 6=$1F (noise grave), reg 7=$05+$40 (mixer : tone B on
+        ;          + noise A on + port A input pour scan clavier Oric),
+        ;          reg 9=$0F (volume B max). Durée 6 frames.
+        lda  #$39
+        ldy  #2
+        jsr  _psg_write       ; freq B lo
         lda  #$00
-        ldy  #1
-        jsr  _psg_write       ; freq A hi
-        lda  #$0E             ; volume max canal A
-        ldy  #8
-        jsr  _psg_write
-        lda  #$7E             ; mixer : tone A on
+        ldy  #3
+        jsr  _psg_write       ; freq B hi
+        lda  #$1F
+        ldy  #6
+        jsr  _psg_write       ; noise grave max
+        lda  #$0F
+        ldy  #9
+        jsr  _psg_write       ; volume B max
+        lda  #$45             ; mixer Vectrex $05 + bit 6 (port A input Oric)
         ldy  #7
         jsr  _psg_write
         lda  #6
@@ -173,14 +179,26 @@ _sound_play_fx:
 
         cmp  #FX_EXPLODE
         bne  @not_explode
-        ; Explosion : noise canal A, freq noise basse, durée 25 frames
-        lda  #$1F             ; freq noise (max = grave)
+        ; SS.EXP Mine Storm : reg 6=$1F (noise grave), reg 7=$07+$40
+        ; (mixer noise tous canaux, port A input), reg 10=$10 (vol C
+        ; en mode enveloppe), regs 11-12=$0038 (envelope period), reg
+        ; 13=$00 (envelope shape : decay puis hold à 0). Fade-out AY natif.
+        lda  #$1F
         ldy  #6
+        jsr  _psg_write       ; noise grave max
+        lda  #$10              ; volume C en mode enveloppe
+        ldy  #10
         jsr  _psg_write
-        lda  #$0F             ; volume canal A max
-        ldy  #8
+        lda  #$00              ; envelope period lo
+        ldy  #11
         jsr  _psg_write
-        lda  #$77             ; mixer : noise A on (bit 3=0), tone off (bit 0=1)
+        lda  #$38              ; envelope period hi
+        ldy  #12
+        jsr  _psg_write
+        lda  #$00              ; envelope shape : \___  (decay + hold)
+        ldy  #13
+        jsr  _psg_write
+        lda  #$47              ; mixer noise tous canaux + port A input
         ldy  #7
         jsr  _psg_write
         lda  #25
@@ -190,17 +208,22 @@ _sound_play_fx:
 
         cmp  #FX_THUMP
         bne  @not_thump
-        ; Thump : tone très grave canal B, durée 8 frames
-        lda  #$00
+        ; SS.POP Mine Storm (mine pop) — adapté pour notre thump :
+        ; reg 2=$30 (tone B freq lo grave), reg 3=$00, reg 6=$1F, reg
+        ; 7=$3D+$40 (mixer tone B on uniquement), reg 9=$0F. Durée 8.
+        lda  #$30
         ldy  #2
-        jsr  _psg_write       ; freq B lo
-        lda  #$08             ; freq B hi (very low pitch)
+        jsr  _psg_write       ; freq B lo (~155 Hz à 1.79 MHz / 16)
+        lda  #$00
         ldy  #3
         jsr  _psg_write
-        lda  #$0E             ; volume B max
+        lda  #$1F
+        ldy  #6
+        jsr  _psg_write       ; noise (silencieux car bits 4-5 = 1)
+        lda  #$0F
         ldy  #9
-        jsr  _psg_write
-        lda  #$7D             ; mixer : tone A off, tone B on
+        jsr  _psg_write       ; volume B max
+        lda  #$7D             ; mixer : tone B on, port A input ($3D + $40)
         ldy  #7
         jsr  _psg_write
         lda  #8
@@ -233,15 +256,22 @@ _sound_play_fx:
 
         cmp  #FX_THRUST
         bne  @not_thrust
-        ; Thrust : noise canal C, court (3 frames). Re-déclenché chaque
-        ; frame que UP est held → effet de bruit continu approximatif.
-        lda  #$0F              ; freq noise high
+        ; SS.THR Mine Storm : reg 0=$10, reg 1=$00 (tone A grave), reg
+        ; 6=$1F (noise grave), reg 7=$06+$40 (tone A + noise A+B+C on,
+        ; port A input), reg 8=$0F (volume A max). Re-déclenché 3 frames.
+        lda  #$10
+        ldy  #0
+        jsr  _psg_write       ; freq A lo
+        lda  #$00
+        ldy  #1
+        jsr  _psg_write
+        lda  #$1F
         ldy  #6
         jsr  _psg_write
-        lda  #$08              ; volume C low (discret)
-        ldy  #10
-        jsr  _psg_write
-        lda  #$3F              ; mixer : noise C on (bit 5 = 0)
+        lda  #$0F
+        ldy  #8
+        jsr  _psg_write       ; volume A max
+        lda  #$46             ; mixer Vectrex $06 + port A input Oric
         ldy  #7
         jsr  _psg_write
         lda  #3
