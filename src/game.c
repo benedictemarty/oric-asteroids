@@ -287,21 +287,36 @@ static void ship_update(void)
     if (ship_vy < -V_MAX_FIXED) ship_vy = -V_MAX_FIXED;
 
     /* Position 8.8 : recompose (entier, frac) en 16 bits, ajoute vélocité
-     * signed (cast modulaire unsigned), reséparer. Mouvement sub-pixel
-     * lisse même à 25 Hz. */
-    pos16 = ((unsigned int)ship_x << 8) | ship_x_frac;
-    pos16 += (unsigned int)ship_vx;
-    ship_x      = (unsigned char)(pos16 >> 8);
-    ship_x_frac = (unsigned char)(pos16 & 0xFF);
-    if (ship_x < WX_MIN) ship_x += WX_SPAN;
-    if (ship_x > WX_MAX) ship_x -= WX_SPAN;
-
-    pos16 = ((unsigned int)ship_y << 8) | ship_y_frac;
-    pos16 += (unsigned int)ship_vy;
-    ship_y      = (unsigned char)(pos16 >> 8);
-    ship_y_frac = (unsigned char)(pos16 & 0xFF);
-    if (ship_y < WY_MIN) ship_y += WY_SPAN;
-    if (ship_y > WY_MAX) ship_y -= WY_SPAN;
+     * signed (cast modulaire unsigned). Le wrap est testé selon le signe
+     * de la vélocité (sinon arithmétique modulo 65536 mélange overflow
+     * et sous-flow → wrap au milieu d'écran au lieu du côté opposé).
+     * Note : la zone jouable ship [WX_MIN..WX_MAX] est plus étroite que
+     * l'écran complet, donc on n'utilise pas la même constante (X_SPAN_FIX)
+     * que les asteroids. */
+    {
+        unsigned int x_span_fix = (unsigned int)WX_SPAN << 8;
+        pos16 = (((unsigned int)(ship_x - WX_MIN)) << 8) | ship_x_frac;
+        pos16 += (unsigned int)ship_vx;
+        if (ship_vx >= 0) {
+            if (pos16 >= x_span_fix) pos16 -= x_span_fix;
+        } else {
+            if (pos16 >= x_span_fix) pos16 += x_span_fix;
+        }
+        ship_x      = (unsigned char)((pos16 >> 8) + WX_MIN);
+        ship_x_frac = (unsigned char)(pos16 & 0xFF);
+    }
+    {
+        unsigned int y_span_fix = (unsigned int)WY_SPAN << 8;
+        pos16 = (((unsigned int)(ship_y - WY_MIN)) << 8) | ship_y_frac;
+        pos16 += (unsigned int)ship_vy;
+        if (ship_vy >= 0) {
+            if (pos16 >= y_span_fix) pos16 -= y_span_fix;
+        } else {
+            if (pos16 >= y_span_fix) pos16 += y_span_fix;
+        }
+        ship_y      = (unsigned char)((pos16 >> 8) + WY_MIN);
+        ship_y_frac = (unsigned char)(pos16 & 0xFF);
+    }
 }
 
 static void ship_apply_thrust(void)

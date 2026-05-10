@@ -149,6 +149,17 @@ void asteroids_spawn_wave(void)
 #define WRAP_X_SPAN 240
 #define WRAP_Y_SPAN 200
 
+/* Wrap 8.8 fixed-point — le pixel pos évolue dans [0, SPAN-1] mais la
+ * version 16-bit (pixel<<8 | frac) dans [0, SPAN*256-1]. L'addition de vy
+ * (signed) en arithmétique modulo 65536 produit un résultat correct
+ * MODULO 65536 — pas modulo SPAN*256. Il faut donc tester selon le signe
+ * de la vélocité :
+ *   - vy ≥ 0 : si pos16 a dépassé SPAN*256, soustraire SPAN*256.
+ *   - vy < 0 : si pos16 a "sous-flowé" (= maintenant ≥ SPAN*256 vu
+ *              modulo 65536), ajouter SPAN*256 (modulo 65536). */
+#define X_SPAN_FIX  ((unsigned int)WRAP_X_SPAN << 8)   /* 240 * 256 = 61440 */
+#define Y_SPAN_FIX  ((unsigned int)WRAP_Y_SPAN << 8)   /* 200 * 256 = 51200 */
+
 void asteroids_update(void)
 {
     unsigned char i;
@@ -160,22 +171,27 @@ void asteroids_update(void)
         asteroids[i].prev_x = asteroids[i].x;
         asteroids[i].prev_y = asteroids[i].y;
 
-        /* 8.8 fixed-point : recompose pos16 = (x<<8)|x_frac, ajoute vx
-         * (signed → unsigned cast modulaire), reséparer. Mouvement
-         * sub-pixel lisse à 25 Hz. */
+        /* X : 8.8 add + wrap modulo SPAN*256 (≠ modulo 65536). */
         pos16 = ((unsigned int)asteroids[i].x << 8) | asteroids[i].x_frac;
         pos16 += (unsigned int)asteroids[i].vx;
+        if (asteroids[i].vx >= 0) {
+            if (pos16 >= X_SPAN_FIX) pos16 -= X_SPAN_FIX;
+        } else {
+            if (pos16 >= X_SPAN_FIX) pos16 += X_SPAN_FIX;
+        }
         asteroids[i].x      = (unsigned char)(pos16 >> 8);
         asteroids[i].x_frac = (unsigned char)(pos16 & 0xFF);
-        if (asteroids[i].x < WRAP_X_MIN) asteroids[i].x += WRAP_X_SPAN;
-        if (asteroids[i].x > WRAP_X_MAX) asteroids[i].x -= WRAP_X_SPAN;
 
+        /* Y : idem. */
         pos16 = ((unsigned int)asteroids[i].y << 8) | asteroids[i].y_frac;
         pos16 += (unsigned int)asteroids[i].vy;
+        if (asteroids[i].vy >= 0) {
+            if (pos16 >= Y_SPAN_FIX) pos16 -= Y_SPAN_FIX;
+        } else {
+            if (pos16 >= Y_SPAN_FIX) pos16 += Y_SPAN_FIX;
+        }
         asteroids[i].y      = (unsigned char)(pos16 >> 8);
         asteroids[i].y_frac = (unsigned char)(pos16 & 0xFF);
-        if (asteroids[i].y < WRAP_Y_MIN) asteroids[i].y += WRAP_Y_SPAN;
-        if (asteroids[i].y > WRAP_Y_MAX) asteroids[i].y -= WRAP_Y_SPAN;
     }
 }
 
