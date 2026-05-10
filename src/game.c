@@ -81,6 +81,9 @@ void key_scan(void);
 #define THUMP_PERIOD_BASE   30
 #define THUMP_PERIOD_MIN    6
 
+/* Phase 10n — cadence UFO bip-bip */
+#define UFO_SOUND_PERIOD    16
+
 /* Score asteroid + UFO arcade */
 static const unsigned int score_by_size[3] = { 100, 50, 20 };
 #define UFO_SCORE_LARGE     200U
@@ -126,6 +129,8 @@ static unsigned char gameover_text_drawn; /* Phase 9d : "GAME OVER" affiché */
 
 /* Phase 8 — cadence thump : décrémente sur le timer, déclenche sound_play_fx */
 static unsigned char thump_timer;
+/* Phase 10n — cadence UFO sound */
+static unsigned char ufo_sound_timer;
 /* Phase 9f — détecter extra life (lives++) pour déclencher FX_LIFE */
 static unsigned char lives_prev;
 /* Phase 10d — affichage "WAVE n" en haut-centre */
@@ -606,6 +611,7 @@ void game_run(void)
     hiscores_init();
     debris_init();
     thump_timer = THUMP_PERIOD_BASE;
+    ufo_sound_timer = 0;
     lives_prev = lives;
     wave_displayed = 0;
 
@@ -695,9 +701,18 @@ void game_run(void)
         }
 
         /* Phase 8 : thump cadencé sur asteroids_count, accélère quand
-         * il reste peu d'asteroids (cf. arcade : tension croissante) */
+         * il reste peu d'asteroids (cf. arcade : tension croissante).
+         * Phase 10n : prioritaire sur UFO sound si UFO actif. */
         if (!gameover && sfx_id == FX_NONE) {
-            if (thump_timer == 0) {
+            if (ufo_active) {
+                /* Phase 10n : bip-bip UFO continu tant qu'UFO actif */
+                if (ufo_sound_timer == 0) {
+                    sound_play_fx(FX_UFO);
+                    ufo_sound_timer = UFO_SOUND_PERIOD;
+                } else {
+                    ufo_sound_timer--;
+                }
+            } else if (thump_timer == 0) {
                 unsigned char n = asteroids_count();
                 unsigned char period;
                 if (n >= 8)      period = THUMP_PERIOD_BASE;

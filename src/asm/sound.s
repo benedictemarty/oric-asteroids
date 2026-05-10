@@ -44,6 +44,7 @@
         FX_HYPER   = 4    ; Phase 9b — whoosh hyperespace
         FX_THRUST  = 5    ; Phase 9f — noise court continu (override par hold)
         FX_LIFE    = 6    ; Phase 9f — chime extra ship
+        FX_UFO     = 7    ; Phase 10n — bip-bip UFO (canal C, re-déclenché)
 
 ;-----------------------------------------------------------------
 ; Variables ZP
@@ -267,6 +268,27 @@ _sound_play_fx:
         sta  _sfx_timer
         jmp  @done
 @not_life:
+
+        cmp  #FX_UFO
+        bne  @not_ufo
+        ; UFO : tone canal C grave (freq $C0), durée 4 frames.
+        ; Re-déclenché par game.c chaque ~16 frames pour effet bip-bip continu.
+        lda  #$C0
+        ldy  #4
+        jsr  _psg_write       ; freq C lo
+        lda  #$00
+        ldy  #5
+        jsr  _psg_write       ; freq C hi
+        lda  #$0A              ; volume C modéré
+        ldy  #10
+        jsr  _psg_write
+        lda  #$7B              ; mixer : tone C on (bit 2 = 0), autres off
+        ldy  #7
+        jsr  _psg_write
+        lda  #4
+        sta  _sfx_timer
+        jmp  @done
+@not_ufo:
 
 @done:
         pla

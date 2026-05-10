@@ -38,6 +38,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 10k | AstBreakTimer (anti-saucer 80 frames post-hit) (v1.1.10) | — | 1 j |
 | ✅ | 10l | Wraparound par duplication d'instance (vrai cylindre) (v1.1.11) | — | 1 j |
 | ✅ | 10m | Clignotement PRESS SPACE écran titre (effet pulse arcade) (v1.1.12) | — | 1 j |
+| ✅ | 10n | FX_UFO bip-bip continu (8 effets sons total) (v1.1.13) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.

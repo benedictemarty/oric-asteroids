@@ -82,8 +82,9 @@ des 9 phases.
 | 10k | AstBreakTimer (anti-saucer 80 frames post-hit) | `phase10k-done` / `v1.1.10` |
 | 10l | Wraparound asteroids par duplication d'instance | `phase10l-done` / `v1.1.11` |
 | 10m | Clignotement PRESS SPACE écran titre (pulse arcade) | `phase10m-done` / `v1.1.12` |
+| 10n | FX_UFO bip-bip continu (8 effets sons total) | `phase10n-done` / `v1.1.13` |
 
-## Différé Phase 10n+
+## Différé Phase 10o+
 
 - Persistance high scores en `.tap` ou `.dsk` (driver cassette résident).
 - Image `.dsk` Microdisc avec sauvegarde native.

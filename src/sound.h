@@ -15,6 +15,7 @@
 #define FX_HYPER    4   /* hyperespace whoosh   (~14 frames, tone+noise) */
 #define FX_THRUST   5   /* thrust noise         (~3 frames, re-déclenché) */
 #define FX_LIFE     6   /* chime extra ship     (~20 frames, tone aigu)  */
+#define FX_UFO      7   /* UFO bip-bip          (~4 frames, re-déclenché) */
 
 extern unsigned char sfx_id;
 extern unsigned char sfx_timer;

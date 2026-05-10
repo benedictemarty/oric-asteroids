@@ -7,12 +7,53 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10n+ :
+À venir Phase 10o+ :
 - Variables Atari arcade (`statusShip`, `horzVelShip`, etc.) côté code.
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
 - Wraparound par duplication d'instance (vrai cylindre arcade).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.1.13] - 2026-05-10
+
+### Phase 10n — Effet sonore UFO bip-bip continu ✅
+
+**Effet sonore arcade emblématique** : tant qu'un UFO est actif, le
+PSG produit un bip-bip répété qui signale la présence du saucer.
+
+### Mécanique
+
+- `FX_UFO` : tone canal C grave (freq $00C0), volume modéré 10/15,
+  durée 4 frames.
+- Re-déclenché toutes les 16 frames (`UFO_SOUND_PERIOD`) tant que
+  `ufo_active` → effet "bip-bip" perceptible (~5 Hz).
+- **Prioritaire sur le thump** : quand UFO actif, le thump est suspendu
+  pour éviter le mix sonore confus (cohérent avec arcade : `SaucerSFX`
+  override le thump).
+
+### Added
+
+- `FX_UFO 7` dans `src/sound.h`.
+- Config `FX_UFO` dans `src/asm/sound.s` (tone canal C grave).
+- `UFO_SOUND_PERIOD = 16` + `ufo_sound_timer` (BSS) dans `src/game.c`.
+
+### Changed
+
+- `src/game.c` : la branche thump ne s'exécute que si `!ufo_active`.
+  La branche UFO sound s'exécute en priorité quand UFO actif.
+
+### Décisions techniques Phase 10n
+
+- **Canal C dédié** (au lieu de canal A comme tir/explosion) : permettrait
+  potentiellement le mix simultané. Mais le modèle "1 effet à la fois"
+  de Phase 8 ne mixe pas — c'est une préparation pour Phase 11+.
+- **Re-déclenchement périodique** comme `FX_THRUST` : produit un effet
+  pseudo-continu sans nécessiter de changement du modèle sound.s.
+- **Thump suspendu pendant UFO** : le mix UFO+thump est confus visuellement
+  (même fréquence grave). Suspendre le thump donne plus de présence à l'UFO.
+- **Period 16 frames** : ~1 s à 17 Hz observés → 5 bips/s. Compromis
+  entre "présence" (assez fréquent pour être audible) et "discrétion"
+  (pas trop pour dominer le mix).
 
 ## [1.1.12] - 2026-05-10
 
