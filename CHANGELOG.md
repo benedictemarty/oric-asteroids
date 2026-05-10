@@ -7,13 +7,53 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10g+ :
+À venir Phase 10h+ :
 - Variables Atari arcade (`statusShip`, `horzVelShip`, etc.) côté code.
-- IA soucoupe rev 4 (table de précision indexée par score).
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
 - Wraparound par duplication d'instance (vrai cylindre arcade).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.1.6] - 2026-05-10
+
+### Phase 10g — IA UFO arcade authentique ✅
+
+**Port de la précision UFO petit** depuis le désasm rev 4 :
+- `CalcScrShotDir` ($6CA5)
+- `ScrShotAddOffset` ($6CB7)
+- `ShotRndAddTbl` ($6CCD) : `$8F, $87, $70, $78`
+
+### Logique arcade rev 4
+
+L'arcade utilise un **seuil unique à 35000** :
+- score < 35000 : mask `$8F` (sign + 4 bits magnitude → ±15 d'imprécision)
+- score ≥ 35000 : mask `$87` (sign + 3 bits magnitude → ±7 d'imprécision, "petit UFO tueur")
+
+### Adaptation Oric (8 directions vs 256 angles arcade)
+
+Notre format tir UFO est en 8 directions discrètes (pas 256 angles), donc
+on simplifie en 2 niveaux de probabilité de **mauvaise direction** :
+- score < 35000 : **50%** chance d'inversion d'une composante
+- score ≥ 35000 : **12%** chance (1/8 : la précision croît avec le score)
+
+### Changed
+
+- `src/ufo.c` : `ufo_fire` UFO_SMALL utilise maintenant le seuil arcade
+  35000 (vs notre seuil interne 5000 antérieur). En-dessous de 35000 le
+  petit UFO reste très imprécis ; au-delà il devient un sniper.
+
+### Décisions techniques Phase 10g
+
+- **Seuil unique 35000** vs notre ancien double seuil (5000, 15000) :
+  fidèle à l'arcade. À 35000 pts un joueur a déjà détruit ~700 asteroids
+  petits ou ~1750 grands — niveau "expert", la difficulté monte d'un cran.
+- **8 dirs vs 256 angles arcade** : cohérent avec notre format
+  `ufo_bullet_vx/vy` 8-bit signed à magnitude fixe (`UFO_BULLET_SPEED = 4`).
+  Phase 10h pourrait passer en système d'angle continu via `ship_thrx/thry`
+  (déjà disponibles 32 angles).
+- **Probabilité binaire** (50% / 12%) plutôt que perturbation continue
+  proportionnelle : limitation du système 8-dir (impossible de "biaiser"
+  doucement la trajectoire entre 2 directions discrètes).
 
 ## [1.1.5] - 2026-05-10
 

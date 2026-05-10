@@ -170,21 +170,35 @@ static void ufo_fire(unsigned char ship_x_in, unsigned char ship_y_in,
             default: dx = +UFO_BULLET_SPEED; dy = -UFO_BULLET_SPEED; break;
         }
     } else {
-        /* Visée approximative vers le ship */
+        /* Visée approximative vers le ship.
+         * Phase 10g — port arcade rev 4 (CalcScrShotDir + ScrShotAddOffset
+         * à $6CA5+).  L'arcade utilise un seuil unique à 35000 :
+         *   - score < 35000 : précision faible (mask $8F → bruit ±15)
+         *   - score ≥ 35000 : précision élevée (mask $87 → bruit ±7)
+         * En dessous on utilise des seuils adaptés à notre échelle 8-dir. */
         signed char ddx = (signed char)(ship_x_in - ufo_x);
         signed char ddy = (signed char)(ship_y_in - ufo_y);
-        /* Normalisation grossière en 8 dirs */
         if (ddx > 4)       dx = +UFO_BULLET_SPEED;
         else if (ddx < -4) dx = -UFO_BULLET_SPEED;
         else               dx = 0;
         if (ddy > 4)       dy = +UFO_BULLET_SPEED;
         else if (ddy < -4) dy = -UFO_BULLET_SPEED;
         else               dy = 0;
-        /* Bruit selon score : score < 5000 → ±1 fois sur 2 sur dx ou dy */
-        if (score_in < 5000U && (rng8() & 1)) {
-            r = rng8() & 1;
-            if (r) dx = -dx;
-            else   dy = -dy;
+        /* Précision indexée sur le score (port arcade $6CB1) :
+         *   - score < 35000 : 50% chance de mauvaise direction
+         *   - score ≥ 35000 : 12% chance (rare) — petit UFO devient "tueur" */
+        if (score_in < 35000U) {
+            if (rng8() & 1) {           /* 50% de bruit */
+                r = rng8() & 1;
+                if (r) dx = -dx;
+                else   dy = -dy;
+            }
+        } else {
+            if ((rng8() & 7) == 0) {    /* 12% de bruit */
+                r = rng8() & 1;
+                if (r) dx = -dx;
+                else   dy = -dy;
+            }
         }
         /* Si visée nulle (ship juste sur l'UFO), tir vers le bas */
         if (dx == 0 && dy == 0) dy = +UFO_BULLET_SPEED;

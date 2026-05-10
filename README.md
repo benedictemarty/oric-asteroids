@@ -75,8 +75,9 @@ des 9 phases.
 | 10d | Lettre W + affichage "WAVE n" dans HUD | `phase10d-done` / `v1.1.3` |
 | 10e | Démo passive arcade-style en écran titre | `phase10e-done` / `v1.1.4` |
 | 10f | Fragmentation arcade (3 fragments, RNG vél., parent réduit) | `phase10f-done` / `v1.1.5` |
+| 10g | IA UFO arcade (seuil 35000, précision indexée score) | `phase10g-done` / `v1.1.6` |
 
-## Différé Phase 10g+
+## Différé Phase 10h+
 
 - Persistance high scores en `.tap` ou `.dsk` (driver cassette résident).
 - Image `.dsk` Microdisc avec sauvegarde native.
