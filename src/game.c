@@ -132,6 +132,18 @@ static unsigned char lives_prev;
 static unsigned char wave_displayed;
 #define WAVE_HUD_Y  16
 
+/* Phase 10i — debris ship (port DoShipExplsn $7465 simplifié) :
+ * 5 fragments éphémères qui s'éparpillent depuis la position du ship
+ * au moment de sa destruction. Chaque fragment = mini-segment animé.
+ * Durée 30 frames (~1.8s à 17 Hz observés). */
+#define DEBRIS_COUNT      5
+#define DEBRIS_TTL        30
+static unsigned char  dbr_x[DEBRIS_COUNT];
+static unsigned char  dbr_y[DEBRIS_COUNT];
+static signed char    dbr_vx[DEBRIS_COUNT];
+static signed char    dbr_vy[DEBRIS_COUNT];
+static unsigned char  dbr_ttl[DEBRIS_COUNT];
+
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
@@ -224,6 +236,60 @@ static void ship_respawn(void)
     ship_vy = 0;
     ship_angle = 0;
     ship_invincible = INVINCIBLE_FRAMES;
+}
+
+/* Phase 10i — Spawn de 5 fragments à la position passée (ship juste tué). */
+static void debris_spawn(unsigned char ax, unsigned char ay)
+{
+    unsigned char i, r;
+    for (i = 0; i < DEBRIS_COUNT; i++) {
+        dbr_x[i]   = ax;
+        dbr_y[i]   = ay;
+        r = rng8();
+        /* Vélocité radiale ~3 px/frame en 8 directions, légèrement perturbée */
+        dbr_vx[i]  = ((r & 1) ? 1 : -1) * (1 + ((r >> 1) & 1) * 2);   /* ±1 ou ±3 */
+        dbr_vy[i]  = ((r & 4) ? 1 : -1) * (1 + ((r >> 3) & 1) * 2);
+        dbr_ttl[i] = DEBRIS_TTL - (i & 3);    /* légère désync */
+    }
+}
+
+static void debris_update(void)
+{
+    unsigned char i;
+    int nx, ny;
+    for (i = 0; i < DEBRIS_COUNT; i++) {
+        if (dbr_ttl[i] == 0) continue;
+        nx = (int)dbr_x[i] + (int)dbr_vx[i];
+        ny = (int)dbr_y[i] + (int)dbr_vy[i];
+        if (nx < 1 || nx > 238 || ny < 1 || ny > 198) {
+            dbr_ttl[i] = 0;
+            continue;
+        }
+        dbr_x[i] = (unsigned char)nx;
+        dbr_y[i] = (unsigned char)ny;
+        dbr_ttl[i]--;
+    }
+}
+
+/* Tracé des fragments en XOR : chaque fragment = mini-segment de 3 px
+ * dans la direction du mouvement. */
+static void debris_render(void)
+{
+    unsigned char i;
+    for (i = 0; i < DEBRIS_COUNT; i++) {
+        if (dbr_ttl[i] == 0) continue;
+        lx0 = dbr_x[i];
+        ly0 = dbr_y[i];
+        lx1 = (unsigned char)((signed char)dbr_x[i] + (dbr_vx[i] >> 1));
+        ly1 = (unsigned char)((signed char)dbr_y[i] + (dbr_vy[i] >> 1));
+        draw_line_xor();
+    }
+}
+
+static void debris_init(void)
+{
+    unsigned char i;
+    for (i = 0; i < DEBRIS_COUNT; i++) dbr_ttl[i] = 0;
 }
 
 /* Hyperespace : téléportation aléatoire, 25% chance de mort.
@@ -346,6 +412,7 @@ static unsigned char collisions_ship_asteroids(void)
         r = shape_radii[asteroids[a].size] + SHIP_RADIUS;
         if (collide(ship_x, ship_y, asteroids[a].x, asteroids[a].y, r)) {
             hud_lose_life();
+            debris_spawn(ship_x, ship_y);
             ship_respawn();
             sound_play_fx(FX_EXPLODE);
             return 1;
@@ -527,6 +594,7 @@ void game_run(void)
     ufo_init();
     hud_init();
     hiscores_init();
+    debris_init();
     thump_timer = THUMP_PERIOD_BASE;
     lives_prev = lives;
     wave_displayed = 0;
@@ -540,6 +608,7 @@ void game_run(void)
         key_scan();
 
         /* Effacer (XOR) — ordre inverse du tracé */
+        debris_render();             /* erase debris si actifs */
         ufo_bullet_draw();
         ufo_draw();
         bullets_render();
@@ -592,6 +661,7 @@ void game_run(void)
         asteroids_update();
         if (!gameover) ufo_tick(ship_x, ship_y, score);
         ufo_bullet_update();
+        debris_update();
 
         /* Collisions */
         collisions_bullets_asteroids();
@@ -655,6 +725,7 @@ void game_run(void)
         bullets_render();
         ufo_draw();
         ufo_bullet_draw();
+        debris_render();             /* redraw debris aux nouvelles positions */
         hud_draw();
         if (gameover) {
             hiscores_draw_table();

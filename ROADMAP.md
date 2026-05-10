@@ -33,6 +33,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 10f | Fragmentation arcade authentique (3 fragments, RNG vél.) (v1.1.5) | — | 1 j |
 | ✅ | 10g | IA UFO arcade authentique (seuil 35000, précision indexée) (v1.1.6) | — | 1 j |
 | ✅ | 10h | ScrSpeedup arcade (saucer pressure fin-de-vague) (v1.1.7) | — | 1 j |
+| ✅ | 10i | Ship explosion debris (5 fragments éphémères) (v1.1.8) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.

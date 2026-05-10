@@ -7,12 +7,58 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10i+ :
+À venir Phase 10j+ :
 - Variables Atari arcade (`statusShip`, `horzVelShip`, etc.) côté code.
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
 - Wraparound par duplication d'instance (vrai cylindre arcade).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.1.8] - 2026-05-10
+
+### Phase 10i — Ship explosion debris arcade ✅
+
+**Effet visuel arcade emblématique** : quand le vaisseau est détruit
+(collision asteroid / UFO / UFO bullet), 5 fragments (mini-segments)
+s'éparpillent depuis sa position dans des directions aléatoires.
+
+Inspiré de `DoShipExplsn` ($7465) et `ShipExpVelTbl` arcade rev 4 —
+version simplifiée Oric (5 fragments vs ~12 arcade, vitesses entières
+vs 8.8 fixed, segments ligne droite vs vrais débris vectoriels).
+
+### Mécanique
+
+- **Spawn** : 5 fragments dans `dbr_x/y/vx/vy/ttl[5]` à la position
+  du ship juste avant respawn.
+- **Vélocités radiales** : RNG → ±1 ou ±3 sur chaque axe (8 directions
+  × 2 amplitudes = 16 trajectoires possibles).
+- **Forme** : chaque fragment trace un mini-segment de 1-2 px dans la
+  direction du mouvement (`(x, y) → (x+vx/2, y+vy/2)`).
+- **Durée** : 30 frames (~1.8 s à 17 Hz observés), désynchronisée par
+  fragment (`DEBRIS_TTL - (i & 3)`) pour effet fade-out organique.
+- **Sortie d'écran** : disparu (TTL = 0).
+
+### Added
+
+- `dbr_x/y/vx/vy/ttl[5]` (BSS, 25 octets).
+- `debris_init/spawn/update/render` (4 fonctions, ~50 lignes C).
+- Hooks dans `collisions_ship_asteroids` (3 cas : asteroid, UFO, UFO bullet)
+  → `debris_spawn(ship_x, ship_y)` avant `ship_respawn`.
+- Hooks dans la boucle de jeu : `debris_render` (erase + redraw),
+  `debris_update`.
+
+### Décisions techniques Phase 10i
+
+- **5 fragments fixes** (vs ~12 arcade) : compromis budget cycles
+  (~30 lignes XOR par frame de debris) vs visibilité.
+- **Mini-segments (1-2 px)** plutôt que vraies parties du ship vectoriel :
+  l'arcade dessine 4 morceaux distincts du vaisseau (pointe, gauche,
+  droite, base), chacun rotant et translatant. Notre version simplifie
+  en points-traits.
+- **Fragment auto-disparu hors écran** : pas de wraparound (cohérent avec
+  un effet "explosion" éphémère, pas un objet de jeu persistant).
+- **TTL désynchronisé** par fragment (`30, 29, 28, 27, 26`) : effet
+  fade-out plus naturel qu'un cut net synchronisé.
 
 ## [1.1.7] - 2026-05-10
 
