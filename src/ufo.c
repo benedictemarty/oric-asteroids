@@ -221,15 +221,25 @@ void ufo_tick(unsigned char ship_x_in, unsigned char ship_y_in,
 {
     int nx;
     if (!ufo_active) {
+        /* Phase 10k : décrément AstBreakTimer (arcade $6BAF-$6BB7).
+         * Pendant ce délai, on bloque le spawn saucer. */
+        if (ast_break_timer) ast_break_timer--;
+
         if (ufo_spawn_timer == 0) {
-            ufo_spawn(score_in);
-            /* Phase 10h : reload accéléré si asteroids_count ≤ ScrSpeedup
-             * (cf. arcade $6BC6-$6BCE — saucer pressant en fin de vague). */
-            if (asteroids_count() <= scr_speedup) {
-                ufo_spawn_timer = UFO_SPAWN_FAST;
-            } else {
-                ufo_spawn_timer = UFO_SPAWN_PERIOD;
+            /* Phase 10k : conditions arcade pour empêcher spawn :
+             *   - AstBreakTimer > 0 (asteroid détruit récemment)
+             *   - 0 asteroids actifs (vague vide, transition imminente)
+             *   cf. UpdateScr $6BBF-$6BC9. */
+            if (ast_break_timer == 0 && asteroids_count() != 0) {
+                ufo_spawn(score_in);
+                /* Phase 10h : reload accéléré si asteroids_count ≤ ScrSpeedup */
+                if (asteroids_count() <= scr_speedup) {
+                    ufo_spawn_timer = UFO_SPAWN_FAST;
+                } else {
+                    ufo_spawn_timer = UFO_SPAWN_PERIOD;
+                }
             }
+            /* Si bloqué, on garde le timer à 0 → re-test prochaine frame */
         } else {
             ufo_spawn_timer--;
         }

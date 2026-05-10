@@ -7,12 +7,58 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10k+ :
+À venir Phase 10l+ :
 - Variables Atari arcade (`statusShip`, `horzVelShip`, etc.) côté code.
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
 - Wraparound par duplication d'instance (vrai cylindre arcade).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.1.10] - 2026-05-10
+
+### Phase 10k — AstBreakTimer (anti-saucer post-hit) ✅
+
+**Port de la mécanique anti-spawn arcade** :
+- `AstBreakTimer` ($02F9) : compteur frames après destruction d'un asteroid.
+- **Reload à 80 frames** dans `BreakAsteroid` ($75EE).
+- **Décrément 1/frame** dans `DoScrTmrUpdate` ($6BAF).
+- **Bloque le spawn saucer** tant que `AstBreakTimer > 0`
+  (cf. `UpdateScr` $6BC1).
+- **Bloque aussi si 0 asteroids actifs** (`CurAsteroids == 0` à $6BC6).
+
+### Effet gameplay
+
+- Après chaque hit asteroid : **80 frames de répit** (~4.7 s à 17 Hz)
+  avant qu'un saucer puisse spawn.
+- Permet au joueur de finir une vague en chaîne sans être interrompu
+  par un saucer.
+- Empêche un saucer d'apparaître **avant** la transition de vague
+  (vague vide = pas de saucer).
+
+### Added
+
+- `ast_break_timer` (BSS, 1 octet) dans `src/asteroids.c`, exposé dans
+  `asteroids.h`.
+
+### Changed
+
+- `src/asteroids.c` : `asteroids_init` reset à 0, `asteroids_fragment`
+  reload à 80.
+- `src/ufo.c` : `ufo_tick` décrément `ast_break_timer` chaque frame
+  même si UFO inactif (cohérent avec l'arcade qui décrémente toujours
+  via `DoScrTimers`). Bloque spawn si `ast_break_timer > 0` ou
+  `asteroids_count() == 0`.
+
+### Décisions techniques Phase 10k
+
+- **Décrément même UFO inactif** : nécessaire car le timer est global
+  (pas attaché à un UFO en cours). Cohérent avec arcade `DoScrTmrUpdate`
+  qui s'exécute à chaque frame indépendamment de `ScrStatus`.
+- **Pas de re-test à chaque frame du `ufo_spawn_timer = 0`** : on
+  laisse `ufo_spawn_timer` à 0 si bloqué, ce qui re-déclenche le
+  test la frame suivante. Légèrement différent de l'arcade
+  (qui maintient `ScrTimer = $7F` post-respawn) mais comportement
+  équivalent.
 
 ## [1.1.9] - 2026-05-10
 

@@ -43,6 +43,12 @@ static unsigned char ast_per_wave;
  * vague, max 11 (cf. InitGameVars $690E + InitWaveVars $717A-$7184). */
 unsigned char scr_speedup;
 
+/* Phase 10k — AstBreakTimer arcade ($02F9) : compteur frames après
+ * destruction d'un asteroid. Pendant ce délai, le saucer ne peut pas
+ * spawn. Reload à 80 dans BreakAsteroid ($75EE), décrément 1/frame
+ * dans DoScrTmrUpdate ($6BAF). */
+unsigned char ast_break_timer;
+
 /* RNG : LFSR 8-bit Galois (polynôme x^8 + x^6 + x^5 + x^4 + 1) */
 static unsigned char rng_state;
 
@@ -61,6 +67,7 @@ void asteroids_init(unsigned char seed)
     current_wave = 0;
     ast_per_wave = 0;
     scr_speedup = 5;            /* arcade : init à 5 */
+    ast_break_timer = 0;        /* arcade : aucun hit en attente */
     for (i = 0; i < MAX_ASTEROIDS; i++) asteroids[i].active = 0;
 }
 
@@ -236,6 +243,10 @@ void asteroids_fragment(unsigned char idx)
     unsigned char ax, ay;
 
     if (!asteroids[idx].active) return;
+
+    /* Phase 10k : reload AstBreakTimer = 80 (arcade $75EE).  Tout hit
+     * d'asteroid retarde le prochain spawn saucer de 80 frames. */
+    ast_break_timer = 80;
 
     /* Petit détruit complètement (cf. arcade : size devient 0, asteroid disparu) */
     if (asteroids[idx].size == SIZE_SMALL) {
