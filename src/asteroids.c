@@ -123,11 +123,11 @@ void asteroids_spawn_wave(void)
         asteroids[i].x_frac = 0;
         asteroids[i].y_frac = 0;
 
-        /* Vélocité 8.8 (scale ×64) : base RNG (1 ou 2 px) × 64
-         * → 64 ou 128 = 0.25 ou 0.5 px/frame initial. */
+        /* Vélocité 8.8 (scale ×128) : base RNG (1 ou 2 px) × 128
+         * → 128 ou 256 = 0.5 ou 1.0 px/frame initial. */
         r = rng8();
-        asteroids[i].vx = ((r & 1) ? 1 : -1) * ((r & 2) ? 128 : 64);
-        asteroids[i].vy = ((r & 4) ? 1 : -1) * ((r & 8) ? 128 : 64);
+        asteroids[i].vx = ((r & 1) ? 1 : -1) * ((r & 2) ? 256 : 128);
+        asteroids[i].vy = ((r & 4) ? 1 : -1) * ((r & 8) ? 256 : 128);
     }
     /* Marquer les autres comme libres */
     for (; i < MAX_ASTEROIDS; i++) {
@@ -311,22 +311,22 @@ void asteroids_render(void)
     }
 }
 
-/* 8.8 fixed-point pour asteroid velocities — scale ×64 (= 0.25 px/unit) :
- *   V_MAX_AST = 15 × 64 = 960 ≈ 3.75 px/frame max
- *   V_MIN_AST =  3 × 64 = 192 ≈ 0.75 px/frame min (asteroid ne peut pas s'arrêter)
+/* 8.8 fixed-point pour asteroid velocities — scale ×128 (= 0.5 px/unit) :
+ *   V_MAX_AST = 15 × 128 = 1920 ≈ 7.5 px/frame max
+ *   V_MIN_AST =  3 × 128 =  384 ≈ 1.5 px/frame min (asteroid ne peut pas s'arrêter)
  */
-#define V_MAX_AST   960
-#define V_MIN_AST   192
+#define V_MAX_AST   1920
+#define V_MIN_AST    384
 
 /* RNG signé en 8.8 — port de SetAstVel ($7203) :
- *   AND #$8F garde sign + 4 bits magnitude, scale ×64.  */
+ *   AND #$8F garde sign + 4 bits magnitude, scale ×128.  */
 static int rand_offset(void)
 {
     unsigned char r = rng8() & 0x8F;
     signed char s;
     if (r & 0x80) r |= 0xF0;
     s = (signed char)r;
-    return ((int)s) << 6;     /* ×64 = scale 8.8 */
+    return ((int)s) << 7;     /* ×128 = scale 8.8 (matches V_MAX/MIN_AST) */
 }
 
 /* Clamp arcade GetAstVelocity ($7233) en 8.8 fixed-point. */

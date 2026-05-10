@@ -66,7 +66,7 @@ void tune_stop(void);
 
 #define BULLETS         4
 #define BULLET_TTL      35
-#define FIRE_COOLDOWN   4
+#define FIRE_COOLDOWN   2     /* ~12 tirs/s à 25 Hz */
 
 /* 8.8 fixed-point pour ship_vx/vy (16 bits signed).
  *   - V_MAX_FIXED = 2048 = 8.00 px/frame max (à 25 Hz = 200 px/s).
@@ -139,7 +139,6 @@ static unsigned char hyper_cd;
 
 static unsigned char ship_invincible;
 static unsigned char ship_was_drawn;
-static unsigned char rot_tick;       /* ralentit la rotation à 1/2 frames */
 
 /* Phase 7 — high scores en RAM (persistance .tap reportée Phase 9) */
 static unsigned int  hiscores[HISCORE_COUNT];
@@ -854,15 +853,9 @@ void game_run(void)
         if (ship_was_drawn) ship_erase();    /* erase à pos/angle N-1 */
 
         if (!gameover) {
-            /* Rotation à 1 angle/2 frames pour réduire la saccade visuelle
-             * (32 angles × 25 Hz = 25 angles/s → tour en 1.3 s = trop rapide
-             * et chaque pas de 11.25° très visible). Ralenti à 12.5 angles/s
-             * = tour en 2.6 s, plus contrôlable et moins saccadé. */
-            rot_tick ^= 1;
-            if (rot_tick) {
-                if (key_state & 0x01) ship_rotate((signed char)-1);
-                if (key_state & 0x02) ship_rotate((signed char)+1);
-            }
+            /* Rotation : 1 angle/frame = 25 angles/s = tour en 1.3 s. */
+            if (key_state & 0x01) ship_rotate((signed char)-1);
+            if (key_state & 0x02) ship_rotate((signed char)+1);
             if (key_state & 0x04) {
                 ship_apply_thrust();
                 if (sfx_id == FX_NONE) sound_play_fx(FX_THRUST);
