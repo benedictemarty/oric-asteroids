@@ -34,6 +34,7 @@ l_ptr:      .res 2          ; pointeur ZP vers l'octet HIRES courant
 l_e2lo:     .res 1          ; e2 temporaire bas  (2 * err)
 l_e2hi:     .res 1          ; e2 temporaire haut
 l_mask:     .res 1          ; masque de bit du pixel courant
+l_pix:      .res 1          ; Phase 17 — compteur pixels = max(dx,dy)+1
 
 ;-----------------------------------------------------------------
 ; Tables precalculees (RODATA, 200+200+240+240 = 880 octets)
@@ -138,11 +139,11 @@ _plot_dot:
         bcc  @nc
         inc  l_ptr+1
 @nc:
-        ; XOR le pixel + bit6 toujours 1
+        ; XOR le pixel — bit6 préservé (même raisonnement que la boucle :
+        ; x_msk[i] a toujours bit6=0, donc l'XOR ne touche pas bit6).
         lda  x_msk,y
         ldy  #0
         eor  (l_ptr),y
-        ora  #$40
         sta  (l_ptr),y
         rts
 
@@ -203,6 +204,16 @@ _draw_line_xor:
         lda  x_msk,y
         sta  l_mask
 
+        ;--- Phase 17 : compteur pixels = max(dx, dy) + 1 ---
+        lda  l_dx
+        cmp  l_dy
+        bcs  @pix_dx
+        lda  l_dy
+@pix_dx:
+        clc
+        adc  #1
+        sta  l_pix
+
         ;--- err = dx - dy (16-bit signe) ---
         lda  l_dx
         sec
@@ -224,20 +235,13 @@ _draw_line_xor:
         ;--- XOR du pixel (Phase 16 : 14 cycles, ORA #$40 retiré) ---
         ; L'invariant bit6=1 est préservé : x_msk[i] a TOUJOURS bit6=0,
         ; donc l'XOR ne touche pas bit6. Init HIRES = $40 → bit6 reste 1.
-        ; Gain ~2 cycles par pixel × ~150 pixels/frame = ~300 c/frame.
         lda  l_mask
         eor  (l_ptr),y
         sta  (l_ptr),y
 
-        ;--- Test de fin (12 cycles) ---
-        lda  _lx0
-        cmp  _lx1
-        bne  @not_done
-        lda  _ly0
-        cmp  _ly1
-        bne  @not_done
-        jmp  @done
-@not_done:
+        ;--- Phase 17 : Test de fin par compteur (7-8 c vs 12-15 c) ---
+        dec  l_pix
+        beq  @done
 
         ;--- e2 = 2 * err (16 cycles) ---
         lda  l_err_lo
@@ -267,19 +271,17 @@ _draw_line_xor:
         bcs  @sx_ok
         dec  l_err_hi
 @sx_ok:
-        ; Avancer x (sx=+1 toujours) : LSR masque, incr adresse si nouvelle colonne
+        ; Phase 17 : inc _lx0 supprimés (plus relu — fin via compteur).
+        ; Avancer x (sx=+1 toujours) : LSR masque, incr adresse si nouvelle colonne.
         lsr  l_mask             ; 5 cycles (ZP)
         bcs  @sx_newcol         ; 3 (pris 1/6)
-        inc  _lx0               ; 5
         jmp  @no_stepx          ; 3
 @sx_newcol:
         lda  #$20               ; 2 nouveau masque = bit5
         sta  l_mask             ; 3
         inc  l_ptr              ; 5
-        bne  @sx_xpp
+        bne  @no_stepx
         inc  l_ptr+1            ; 5 (rare : page boundary)
-@sx_xpp:
-        inc  _lx0               ; 5
 @no_stepx:
 
         ;--- Test : e2 < dx (step y) ---
@@ -316,10 +318,7 @@ _draw_line_xor:
         bcs  @sy_done
         dec  l_ptr+1
 @sy_done:
-        lda  _ly0
-        clc
-        adc  l_sy
-        sta  _ly0
+        ; Phase 17 : update _ly0 supprimée (plus relu — fin via compteur).
 @no_stepy:
         jmp  @loop
 

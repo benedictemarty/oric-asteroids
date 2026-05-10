@@ -90,8 +90,9 @@ des 9 phases.
 | 14b | Pattern shrapnel 1 arcade exact | `phase14b-done` / `v1.2.4` |
 | 15  | Lettre H + label "HIGH SCORES" en game over | `phase15-done` / `v1.2.5` |
 | 16  | Optimisations framerate (`_plot_dot` + `ORA #$40` retiré) | `phase16-done` / `v1.2.6` |
+| 17  | Compteur pixels Bresenham + suppression mises à jour _lx0/_ly0 | `phase17-done` / `v1.2.7` |
 
-## Différé Phase 17+
+## Différé Phase 18+
 
 - Persistance high scores en `.tap` ou `.dsk` (driver cassette résident).
 - Image `.dsk` Microdisc avec sauvegarde native.
