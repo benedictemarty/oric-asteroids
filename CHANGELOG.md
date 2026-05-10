@@ -7,12 +7,43 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10m+ :
+À venir Phase 10n+ :
 - Variables Atari arcade (`statusShip`, `horzVelShip`, etc.) côté code.
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
 - Wraparound par duplication d'instance (vrai cylindre arcade).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.1.12] - 2026-05-10
+
+### Phase 10m — Clignotement PRESS SPACE écran titre ✅
+
+**Effet arcade-style** : "PRESS SPACE" pulse pendant l'attente input
+pour signaler visuellement au joueur que le jeu attend une action.
+
+### Mécanique
+
+- Compteur `ps_visible` (uint8) tracke l'état actuel du tracé.
+- **Toggle tous les 24 frames** (~1.4 s à 17 Hz observés) : XOR efface,
+  inversion du flag, XOR redraw si nécessaire.
+- **Nettoyage en sortie** : si `ps_visible` à la sortie de la boucle,
+  on appelle `presspace_erase(110)` pour garantir l'état "écran effacé"
+  cohérent avec l'XOR.
+
+### Changed
+
+- `src/game.c` : boucle d'attente du titre intègre le toggle 24-frame
+  via `if ((i & 0x17) == 0x17)` (mask de 24 = test sur 5 bits LSB).
+
+### Décisions techniques Phase 10m
+
+- **Période 24 frames (≈1.4 s)** : compromis entre lisibilité (assez
+  lent pour ne pas être agressif) et urgence (assez rapide pour signaler
+  l'attente). L'arcade Atari pulse à environ 1 s.
+- **Toggle XOR symétrique** : `presspace_erase` puis `presspace_draw` —
+  les 2 opérations sont identiques (XOR), seul le flag interne change.
+- **Garantie d'état sortie** : `if (ps_visible) erase` avant de quitter
+  la boucle. Évite de laisser du résidu graphique au démarrage du jeu.
 
 ## [1.1.11] - 2026-05-10
 

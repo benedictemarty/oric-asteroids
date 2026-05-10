@@ -560,8 +560,10 @@ void game_run(void)
     timer_init();
     sound_init();
 
-    /* Phase 9c/9e/10e — écran titre : "ASTEROIDS" + "PRESS SPACE" +
-     * démo passive (asteroids spawnés et animés en arrière-plan).
+    /* Phase 9c/9e/10e/10m — écran titre :
+     *   - "ASTEROIDS" statique
+     *   - "PRESS SPACE" qui clignote toutes les ~1.5 s (effet arcade pulse)
+     *   - démo passive (asteroids animés en arrière-plan).
      * Au démarrage du jeu, on garde l'état asteroids en place. */
     title_draw();
     presspace_draw(110);
@@ -571,17 +573,25 @@ void game_run(void)
     {
         unsigned char i;
         unsigned char prev_space = 0;
+        unsigned char ps_visible = 1;     /* PRESS SPACE actuellement affiché */
         for (i = 0; i < 200; i++) {
             key_scan();
             if ((key_state & 0x08) && !prev_space) break;
             prev_space = key_state & 0x08;
-            asteroids_draw();        /* efface */
+            asteroids_draw();
             asteroids_update();
-            asteroids_draw();        /* redessine aux nouvelles positions */
+            asteroids_draw();
+            /* Phase 10m : toggle PRESS SPACE tous les 24 frames (~1.4 s à 17 Hz) */
+            if ((i & 0x17) == 0x17) {
+                presspace_erase(110);
+                ps_visible = !ps_visible;
+                if (ps_visible) presspace_draw(110);
+            }
             frame_wait();
         }
+        /* Garantir l'état "effacé" en sortie (XOR cohérence) */
+        if (ps_visible) presspace_erase(110);
     }
-    presspace_erase(110);
     title_erase();
     /* Phase 10e — current_wave passe à 1 dans asteroids_spawn_wave ci-dessus.
      * Reset à 0 pour que le test wave_displayed != current_wave déclenche
