@@ -7,12 +7,63 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10l+ :
+À venir Phase 10m+ :
 - Variables Atari arcade (`statusShip`, `horzVelShip`, etc.) côté code.
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
 - Wraparound par duplication d'instance (vrai cylindre arcade).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.1.11] - 2026-05-10
+
+### Phase 10l — Wraparound par duplication d'instance ✅
+
+**Fini la zone safe rétrécie** : les asteroids utilisent maintenant
+**l'écran complet** `[0, 239] × [0, 199]` avec **duplication d'instance**
+arcade-fidèle (cf. CLAUDE.md / guide §5).
+
+### Mécanique
+
+- `asteroid_draw_at(idx, ox, oy)` : dessine un asteroid avec offset
+  signé (en `int` 16-bit). Clipping `IN_BOUNDS` segment-par-segment :
+  un segment dont au moins une extrémité dépasse `[0,239]×[0,199]` est skippé.
+- `asteroid_draw_one(idx)` : dessine **toujours** l'instance principale,
+  puis selon la position, les instances fantômes :
+  - `x ≤ 14` : copie à `x + 240` (côté droit)
+  - `x ≥ 226` : copie à `x - 240` (côté gauche)
+  - `y ≤ 14` : copie à `y + 200` (bas)
+  - `y ≥ 186` : copie à `y - 200` (haut)
+  - **coins** : 4× (instance + dx + dy + dx_dy)
+- Wraparound dans `asteroids_update` : `[0, 239] × [0, 199]` (vrai cylindre).
+
+### Effet visuel
+
+Quand un asteroid traverse un bord, la moitié visible à droite et
+celle à gauche sont **simultanément affichées** pendant la transition.
+Le joueur voit l'asteroid passer "à travers" l'écran sans saut brutal —
+sensation arcade authentique.
+
+### Changed
+
+- `WRAP_X_MIN/MAX/SPAN` : `0/239/240` (avant : `16/224/208`).
+- `asteroid_draw_one` séparé en `asteroid_draw_at(ox, oy)` (1 instance)
+  + wrapper qui appelle 1 à 4 fois selon position.
+- Le ship et les bullets gardent leurs zones safe respectives (ship
+  toujours proche du centre, bullets éphémères).
+
+### Décisions techniques Phase 10l
+
+- **Clipping segment-par-segment** plutôt que tracé tronqué propre :
+  un segment dont une extrémité dépasse est SKIPPÉ entièrement. Plus
+  simple à coder mais visuel "trous" pendant les transitions de bord.
+  Une vraie implémentation arcade découperait le segment à l'intersection
+  bord-segment (Cohen-Sutherland) — reporté à Phase 10m.
+- **Pas de duplication pour le ship** : il a sa zone safe `[14, 226]`.
+  Garantie qu'un sommet ship ne déborde jamais. Pas besoin de duplication.
+- **Pas de duplication pour les bullets** : éphémères (35 frames TTL),
+  généralement détruits avant d'atteindre un bord.
+- **Pas de duplication pour le UFO** : trajectoire purement horizontale
+  bord à bord sans wraparound. Disparaît en sortie.
 
 ## [1.1.10] - 2026-05-10
 

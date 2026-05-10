@@ -80,8 +80,9 @@ des 9 phases.
 | 10i | Ship explosion debris (5 fragments éphémères) | `phase10i-done` / `v1.1.8` |
 | 10j | Affichage WAVE 2 chiffres (10, 11) | `phase10j-done` / `v1.1.9` |
 | 10k | AstBreakTimer (anti-saucer 80 frames post-hit) | `phase10k-done` / `v1.1.10` |
+| 10l | Wraparound asteroids par duplication d'instance | `phase10l-done` / `v1.1.11` |
 
-## Différé Phase 10l+
+## Différé Phase 10m+
 
 - Persistance high scores en `.tap` ou `.dsk` (driver cassette résident).
 - Image `.dsk` Microdisc avec sauvegarde native.

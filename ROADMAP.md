@@ -36,6 +36,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 10i | Ship explosion debris (5 fragments éphémères) (v1.1.8) | — | 1 j |
 | ✅ | 10j | Affichage WAVE 2 chiffres (10, 11) (v1.1.9) | — | 1 j |
 | ✅ | 10k | AstBreakTimer (anti-saucer 80 frames post-hit) (v1.1.10) | — | 1 j |
+| ✅ | 10l | Wraparound par duplication d'instance (vrai cylindre) (v1.1.11) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.

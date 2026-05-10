@@ -123,16 +123,18 @@ void asteroids_spawn_wave(void)
     for (; i < MAX_ASTEROIDS; i++) asteroids[i].active = 0;
 }
 
-/* Mise à jour : intégration + wraparound zone safe.
- * Marge = 16 px (≥ rayon max grand 14 + tolérance) pour éviter overflow
- * vertices hors HIRES. La duplication d'instance (Phase 4b) supprimera
- * cette restriction. */
-#define WRAP_X_MIN  16
-#define WRAP_X_MAX  224
-#define WRAP_Y_MIN  16
-#define WRAP_Y_MAX  184
-#define WRAP_X_SPAN (WRAP_X_MAX - WRAP_X_MIN)
-#define WRAP_Y_SPAN (WRAP_Y_MAX - WRAP_Y_MIN)
+/* Mise à jour : intégration + wraparound écran complet (Phase 10l).
+ * Le wraparound utilise désormais l'écran complet [0, 239] × [0, 199] ;
+ * les asteroids près des bords dessinent leur instance fantôme à l'autre
+ * extrémité (duplication d'instance arcade-fidèle).  Le clipping segment
+ * par segment dans asteroid_draw_one_at évite l'overflow HIRES si des
+ * vertices dépassent. */
+#define WRAP_X_MIN  0
+#define WRAP_X_MAX  239
+#define WRAP_Y_MIN  0
+#define WRAP_Y_MAX  199
+#define WRAP_X_SPAN 240
+#define WRAP_Y_SPAN 200
 
 void asteroids_update(void)
 {
@@ -151,21 +153,25 @@ void asteroids_update(void)
     }
 }
 
-/* Tracé d'un astéroïde — Phase 10b : N sommets variables.
- *   shape_idx = size * 4 + shape
- *   base      = shape_off[shape_idx]
- *   n         = shape_len[shape_idx]
- *   trace n segments vertex_i → vertex_((i+1) mod n) puis replot des
- *   n sommets (Phase 9g — polygone fermé, sommets partagés). */
-static void asteroid_draw_one(unsigned char idx)
+/* Phase 10l — vérifie qu'une coord (x, y) en int signé est dans
+ * la zone HIRES valide [0, 239] × [0, 199]. Permet le clipping
+ * segment par segment lors de la duplication d'instance. */
+#define IN_BOUNDS(x, y)  ((x) >= 0 && (x) <= 239 && (y) >= 0 && (y) <= 199)
+
+/* Tracé d'un astéroïde à un offset arbitraire (ox, oy) en int signé.
+ * Permet la duplication d'instance : (0, 0) pour l'instance principale,
+ * (±240, 0) ou (0, ±200) pour les instances fantômes près des bords.
+ * Clipping segment-par-segment : skip si une extrémité hors HIRES. */
+static void asteroid_draw_at(unsigned char idx, int ox, int oy)
 {
     unsigned char i, base, n, next;
     unsigned char shape_idx;
-    unsigned char ax, ay;
+    int ax, ay;
+    int x0, y0, x1, y1;
     signed char dx0, dy0, dx1, dy1;
 
-    ax = asteroids[idx].x;
-    ay = asteroids[idx].y;
+    ax = (int)(unsigned int)asteroids[idx].x + ox;
+    ay = (int)(unsigned int)asteroids[idx].y + oy;
     shape_idx = (asteroids[idx].size << 2) + asteroids[idx].shape;
     base = shape_off[shape_idx];
     n    = shape_len[shape_idx];
@@ -176,22 +182,59 @@ static void asteroid_draw_one(unsigned char idx)
         dy0 = shape_y[base + i];
         dx1 = shape_x[base + next];
         dy1 = shape_y[base + next];
-        lx0 = (unsigned char)((signed char)ax + dx0);
-        ly0 = (unsigned char)((signed char)ay + dy0);
-        lx1 = (unsigned char)((signed char)ax + dx1);
-        ly1 = (unsigned char)((signed char)ay + dy1);
-        draw_line_xor();
+        x0 = ax + (int)dx0;
+        y0 = ay + (int)dy0;
+        x1 = ax + (int)dx1;
+        y1 = ay + (int)dy1;
+        if (IN_BOUNDS(x0, y0) && IN_BOUNDS(x1, y1)) {
+            lx0 = (unsigned char)x0;
+            ly0 = (unsigned char)y0;
+            lx1 = (unsigned char)x1;
+            ly1 = (unsigned char)y1;
+            draw_line_xor();
+        }
     }
-    /* Phase 9g : replot des N sommets (polygone fermé) */
+    /* Phase 9g : replot des N sommets (polygone fermé) — clippés pareil */
     for (i = 0; i < n; i++) {
         dx0 = shape_x[base + i];
         dy0 = shape_y[base + i];
-        lx0 = (unsigned char)((signed char)ax + dx0);
-        ly0 = (unsigned char)((signed char)ay + dy0);
-        lx1 = lx0;
-        ly1 = ly0;
-        draw_line_xor();
+        x0 = ax + (int)dx0;
+        y0 = ay + (int)dy0;
+        if (IN_BOUNDS(x0, y0)) {
+            lx0 = (unsigned char)x0;
+            ly0 = (unsigned char)y0;
+            lx1 = lx0;
+            ly1 = ly0;
+            draw_line_xor();
+        }
     }
+}
+
+/* Phase 10l — duplication d'instance : asteroid près d'un bord est
+ * dessiné aussi à son emplacement "fantôme" de l'autre côté de l'écran.
+ * Bords (rayon ~14 px) :
+ *   - x ≤ 14 : copie à x + 240
+ *   - x ≥ 226 : copie à x - 240
+ *   - idem Y avec 200
+ *   - coins : 4× (1 + dx + dy + dx_dy) */
+static void asteroid_draw_one(unsigned char idx)
+{
+    unsigned char ax, ay;
+    /* Rayon max conservateur : 14 (= rayon grand asteroid) */
+    int dup_x = 0, dup_y = 0;
+
+    asteroid_draw_at(idx, 0, 0);
+
+    ax = asteroids[idx].x;
+    ay = asteroids[idx].y;
+    if (ax <= 14)        dup_x = +240;
+    else if (ax >= 226)  dup_x = -240;
+    if (ay <= 14)        dup_y = +200;
+    else if (ay >= 186)  dup_y = -200;
+
+    if (dup_x) asteroid_draw_at(idx, dup_x, 0);
+    if (dup_y) asteroid_draw_at(idx, 0, dup_y);
+    if (dup_x && dup_y) asteroid_draw_at(idx, dup_x, dup_y);
 }
 
 void asteroids_draw(void)
