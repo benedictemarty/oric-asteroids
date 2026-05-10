@@ -7,6 +7,86 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Anti-flicker — réorganisation boucle `game_run` (étapes A + B) ✅
+
+**Symptôme** : à 25 Hz, les astéroïdes (et autres entités mobiles)
+clignotaient de façon perceptible.
+
+**Cause** : dans `game.c game_run()`, ~30 lignes de logique (sound,
+scoring, hi-scores, wave label, game-over detect) s'intercalaient
+entre la phase erase (XOR) en début de frame et la phase draw en
+fin de frame. La fenêtre pendant laquelle un astéroïde était éteint
+à l'écran couvrait ~80 % de la durée de frame → l'œil percevait
+un cycle "présent/absent" à 25 Hz, fréquence de flicker maximale.
+
+**Correctif** :
+
+- **Étape A** : restructuration de la boucle en 2 blocs distincts :
+  1. **Bloc render compact** : erase → apply input → updates →
+     collisions → ship_visible → draw (fenêtre flicker minimisée).
+  2. **Bloc post-render** (hors fenêtre critique) : sound logic
+     (FX_LIFE, thump, UFO bip-bip), `sound_tick`, insertion
+     hi-scores, wave label, `hud_draw`, textes game-over.
+
+- **Étape B (simplifiée)** : sortir le couple erase/draw asteroids
+  du bloc général, le placer en sandwich autour de
+  `asteroids_update + collisions_*_asteroids`. Fenêtre asteroids
+  réduite à ~7 ms (vs ~20 ms pré-refactor) — pattern *per-entity*
+  avec `prev_x/prev_y` reste envisageable si flicker résiduel.
+
+Aucun changement de structures de données ni d'API asm. Test
+régression `make check` PASS (capture identique à la référence).
+
+### Fix — toggle PRESS SPACE écran titre ✅
+
+**Symptôme** : "PRESS SPACE" apparaissait altéré ou disparaissait
+quand un astéroïde traversait sa zone, et le clignotement attendu
+ne fonctionnait pas comme prévu.
+
+**Cause** : pattern de toggle buggy dans `game.c` boucle titre :
+```c
+presspace_erase(110);
+ps_visible = !ps_visible;
+if (ps_visible) presspace_draw(110);
+```
+Aux toggles impairs, ce code fait `XOR` puis `XOR` aux mêmes
+coords = identité visuelle, mais flippe `ps_visible`. Résultat :
+le texte n'était en pratique visible qu'une fois sur deux, et
+l'état tracking était désynchronisé.
+
+**Correctif** : un seul XOR par toggle (erase si actuellement
+visible, draw si caché).
+
+Note : l'overlap astéroïde ↔ texte reste inhérent au tracé XOR
+mono-buffer. Solution future possible : déplacer "PRESS SPACE"
+hors de la zone de circulation des astéroïdes, ou confiner ces
+derniers à une bande de l'écran titre.
+
+### Réactivité scan SPACE — double-scan boucle titre ✅
+
+**Symptôme** : le démarrage du jeu via SPACE depuis l'écran titre
+nécessitait parfois plusieurs appuis.
+
+**Cause** : la boucle titre tourne à ~17 Hz (frame ~60 ms) avec un
+seul `key_scan()` en début de frame. Un appui SPACE bref (< 60 ms)
+tombant entre deux scans n'était jamais détecté.
+
+**Correctif** : ajouter un second `key_scan()` après le tracé
+asteroids, juste avant le toggle PRESS SPACE. Double les chances
+de capter un appui dans la frame.
+
+Note : la même problématique existe potentiellement dans `game_run`
+pour le tir et l'hyperespace ; non corrigée ici car la boucle de
+jeu tourne à 25 Hz (frame ~40 ms) et un appui humain dépasse
+typiquement cette durée. À investiguer si le user signale des
+tirs manqués.
+
+### Maintenance
+
+- Mise à jour de `tests/ref/phase9_release.ppm` pour refléter
+  l'affichage correct de "PRESS SPACE" (le snapshot précédent
+  capturait l'état buggy du toggle).
+
 À venir Phase 19 (planifiée) :
 - **Vaisseau arcade-fidèle** : passer de 3 à **5 segments** pour
   reproduire la forme exacte de l'Atari rev 4 (pointe + 2 côtés

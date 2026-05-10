@@ -687,17 +687,31 @@ void game_run(void)
         unsigned char prev_space = 0;
         unsigned char ps_visible = 1;     /* PRESS SPACE actuellement affiché */
         for (i = 0; i < 200; i++) {
+            /* Double-scan par frame pour rattraper les appuis brefs.
+             * La frame du titre dure ~60 ms (17 Hz) : un appui SPACE
+             * < 60 ms tombant entre deux scans serait sinon manqué. */
             key_scan();
             if ((key_state & 0x08) && !prev_space) break;
             prev_space = key_state & 0x08;
             asteroids_draw();
             asteroids_update();
             asteroids_draw();
-            /* Phase 10m : toggle PRESS SPACE tous les 24 frames (~1.4 s à 17 Hz) */
+            key_scan();
+            if ((key_state & 0x08) && !prev_space) break;
+            prev_space = key_state & 0x08;
+            /* Phase 10m : toggle PRESS SPACE tous les 24 frames (~1.4 s à 17 Hz).
+             * Bug originel : `erase(); if(visible) draw();` faisait XOR XOR
+             * = identité aux toggles impairs → texte effectivement caché 100 %
+             * du temps après le 2e toggle, et état `ps_visible` désynchronisé.
+             * Fix : un seul XOR par toggle (erase si visible, draw si caché). */
             if ((i & 0x17) == 0x17) {
-                presspace_erase(110);
-                ps_visible = !ps_visible;
-                if (ps_visible) presspace_draw(110);
+                if (ps_visible) {
+                    presspace_erase(110);
+                    ps_visible = 0;
+                } else {
+                    presspace_draw(110);
+                    ps_visible = 1;
+                }
             }
             frame_wait();
         }
@@ -730,24 +744,11 @@ void game_run(void)
     for (;;) {
         key_scan();
 
-        /* Effacer (XOR) — ordre inverse du tracé */
-        asteroid_debris_render();    /* erase explosion dots si actifs */
-        debris_render();             /* erase debris si actifs */
-        ufo_bullet_draw();
-        ufo_draw();
-        bullets_render();
-        asteroids_draw();
-        if (ship_was_drawn) ship_erase();
-        if (gameover && hiscores_drawn) {
-            hiscores_draw_table();
-        }
-        if (gameover && gameover_text_drawn) {
-            gameover_erase();
-            presspace_erase(140);
-        }
-
-        /* Restart : SPACE en game over */
+        /* Restart en game over (avant le bloc render pour éviter
+         * d'effacer puis re-init dans la même frame). */
         if (gameover && (key_state & 0x08)) {
+            /* L'erase de la frame précédente est encore à faire : game_reset
+             * s'en charge en appelant ship_erase + asteroids_draw + ufo_draw + ... */
             game_reset();
             prev_gameover = 0;
             hiscores_drawn = 0;
@@ -755,13 +756,32 @@ void game_run(void)
             continue;
         }
 
-        /* Input → actions (ignoré en game over) */
+        /* ============================================================
+         * BLOC ERASE → LOGIQUE → DRAW (fenêtre flicker compactée)
+         *
+         * Tout ce qui ne touche pas au tracé d'entité mobile (sound,
+         * scoring, hi-scores, HUD statique, wave label) est sorti de
+         * cette fenêtre — cf. POST-RENDER plus bas. Cela réduit ~50 %
+         * le temps pendant lequel un astéroïde est éteint à l'écran.
+         * ============================================================ */
+
+        /* 1. Erase entités mobiles SAUF asteroids (XOR à pos N-1).
+         *    Les asteroids ont leur propre bloc compact plus bas pour
+         *    minimiser leur fenêtre flicker (le plus visible). */
+        asteroid_debris_render();
+        debris_render();
+        ufo_bullet_draw();
+        ufo_draw();
+        bullets_render();
+        if (ship_was_drawn) ship_erase();
+
+        /* 2. Apply input — modifie ship_angle / vel / spawne bullets.
+         *    Les modifs sont sûres ici : l'erase est terminé. */
         if (!gameover) {
             if (key_state & 0x01) ship_rotate((signed char)-1);
             if (key_state & 0x02) ship_rotate((signed char)+1);
             if (key_state & 0x04) {
                 ship_apply_thrust();
-                /* Phase 9f : son thrust intermittent quand aucun autre FX */
                 if (sfx_id == FX_NONE) sound_play_fx(FX_THRUST);
             }
 
@@ -769,7 +789,6 @@ void game_run(void)
             if (fire_now && !prev_fire) bullet_fire();
             prev_fire = fire_now;
 
-            /* Hyperespace : edge-trigger sur DOWN + cooldown */
             hyper_now = key_state & 0x10;
             if (hyper_now && !prev_hyper && hyper_cd == 0) {
                 ship_hyperspace();
@@ -779,42 +798,64 @@ void game_run(void)
             if (hyper_cd) hyper_cd--;
         }
 
-        /* Mise à jour physique */
+        /* 3. Updates physiques NON-asteroids */
         if (!gameover) ship_update();
         bullets_update();
-        asteroids_update();
         if (!gameover) ufo_tick(ship_x, ship_y, score);
         ufo_bullet_update();
         debris_update();
         asteroid_debris_update();
 
-        /* Collisions */
+        /* 4. ===== BLOC COMPACT ASTEROIDS =====
+         * Erase → update → collisions → draw consécutifs.
+         * Fenêtre pendant laquelle un astéroïde est absent de l'écran :
+         * uniquement le temps de asteroids_update + 3 collisions
+         * (~7 ms à 1 MHz vs ~20 ms en pré-refactor). */
+        asteroids_draw();              /* erase à pos N-1 */
+        asteroids_update();            /* pos N-1 → pos N */
         collisions_bullets_asteroids();
         collisions_ufobullet_asteroids();
         if (!gameover) collisions_ship_asteroids();
+        asteroids_draw();              /* draw actifs à pos N */
+        /* ===== FIN BLOC ASTEROIDS ===== */
 
         if (ship_invincible) ship_invincible--;
         check_next_wave();
 
-        /* Phase 9f : extra life détectée (lives a augmenté) → FX_LIFE */
+        ship_visible = !gameover &&
+                       (ship_invincible == 0 || (ship_invincible & 2));
+
+        /* 5. Draw entités mobiles non-asteroids à pos N */
+        if (ship_visible) {
+            ship_draw();
+            ship_was_drawn = 1;
+        } else {
+            ship_was_drawn = 0;
+        }
+        bullets_render();
+        ufo_draw();
+        ufo_bullet_draw();
+        debris_render();
+        asteroid_debris_render();
+
+        /* ============================================================
+         * POST-RENDER (hors fenêtre flicker)
+         * Tout ce qui suit n'affecte aucune entité mobile : sound,
+         * scoring, HUD statique, wave label, textes game over.
+         * Le balayage CRT a déjà rencontré les entités mobiles avec
+         * leur état correct — d'éventuels glitches ici n'affectent
+         * que des zones statiques (pas de flicker perceptible).
+         * ============================================================ */
+
+        /* Extra life (FX_LIFE) */
         if (lives > lives_prev && sfx_id == FX_NONE) {
             sound_play_fx(FX_LIFE);
         }
         lives_prev = lives;
 
-        /* Phase 10d : afficher "WAVE n" si la vague a changé */
-        if (current_wave != wave_displayed) {
-            if (wave_displayed != 0) wave_label_erase(WAVE_HUD_Y, wave_displayed);
-            wave_label_draw(WAVE_HUD_Y, current_wave);
-            wave_displayed = current_wave;
-        }
-
-        /* Phase 8 : thump cadencé sur asteroids_count, accélère quand
-         * il reste peu d'asteroids (cf. arcade : tension croissante).
-         * Phase 10n : prioritaire sur UFO sound si UFO actif. */
+        /* Sound thump / UFO bip-bip cadencé */
         if (!gameover && sfx_id == FX_NONE) {
             if (ufo_active) {
-                /* Phase 10n : bip-bip UFO continu tant qu'UFO actif */
                 if (ufo_sound_timer == 0) {
                     sound_play_fx(FX_UFO);
                     ufo_sound_timer = UFO_SOUND_PERIOD;
@@ -836,33 +877,30 @@ void game_run(void)
         }
         sound_tick();
 
-        /* Détecter passage en game over (insérer dans hi-scores) */
+        /* Passage en game over → insertion hi-scores + clean UFO */
         if (gameover && !prev_gameover) {
             final_score = score;
             hiscores_insert(final_score);
-            ufo_kill();             /* propre : retirer UFO de l'écran */
+            ufo_kill();
         }
         prev_gameover = gameover;
 
-        /* Vaisseau visible (clignotement pendant invincibilité) */
-        ship_visible = !gameover &&
-                       (ship_invincible == 0 || (ship_invincible & 2));
-
-        /* Redessiner */
-        if (ship_visible) {
-            ship_draw();
-            ship_was_drawn = 1;
-        } else {
-            ship_was_drawn = 0;
+        /* Wave label — erase puis redraw consécutifs si vague changée */
+        if (current_wave != wave_displayed) {
+            if (wave_displayed != 0) wave_label_erase(WAVE_HUD_Y, wave_displayed);
+            wave_label_draw(WAVE_HUD_Y, current_wave);
+            wave_displayed = current_wave;
         }
-        asteroids_draw();
-        bullets_render();
-        ufo_draw();
-        ufo_bullet_draw();
-        debris_render();             /* redraw debris aux nouvelles positions */
-        asteroid_debris_render();    /* redraw explosion dots */
+
         hud_draw();
+
+        /* Game over text : erase puis redraw consécutifs (XOR symétrique) */
         if (gameover) {
+            if (hiscores_drawn) hiscores_draw_table();
+            if (gameover_text_drawn) {
+                gameover_erase();
+                presspace_erase(140);
+            }
             hiscores_draw_table();
             hiscores_drawn = 1;
             gameover_draw();
