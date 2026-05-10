@@ -7,7 +7,16 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 19+ :
+À venir Phase 19 (planifiée) :
+- **Vaisseau arcade-fidèle** : passer de 3 à **5 segments** pour
+  reproduire la forme exacte de l'Atari rev 4 (pointe + 2 côtés
+  longs + barre transversale cockpit + 2 encoches arrière en V).
+  Implique : modif `tools/gen_ship.py` (5 sommets × 32 angles =
+  160 octets table), `ship.s` (`draw_three_lines` → `draw_five_lines`),
+  et ajustement explosion ship (Phase 12/13) pour gérer 5 morceaux.
+  Coût rendu : ~100 c/frame supplémentaires (absorbable).
+
+À venir Phase 20+ :
 - SMC : patcher dy/dx en immédiats dans la boucle (gain ~3 c/px).
 - Déroulage 2× ou 4× du corps de boucle main-axis.
 - Optimisations C → ASM des boucles draw critiques en C.
