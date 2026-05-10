@@ -27,6 +27,7 @@
 
         .export   _psg_write, _sound_init, _sound_tick
         .export   _sound_play_fx
+        .export   _tune_play_note, _tune_stop
         .exportzp _sfx_id, _sfx_timer
 
         .importzp kb_pcr_save        ; partagée avec input.s
@@ -369,4 +370,95 @@ _sound_tick:
         cli
 @keep:
 @no_sfx:
+        rts
+
+;-----------------------------------------------------------------
+; _tune_play_note — A = index de note (0..6) : G2 GS2 A2 AS2 B2 C3 CS3
+;
+; Joue la note sur le canal A du PSG (regs 0/1 = freq, reg 8 = volume).
+; Mixer (reg 7) configuré : tone A on, autres off, port A input (clavier OK).
+; Pour Oric à 1 MHz (PSG clock).
+;
+; Cette fonction NE touche PAS sfx_id/sfx_timer : la note reste jouée
+; jusqu'au prochain _tune_play_note ou _tune_stop. La mélodie est gérée
+; côté C (compteur de frames, séquence de notes).
+;-----------------------------------------------------------------
+
+; Tables fréquence PSG pour notes (1 MHz / (16 × freq_Hz)) :
+;   G2  98.00 Hz  → 638 = $027E
+;   GS2 103.83 Hz → 602 = $025A
+;   A2  110.00 Hz → 568 = $0238
+;   AS2 116.54 Hz → 536 = $0218
+;   B2  123.47 Hz → 506 = $01FA
+;   C3  130.81 Hz → 478 = $01DE
+;   CS3 138.59 Hz → 451 = $01C3
+note_lo:  .byte $7E, $5A, $38, $18, $FA, $DE, $C3
+note_hi:  .byte $02, $02, $02, $02, $01, $01, $01
+
+_tune_play_note:
+        sta  sound_tmp        ; sauvegarder index
+        sei
+
+        ; Init kb_pcr_save (au cas où aucun key_scan/sound_init n'a tourné)
+        lda  VIA_PCR
+        and  #$11
+        sta  kb_pcr_save
+
+        ; DDRA = $FF pour les écritures PSG
+        lda  VIA_DDRA
+        pha
+        lda  #$FF
+        sta  VIA_DDRA
+
+        ; reg 0 = note_lo[idx]
+        ldx  sound_tmp
+        lda  note_lo,x
+        ldy  #0
+        jsr  _psg_write
+
+        ; reg 1 = note_hi[idx]
+        ldx  sound_tmp
+        lda  note_hi,x
+        ldy  #1
+        jsr  _psg_write
+
+        ; reg 8 = volume A (10)
+        lda  #$0A
+        ldy  #8
+        jsr  _psg_write
+
+        ; reg 7 = mixer (tone A on bit 0=0, autres off, port A input bit 6=1)
+        lda  #$7E
+        ldy  #7
+        jsr  _psg_write
+
+        pla
+        sta  VIA_DDRA
+        cli
+        rts
+
+;-----------------------------------------------------------------
+; _tune_stop — coupe la note (silence canal A)
+;-----------------------------------------------------------------
+_tune_stop:
+        sei
+        lda  VIA_PCR
+        and  #$11
+        sta  kb_pcr_save
+
+        lda  VIA_DDRA
+        pha
+        lda  #$FF
+        sta  VIA_DDRA
+
+        lda  #$00              ; volume A = 0
+        ldy  #8
+        jsr  _psg_write
+        lda  #$7F              ; mixer tout off, port A input
+        ldy  #7
+        jsr  _psg_write
+
+        pla
+        sta  VIA_DDRA
+        cli
         rts

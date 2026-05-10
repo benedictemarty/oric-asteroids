@@ -53,6 +53,10 @@ void ship_erase(void);
 void ship_rotate(signed char delta);
 void key_scan(void);
 
+/* sound.s — tune player pour la mélodie titre (port Mine Storm Vectrex) */
+void tune_play_note(unsigned char idx);
+void tune_stop(void);
+
 /* ------------------------------------------------------------------ */
 /* Constantes                                                          */
 /* ------------------------------------------------------------------ */
@@ -686,6 +690,27 @@ void game_run(void)
         unsigned char i;
         unsigned char prev_space = 0;
         unsigned char ps_visible = 1;     /* PRESS SPACE actuellement affiché */
+        /* Mélodie LAYTUNE Mine Storm Vectrex (port direct).
+         * Format : couples (note_idx, dur_frames).
+         * Notes : 0=G2 1=GS2 2=A2 3=AS2 4=B2 5=C3 6=CS3 ; 0xFF = boucle.
+         * Durées originales Vectrex (SC8=25, QSC=50) divisées par ~6
+         * pour adapter à notre rate frame ~17 Hz. */
+        static const unsigned char title_tune[] = {
+            0, 4,   /* G2 SC8  */
+            1, 4,   /* GS2 SC8 */
+            0, 4,   /* G2 SC8  */
+            1, 8,   /* GS2 QSC */
+            0, 4,   /* G2 SC8  */
+            1, 4,   /* GS2 SC8 */
+            0, 4,   /* G2 SC8  */
+            6, 4,   /* CS3 SC8 */
+            5, 4,   /* C3 SC8  */
+            0, 14,  /* G2 hold */
+            0xFF, 0 /* loop    */
+        };
+        unsigned char tune_pos = 0;
+        unsigned char tune_dur_left = 0;
+
         for (i = 0; i < 96; i++) {
             /* Double-scan par frame pour rattraper les appuis brefs.
              * La frame du titre dure ~60 ms (17 Hz) : un appui SPACE
@@ -712,14 +737,18 @@ void game_run(void)
                     ps_visible = 1;
                 }
             }
-            /* "Musique" écran titre : thump cadencé tous les 16 frames
-             * (~1 s à 17 Hz), comme l'arcade Atari originale. */
-            if ((i & 0x0F) == 0 && sfx_id == FX_NONE) {
-                sound_play_fx(FX_THUMP);
+            /* Mélodie titre Mine Storm : avance dans title_tune[] */
+            if (tune_dur_left == 0) {
+                if (title_tune[tune_pos] == 0xFF) tune_pos = 0;
+                tune_play_note(title_tune[tune_pos]);
+                tune_dur_left = title_tune[tune_pos + 1];
+                tune_pos += 2;
+            } else {
+                tune_dur_left--;
             }
-            sound_tick();
             frame_wait();
         }
+        tune_stop();
         /* Garantir l'état "effacé" en sortie (XOR cohérence) */
         if (ps_visible) presspace_erase(110);
     }

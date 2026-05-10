@@ -138,10 +138,18 @@ Période du toggle réduite de 24 à 8 frames (de ~1.4 s à ~0.5 s à
 
 - Durée max sans appui SPACE réduite de 200 à 96 frames
   (~12 s → ~5.6 s à 17 Hz).
-- Ajout du `FX_THUMP` cadencé toutes les 16 frames (~1 s), comme
-  l'arcade Atari originale (rythme "thump…thump…" lent).
-- `sound_tick` appelé chaque frame dans la boucle titre pour
-  permettre au FX de s'éteindre proprement après sa durée.
+- Ajout d'un thump cadencé toutes les 16 frames (~1 s) puis,
+  dans un second commit, **portage de la mélodie LAYTUNE de
+  Mine Storm Vectrex** : séquence 10 notes (G2/GS2/CS3/C3),
+  boucle. `sound.s` étendu de `_tune_play_note(idx)` et
+  `_tune_stop()` ; table de fréquences PSG ($027E pour G2,
+  $025A pour GS2, $01DE pour C3, $01C3 pour CS3) calculée
+  pour clock PSG Oric 1 MHz.
+
+  Source : repo `mikepea/vectrex-minestorm` (port public du
+  Vectrex 6809 ASM). Notes ré-encodées en index 0..6 ;
+  durées Vectrex SC8/QSC (25/50 frames @ 50 Hz) divisées
+  pour matcher 17 Hz écran titre.
 
 ### Fix — DDRB pendant scan clavier ✅
 
