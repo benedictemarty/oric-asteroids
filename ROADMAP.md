@@ -43,6 +43,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 12 | Destruction ship + UFO arcade-fidèle (ShipExpVelTbl rev 4) (v1.2.1) | — | 1 j |
 | ✅ | 13 | Fragments morceaux du ship (ShipExpPtrTbl rev 4) (v1.2.2) | — | 1 j |
 | ✅ | 14 | Explosion asteroid (dots éphémères) (v1.2.3) | — | 1 j |
+| ✅ | 14b | Pattern shrapnel 1 arcade exact (v1.2.4) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.

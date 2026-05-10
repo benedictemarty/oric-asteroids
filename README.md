@@ -87,8 +87,9 @@ des 9 phases.
 | 12  | Destruction ship + UFO arcade rev 4 (ShipExpVelTbl) | `phase12-done` / `v1.2.1` |
 | 13  | Fragments morceaux du ship (ShipExpPtrTbl) | `phase13-done` / `v1.2.2` |
 | 14  | Explosion asteroid (dots éphémères) | `phase14-done` / `v1.2.3` |
+| 14b | Pattern shrapnel 1 arcade exact | `phase14b-done` / `v1.2.4` |
 
-## Différé Phase 15+
+## Différé Phase 16+
 
 - Persistance high scores en `.tap` ou `.dsk` (driver cassette résident).
 - Image `.dsk` Microdisc avec sauvegarde native.

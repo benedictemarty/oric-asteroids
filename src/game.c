@@ -173,20 +173,28 @@ static signed char    dbr_vx[DEBRIS_COUNT];
 static signed char    dbr_vy[DEBRIS_COUNT];
 static unsigned char  dbr_ttl[DEBRIS_COUNT];
 
-/* Phase 14 — pool asteroid explosion dots, séparé du ship debris.
- * Inspiration : SharpPatPtrTbl arcade ($50F8) — 4 patterns SVEC qui
- * tracent un nuage de "dots" autour de la position de l'asteroid détruit.
- * Notre version simplifiée : 8 dots en étoile fixes, durée 10 frames,
- * statiques (pas de vélocité). Effet "puff" éphémère.
+/* Phase 14b — pool asteroid explosion : port direct du pattern 1 arcade
+ * (SharpPatPtrTbl[0] = $5100, désasm rev 4). 8 dots cumulés depuis les
+ * SVEC arcade :
  *
- * Coordonnées étoile 8 directions, rayon variable selon index. */
+ *   $5100 SVEC x=-1 y=+0    cumul (-1, 0)
+ *   $5104 SVEC x=-1 y=-1    cumul (-2, -1)
+ *   $5108 SVEC x=+1 y=-1    cumul (-1, -2)
+ *   $510C SVEC x=+3 y=+1    cumul (+2, -1)
+ *   $5110 SVEC x=+2 y=-1    cumul (+4, -2)
+ *   $5114 SVEC x=+0 y=+1    cumul (+4, -1)
+ *   $5118 SVEC x=+1 y=+3    cumul (+5, +2)
+ *   $511C SVEC x=-1 y=+3    cumul (+4, +5)
+ *   ($5120 VCTR sc=5 ignoré — trop large pour notre échelle Oric)
+ *
+ * 8 dots fixes (rayon de 1 à 5 px du centre), durée 10 frames. */
 #define ADBR_COUNT  8
 #define ADBR_TTL    10
 static unsigned char  adbr_x[ADBR_COUNT];
 static unsigned char  adbr_y[ADBR_COUNT];
 static unsigned char  adbr_ttl[ADBR_COUNT];
-static const signed char adbr_dx[ADBR_COUNT] = { -3, -2,  0, +2, +3, +2,  0, -2 };
-static const signed char adbr_dy[ADBR_COUNT] = {  0, -2, -3, -2,  0, +2, +3, +2 };
+static const signed char adbr_dx[ADBR_COUNT] = { -1, -2, -1, +2, +4, +4, +5, +4 };
+static const signed char adbr_dy[ADBR_COUNT] = {  0, -1, -2, -1, -2, -1, +2, +5 };
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */

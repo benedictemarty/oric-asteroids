@@ -7,12 +7,64 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 15+ :
+À venir Phase 16+ :
 - Persistance high scores en `.tap` / `.dsk`.
 - Variables nommées arcade (`statusShip`, `horzVelShip`, etc.).
 - Mix multi-canaux (thump + UFO simultanés).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage.
 - Clipping Cohen-Sutherland (segments tronqués propres aux bords).
+
+## [1.2.4] - 2026-05-10
+
+### Phase 14b — Pattern shrapnel 1 arcade exact ✅
+
+**Port direct du 1er pattern shrapnel** depuis `SharpPatPtrTbl[0]`
+($5100) du désasm rev 4. Notre étoile 8 dots de Phase 14 (positions
+maison) est remplacée par les **positions cumulées exactes** des SVEC
+arcade.
+
+### Décodage SVEC cumulé
+
+```asm
+$5100 SVEC x=-1 y=+0    → cumul (-1,  0)
+$5104 SVEC x=-1 y=-1    → cumul (-2, -1)
+$5108 SVEC x=+1 y=-1    → cumul (-1, -2)
+$510C SVEC x=+3 y=+1    → cumul (+2, -1)
+$5110 SVEC x=+2 y=-1    → cumul (+4, -2)
+$5114 SVEC x=+0 y=+1    → cumul (+4, -1)
+$5118 SVEC x=+1 y=+3    → cumul (+5, +2)
+$511C SVEC x=-1 y=+3    → cumul (+4, +5)
+```
+
+8 positions résultantes :
+```c
+adbr_dx[8] = { -1, -2, -1, +2, +4, +4, +5, +4 };
+adbr_dy[8] = {  0, -1, -2, -1, -2, -1, +2, +5 };
+```
+
+### Pourquoi c'est différent de Phase 14 (étoile maison)
+
+L'arcade ne fait **pas** une étoile symétrique. Le nuage de dots est
+**asymétrique** — concentration à droite/bas (5 dots dans `x ≥ +2`
+contre 3 à gauche). Cette asymétrie donne un look "explosion qui part
+en avant" cohérent avec un asteroid en mouvement.
+
+Notre Phase 14 avait 8 directions cardinales équirépartis (étoile),
+trop "sage" visuellement. Phase 14b restitue le caractère arcade.
+
+### VCTR ignoré
+
+Le pattern arcade contient à $5120 un `VCTR sc=5` (move avec scale
+amplifié). À l'échelle DVG, ça déplace beaucoup (ce 9e dot est à
+~10 px du centre). Trop large pour notre Bresenham raster Oric. On
+conserve les 8 SVEC `sc=0/1/2/3` qui restent dans les ~5 px.
+
+### Différé Phase 14c
+
+Les 3 autres patterns (`SharpPatPtrTbl[1..3]` à $512C, $516A, $51A0)
+sont plus complexes (alternance SVEC + VCTR à scales variés). Phase
+14c pourra les porter pour avoir 4 patterns shrapnel sélectionnés
+selon `asteroid.shape`.
 
 ## [1.2.3] - 2026-05-10
 
