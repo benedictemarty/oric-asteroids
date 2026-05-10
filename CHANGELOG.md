@@ -7,12 +7,70 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 13+ :
+À venir Phase 14+ :
 - Persistance high scores en `.tap` / `.dsk`.
 - Variables nommées arcade (`statusShip`, `horzVelShip`, etc.).
 - Mix multi-canaux (thump + UFO simultanés).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage.
 - Clipping Cohen-Sutherland (segments tronqués propres aux bords).
+
+## [1.2.2] - 2026-05-10
+
+### Phase 13 — Fragments en morceaux du ship vectoriel ✅
+
+**Port direct de `ShipExpPtrTbl` rev 4** depuis `$50E0`. Les 6
+fragments avaient des **vélocités** arcade-fidèles depuis Phase 12,
+mais leur **forme** était encore un mini-segment générique dans la
+direction du mouvement. Cette phase remplace ça par les **6 segments
+SVEC distincts** de l'arcade.
+
+### 6 segments SVEC ($50E0)
+
+```asm
+ShipExpPtrTbl:  .dd2 $ffc6   ; SVEC x=-2 y=-3   debris 0
+                .dd2 $fec1   ; SVEC x=+1 y=-2   debris 1
+                .dd2 $f1c3   ; SVEC x=+3 y=+1   debris 2
+                .dd2 $f1cd   ; SVEC x=-1 y=+1   debris 3
+                .dd2 $f1c7   ; SVEC x=-3 y=+1   debris 4
+                .dd2 $fdc1   ; SVEC x=+1 y=-1   debris 5
+```
+
+### Résultat
+
+Chaque debris a maintenant une **silhouette propre fixe** :
+- Debris 0 part en haut-gauche, c'est un segment qui pointe (-2,-3)
+- Debris 4 file vers le bas-gauche en traînée longue (-3,+1)
+- etc.
+
+La silhouette ne tourne pas avec la vélocité — elle reste fixe
+pendant le déplacement. Comportement arcade authentique.
+
+### Visuel arcade vs nous
+
+L'arcade trace ces SVEC avec un scale variable (`sc=0`, `sc=1`, `sc=2`)
+qui multiplie l'amplitude. Notre Bresenham n'a pas d'échelle DVG — on
+garde les valeurs brutes du désasm. Le scale est implicitement constant
+dans notre rendu (pas de différence visible).
+
+### Changed
+
+- `src/game.c` : `ship_debris_shape_dx[]` et `ship_debris_shape_dy[]`
+  ajoutés (12 octets RODATA, depuis `ShipExpPtrTbl`).
+- `debris_render` : trace `(x, y) → (x + shape_dx, y + shape_dy)`
+  au lieu de `(x, y) → (x + vx/2, y + vy/2)`.
+
+### Décisions techniques Phase 13
+
+- **Scale DVG ignoré** : `sc=0/1/2` = amplitude × 2^scale dans le
+  hardware DVG. Sur Bresenham raster, on n'a pas cette notion. Les
+  valeurs brutes (-3 à +3) donnent des segments de 1-4 px sur Oric,
+  cohérent avec notre échelle.
+- **Forme statique pendant trajectoire** : authentique arcade — un
+  morceau du ship qui s'éloigne ne tourne pas (pas de rotation propre).
+  L'arcade utilise le DVG en mode "absolute" pour ces fragments.
+- **Plus besoin de `vx >> 1`** dans le tracé : la silhouette est
+  totalement découplée de la vélocité. Un fragment immobile (vx=0,vy=0)
+  reste visible comme un segment statique pendant 50 frames.
 
 ## [1.2.1] - 2026-05-10
 

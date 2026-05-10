@@ -150,6 +150,23 @@ static unsigned char wave_displayed;
 static const signed char ship_debris_vx[DEBRIS_COUNT] = { -3, +3,  0, +3,  0, -3 };
 static const signed char ship_debris_vy[DEBRIS_COUNT] = { +1, -2, -4, +1, +4, -3 };
 
+/* Phase 13 — formes des 6 fragments arcade depuis ShipExpPtrTbl ($50E0).
+ * Chaque debris est un mini-segment SVEC avec orientation propre (pas
+ * juste un point dans la direction du mouvement comme Phase 10i/12).
+ *
+ * Source désasm rev 4 :
+ *   50e0: SVEC x=-2 y=-3 sc=1 b=12   (debris 0 — pointe haut-gauche)
+ *   50e2: SVEC x=+1 y=-2 sc=1 b=12   (debris 1)
+ *   50e4: SVEC x=+3 y=+1 sc=0 b=12   (debris 2)
+ *   50e6: SVEC x=-1 y=+1 sc=2 b=12   (debris 3)
+ *   50e8: SVEC x=-3 y=+1 sc=0 b=12   (debris 4)
+ *   50ea: SVEC x=+1 y=-1 sc=1 b=12   (debris 5)
+ *
+ * Le scale `sc` arcade est ignoré (notre Bresenham n'a pas d'échelle).
+ * Les valeurs sont déjà adaptées à notre échelle pixel. */
+static const signed char ship_debris_shape_dx[DEBRIS_COUNT] = { -2, +1, +3, -1, -3, +1 };
+static const signed char ship_debris_shape_dy[DEBRIS_COUNT] = { -3, -2, +1, +1, +1, -1 };
+
 static unsigned char  dbr_x[DEBRIS_COUNT];
 static unsigned char  dbr_y[DEBRIS_COUNT];
 static signed char    dbr_vx[DEBRIS_COUNT];
@@ -285,8 +302,10 @@ static void debris_update(void)
     }
 }
 
-/* Tracé des fragments en XOR : chaque fragment = mini-segment de 3 px
- * dans la direction du mouvement. */
+/* Tracé des fragments en XOR — Phase 13 : chaque debris a sa forme
+ * propre (mini-segment SVEC arcade), pas juste un point dans la
+ * direction du mouvement. La trajectoire (vx, vy) déplace le segment
+ * mais sa silhouette reste fixe (= un morceau du ship arcade). */
 static void debris_render(void)
 {
     unsigned char i;
@@ -294,8 +313,8 @@ static void debris_render(void)
         if (dbr_ttl[i] == 0) continue;
         lx0 = dbr_x[i];
         ly0 = dbr_y[i];
-        lx1 = (unsigned char)((signed char)dbr_x[i] + (dbr_vx[i] >> 1));
-        ly1 = (unsigned char)((signed char)dbr_y[i] + (dbr_vy[i] >> 1));
+        lx1 = (unsigned char)((signed char)dbr_x[i] + ship_debris_shape_dx[i]);
+        ly1 = (unsigned char)((signed char)dbr_y[i] + ship_debris_shape_dy[i]);
         draw_line_xor();
     }
 }
