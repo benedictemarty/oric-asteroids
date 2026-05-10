@@ -38,6 +38,11 @@ Asteroid asteroids[MAX_ASTEROIDS];
 unsigned char current_wave;
 static unsigned char ast_per_wave;
 
+/* Phase 10h — ScrSpeedup arcade ($02FD) : seuil d'asteroids count en
+ * dessous duquel le saucer apparaît plus souvent. Init à 5, +1 par
+ * vague, max 11 (cf. InitGameVars $690E + InitWaveVars $717A-$7184). */
+unsigned char scr_speedup;
+
 /* RNG : LFSR 8-bit Galois (polynôme x^8 + x^6 + x^5 + x^4 + 1) */
 static unsigned char rng_state;
 
@@ -55,6 +60,7 @@ void asteroids_init(unsigned char seed)
     rng_state = seed ? seed : 0x42;
     current_wave = 0;
     ast_per_wave = 0;
+    scr_speedup = 5;            /* arcade : init à 5 */
     for (i = 0; i < MAX_ASTEROIDS; i++) asteroids[i].active = 0;
 }
 
@@ -77,6 +83,8 @@ void asteroids_spawn_wave(void)
         ast_per_wave += 2;
         if (ast_per_wave > 11) ast_per_wave = 11;
         current_wave++;
+        /* Phase 10h : ScrSpeedup += 1 (max 11) — saucer plus pressant */
+        if (scr_speedup < 11) scr_speedup++;
     }
     n = ast_per_wave;
     if (n > MAX_ASTEROIDS) n = MAX_ASTEROIDS;

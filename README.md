@@ -76,8 +76,9 @@ des 9 phases.
 | 10e | Démo passive arcade-style en écran titre | `phase10e-done` / `v1.1.4` |
 | 10f | Fragmentation arcade (3 fragments, RNG vél., parent réduit) | `phase10f-done` / `v1.1.5` |
 | 10g | IA UFO arcade (seuil 35000, précision indexée score) | `phase10g-done` / `v1.1.6` |
+| 10h | ScrSpeedup arcade (saucer pressure fin-de-vague) | `phase10h-done` / `v1.1.7` |
 
-## Différé Phase 10h+
+## Différé Phase 10i+
 
 - Persistance high scores en `.tap` ou `.dsk` (driver cassette résident).
 - Image `.dsk` Microdisc avec sauvegarde native.

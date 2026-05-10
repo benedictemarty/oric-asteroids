@@ -21,6 +21,7 @@ typedef struct {
 
 extern Asteroid asteroids[MAX_ASTEROIDS];
 extern unsigned char current_wave;        /* Phase 10c — vague courante (1..) */
+extern unsigned char scr_speedup;         /* Phase 10h — seuil saucer pressant (5..11) */
 
 void asteroids_init(unsigned char seed);
 void asteroids_spawn_wave(void);

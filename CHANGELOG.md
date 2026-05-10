@@ -7,12 +7,57 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 10h+ :
+À venir Phase 10i+ :
 - Variables Atari arcade (`statusShip`, `horzVelShip`, etc.) côté code.
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
 - Wraparound par duplication d'instance (vrai cylindre arcade).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px.
+
+## [1.1.7] - 2026-05-10
+
+### Phase 10h — ScrSpeedup arcade (saucer pressure) ✅
+
+**Port de la pression saucer fin-de-vague** depuis le désasm rev 4 :
+- `ScrSpeedup` ($02FD) : seuil d'asteroids count en dessous duquel
+  le saucer apparaît plus fréquemment.
+- Init à **5** (`InitGameVars` $690E `lda #$05; sta ScrSpeedup`)
+- **+1 par vague**, max **11** (`InitWaveVars` $717A : `inc ScrSpeedup`,
+  $7180 : `cmp #$0b`)
+- Test fin-de-vague (`UpdateScr` $6BCB) : si `CurAsteroids ≤ ScrSpeedup`
+  → saucer spawn accéléré.
+
+### Comportement
+
+- Wave 1 : `scr_speedup = 5`. Quand il reste ≤5 asteroids, UFO spawn
+  rapide (`UFO_SPAWN_FAST = 120` frames ≈ 7 s vs 300 normal).
+- Wave 2 : `scr_speedup = 6`. Etc.
+- Wave 7+ : `scr_speedup = 11` (max), pression UFO permanente.
+
+**Effet gameplay** : la fin de vague (peu d'asteroids) devient stressante
+car le UFO est plus pressant. C'est une mécanique anti-camping classique
+de l'arcade — le joueur est puni de jouer trop lentement.
+
+### Added
+
+- `scr_speedup` (BSS, exposée dans `asteroids.h`).
+- `UFO_SPAWN_FAST 120` dans `src/ufo.c`.
+
+### Changed
+
+- `src/asteroids.c` : `asteroids_init` reset à 5, `asteroids_spawn_wave`
+  incrémente +1 (max 11).
+- `src/ufo.c` : `ufo_tick` choisit `UFO_SPAWN_FAST` ou `UFO_SPAWN_PERIOD`
+  selon `asteroids_count() ≤ scr_speedup`.
+
+### Décisions techniques Phase 10h
+
+- **Reload appliqué après spawn** plutôt qu'avant : l'arcade fait pareil
+  (le timer raccourci ne s'applique qu'au prochain spawn). Évite le
+  bug où la condition change pendant le décompte.
+- **Ratio FAST/NORMAL = 0.4** (120/300) : l'arcade a un ratio similaire
+  via `ScrTmrReload` qui est divisé quand `CurAsteroids ≤ ScrSpeedup`.
+  Notre 7 s vs 18 s donne un gameplay tendu sans être oppressant.
 
 ## [1.1.6] - 2026-05-10
 

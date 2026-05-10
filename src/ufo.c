@@ -25,7 +25,7 @@
  */
 
 #include "ufo.h"
-#include "asteroids.h"      /* rng8 */
+#include "asteroids.h"      /* rng8, scr_speedup, asteroids_count */
 
 extern unsigned char lx0, ly0, lx1, ly1;
 #pragma zpsym ("lx0")
@@ -55,7 +55,8 @@ static unsigned char ufo_drift_timer;     /* alterne vy ±1 */
 #define UFO_BULLET_TTL      30
 #define UFO_BULLET_SPEED    4
 #define UFO_FIRE_PERIOD     35    /* ~2 s à 17 Hz */
-#define UFO_SPAWN_PERIOD    300U  /* ~18 s */
+#define UFO_SPAWN_PERIOD    300U  /* ~18 s normal */
+#define UFO_SPAWN_FAST      120U  /* ~7 s quand asteroids_count ≤ ScrSpeedup */
 #define UFO_DRIFT_PERIOD    20
 
 /* Segments delta — grande UFO (rayon ~7 px). Format : x0, y0, x1, y1 */
@@ -222,7 +223,13 @@ void ufo_tick(unsigned char ship_x_in, unsigned char ship_y_in,
     if (!ufo_active) {
         if (ufo_spawn_timer == 0) {
             ufo_spawn(score_in);
-            ufo_spawn_timer = UFO_SPAWN_PERIOD;
+            /* Phase 10h : reload accéléré si asteroids_count ≤ ScrSpeedup
+             * (cf. arcade $6BC6-$6BCE — saucer pressant en fin de vague). */
+            if (asteroids_count() <= scr_speedup) {
+                ufo_spawn_timer = UFO_SPAWN_FAST;
+            } else {
+                ufo_spawn_timer = UFO_SPAWN_PERIOD;
+            }
         } else {
             ufo_spawn_timer--;
         }
