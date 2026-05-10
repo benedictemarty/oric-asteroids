@@ -7,17 +7,81 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 16+ :
-- Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px
-  → augmenter framerate (objectif utilisateur).
+À venir Phase 17+ :
+- Phase 2b complète : SMC Bresenham + déroulage (gain 2× potentiel).
+- Optimisations C → ASM des boucles draw critiques.
 
-(Différé Phase 10g/m hors-roadmap : `.tap`/`.dsk` persistance, mix
-multi-canaux — abandonnés selon directives utilisateur.)
+(Hors scope définitif : `.tap`/`.dsk` persistance, mix multi-canaux.)
 - Persistance high scores en `.tap` / `.dsk`.
 - Variables nommées arcade (`statusShip`, `horzVelShip`, etc.).
 - Mix multi-canaux (thump + UFO simultanés).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage.
 - Clipping Cohen-Sutherland (segments tronqués propres aux bords).
+
+## [1.2.6] - 2026-05-10
+
+### Phase 16 — Optimisations framerate ✅
+
+**Objectif utilisateur** : augmenter la fréquence (frame rate observé
+~17 Hz au lieu de 25 Hz cible). Phase 16 = micro-optimisations cumulatives
+non-régressives.
+
+### Bench profiler
+
+- **Avant Phase 16** : 8 915 727 instructions sur 28.5M cycles
+- **Après Phase 16** : 8 856 486 instructions
+- **Gain** : 59 241 instructions = ~**0.66%**
+
+Modeste mais cumulable avec phases ultérieures.
+
+### Optimisation 1 — `_plot_dot` rapide
+
+Nouveau symbole exporté dans `src/asm/line.s` : `_plot_dot` calcule
+l'adresse HIRES + masque depuis tables précalculées et XOR un seul
+pixel (~40 cycles) sans le setup Bresenham complet (~80 cycles via
+`_draw_line_xor` cas dégénéré).
+
+Utilisé pour :
+- Replots des sommets ship (Phase 9g) → 3 plots/frame ship
+- Replots des sommets asteroid (Phase 9g) → 11-13 plots/asteroid
+- Asteroid debris dots (Phase 14b) → 8 plots quand actif
+- Bullets render (`plot()` helper game.c) → ~4 plots/frame
+
+Gain estimé : ~30 plots × 40 cycles = 1200 cycles/frame quand pleine
+charge.
+
+### Optimisation 2 — Suppression `ORA #$40` du chemin chaud
+
+L'invariant `bit6=1` (bit "non-attribut" Oric HIRES) était maintenu
+par `ORA #$40` à chaque pixel XOR-é dans la boucle Bresenham. Or :
+- Les masques `x_msk[]` ont **TOUS** bit6 = 0 (`$20, $10, $08, $04, $02, $01`)
+- L'XOR n'inverse que les bits où le masque est à 1
+- Donc bit6 du byte HIRES n'est **jamais** touché par l'XOR
+- L'invariant `bit6=1` (init HIRES = $40) est préservé sans `ORA #$40`
+
+Gain : **2 cycles par pixel × ~150 pixels/frame = 300 cycles/frame**.
+
+### Changed
+
+- `src/asm/line.s` :
+  - Ajout `_plot_dot` (28 lignes, ~40 cycles).
+  - Boucle `_draw_line_xor` : `ORA #$40` retiré (passe de 16 c/px à 14 c/px sur le bloc XOR).
+- `src/asm/ship.s` : 3 replots P0/P1/P2 via `_plot_dot`.
+- `src/asteroids.c` : replots N sommets via `plot_dot`.
+- `src/game.c` : helper `plot()` + `asteroid_debris_render` via `plot_dot`.
+
+### Décisions techniques Phase 16
+
+- **Approche conservative** : pas de SMC, pas de déroulage. Optimisations
+  qui ne changent ni le visuel ni la correction. Phase 17 pourrait
+  s'attaquer à la vraie SMC Bresenham (objectif Phase 2b — 40-50 c/px
+  vs nos 95 c/px actuels).
+- **`_plot_dot` partagé** par 4 modules (`ship.s`, `asteroids.c`,
+  `game.c`, asteroid_debris) : un seul point de modification si
+  l'algorithme change.
+- **Invariant bit6=1 documenté inline** : garantit que retirer `ORA #$40`
+  n'introduit pas de bug subtil. Si quelqu'un ajoute un masque avec
+  bit6=1, il faudra restaurer l'instruction.
 
 ## [1.2.5] - 2026-05-10
 

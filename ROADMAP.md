@@ -45,6 +45,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 14 | Explosion asteroid (dots éphémères) (v1.2.3) | — | 1 j |
 | ✅ | 14b | Pattern shrapnel 1 arcade exact (v1.2.4) | — | 1 j |
 | ✅ | 15 | Lettre H + label "HIGH SCORES" en game over (v1.2.5) | — | 1 j |
+| ✅ | 16 | Optimisations framerate (`_plot_dot` + `ORA #$40` retiré) (v1.2.6) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.

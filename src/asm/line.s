@@ -11,7 +11,7 @@
 ;   Init vierge = 0x40  (bit6=1, aucun pixel, non-attribut)
 ;=================================================================
 
-        .export  _hires_init, _draw_line_xor
+        .export  _hires_init, _draw_line_xor, _plot_dot
         .exportzp _lx0, _ly0, _lx1, _ly1
         .macpack longbranch
 
@@ -116,6 +116,36 @@ _hires_init:
 ; Invariant XOR : un pixel trace deux fois revient a l'etat initial.
 ; Invariant non-attribut : bit6=1 maintenu par ORA #$40.
 ;-----------------------------------------------------------------
+;-----------------------------------------------------------------
+; _plot_dot — XOR 1 pixel à (_lx0, _ly0). Phase 16 — rapide (~40 c).
+;
+; Évite le setup Bresenham complet pour le cas dégénéré 1 pixel
+; (replots de sommets après segments XOR, fragments éphémères).
+; lx1/ly1 ignorés. Y détruit. Invariant bit6=1 maintenu via ORA #$40.
+;-----------------------------------------------------------------
+_plot_dot:
+        ldy  _lx0             ; X coord pour x_col / x_msk
+        ldx  _ly0             ; Y coord pour hires_lo / hires_hi
+        lda  hires_lo,x
+        sta  l_ptr
+        lda  hires_hi,x
+        sta  l_ptr+1
+        ; Ajouter colonne X
+        lda  l_ptr
+        clc
+        adc  x_col,y
+        sta  l_ptr
+        bcc  @nc
+        inc  l_ptr+1
+@nc:
+        ; XOR le pixel + bit6 toujours 1
+        lda  x_msk,y
+        ldy  #0
+        eor  (l_ptr),y
+        ora  #$40
+        sta  (l_ptr),y
+        rts
+
 _draw_line_xor:
         ;--- Normalisation sx=+1 : si lx0 > lx1, echanger les extremites ---
         lda  _lx0
@@ -191,10 +221,12 @@ _draw_line_xor:
 ; Boucle principale
 ;-----------------------------------------------------------------
 @loop:
-        ;--- XOR du pixel (16 cycles) ---
+        ;--- XOR du pixel (Phase 16 : 14 cycles, ORA #$40 retiré) ---
+        ; L'invariant bit6=1 est préservé : x_msk[i] a TOUJOURS bit6=0,
+        ; donc l'XOR ne touche pas bit6. Init HIRES = $40 → bit6 reste 1.
+        ; Gain ~2 cycles par pixel × ~150 pixels/frame = ~300 c/frame.
         lda  l_mask
         eor  (l_ptr),y
-        ora  #$40
         sta  (l_ptr),y
 
         ;--- Test de fin (12 cycles) ---

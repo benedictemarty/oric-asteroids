@@ -19,6 +19,7 @@ extern unsigned char lx0, ly0, lx1, ly1;
 #pragma zpsym ("ly1")
 
 void draw_line_xor(void);
+void plot_dot(void);    /* Phase 16 — XOR 1 pixel rapide */
 
 /* Tables de sommets générées par tools/gen_shapes.py — Phase 10b N variable.
  *   shape_off[size*4+shape]  : offset (uint8) dans shape_x/y
@@ -194,7 +195,8 @@ static void asteroid_draw_at(unsigned char idx, int ox, int oy)
             draw_line_xor();
         }
     }
-    /* Phase 9g : replot des N sommets (polygone fermé) — clippés pareil */
+    /* Phase 9g : replot des N sommets (polygone fermé) — clippés pareil.
+     * Phase 16 : utilise plot_dot (40 c/plot vs ~80 c via draw_line_xor). */
     for (i = 0; i < n; i++) {
         dx0 = shape_x[base + i];
         dy0 = shape_y[base + i];
@@ -203,9 +205,7 @@ static void asteroid_draw_at(unsigned char idx, int ox, int oy)
         if (IN_BOUNDS(x0, y0)) {
             lx0 = (unsigned char)x0;
             ly0 = (unsigned char)y0;
-            lx1 = lx0;
-            ly1 = ly0;
-            draw_line_xor();
+            plot_dot();
         }
     }
 }

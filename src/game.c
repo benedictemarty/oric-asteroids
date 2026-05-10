@@ -46,6 +46,7 @@ extern const unsigned char shape_radii[3];
 
 void hires_init(void);
 void draw_line_xor(void);
+void plot_dot(void);    /* Phase 16 — XOR 1 pixel rapide */
 void ship_init(void);
 void ship_draw(void);
 void ship_erase(void);
@@ -203,8 +204,9 @@ static const signed char adbr_dy[ADBR_COUNT] = {  0, -1, -2, -1, -2, -1, +2, +5 
 
 static void plot(unsigned char x, unsigned char y)
 {
-    lx0 = x; ly0 = y; lx1 = x; ly1 = y;
-    draw_line_xor();
+    /* Phase 16 : plot_dot (40 c) au lieu de draw_line_xor (~80 c) */
+    lx0 = x; ly0 = y;
+    plot_dot();
 }
 
 static unsigned char abs_diff(unsigned char a, unsigned char b)
@@ -361,7 +363,8 @@ static void asteroid_debris_spawn(unsigned char ax, unsigned char ay)
     }
 }
 
-/* Render des 8 dots en étoile (XOR — appel pair = effacement). */
+/* Render des 8 dots en étoile (XOR — appel pair = effacement).
+ * Phase 16 : plot_dot rapide (40 c vs 80 c) — gain 320 c quand actif. */
 static void asteroid_debris_render(void)
 {
     unsigned char i;
@@ -373,9 +376,7 @@ static void asteroid_debris_render(void)
         if (x < 0 || x > 239 || y < 0 || y > 199) continue;
         lx0 = (unsigned char)x;
         ly0 = (unsigned char)y;
-        lx1 = lx0;
-        ly1 = ly0;
-        draw_line_xor();
+        plot_dot();
     }
 }
 

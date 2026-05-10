@@ -20,6 +20,7 @@
 
         .importzp _lx0, _ly0, _lx1, _ly1
         .import   _draw_line_xor
+        .import   _plot_dot                ; Phase 16 — replot rapide 1 pixel
         .import   ship_pt0x, ship_pt0y
         .import   ship_pt1x, ship_pt1y
         .import   ship_pt2x, ship_pt2y
@@ -140,29 +141,23 @@ draw_three_lines:
         sta  _ly1
         jsr  _draw_line_xor
 
-        ; Replot des 3 sommets : chacun XOR 2x par les segments → effacé.
-        ; On le re-XOR (3e fois → tracé) pour le rendre visible.
+        ; Replot des 3 sommets via _plot_dot rapide (Phase 16) :
+        ; setup réduit (pas de Bresenham), gain ~50 c/plot × 3 = 150 c.
         lda  sh_tx0
         sta  _lx0
-        sta  _lx1
         lda  sh_ty0
         sta  _ly0
-        sta  _ly1
-        jsr  _draw_line_xor    ; plot P0
+        jsr  _plot_dot         ; plot P0
         lda  sh_tx1
         sta  _lx0
-        sta  _lx1
         lda  sh_ty1
         sta  _ly0
-        sta  _ly1
-        jsr  _draw_line_xor    ; plot P1
+        jsr  _plot_dot         ; plot P1
         lda  sh_tx2
         sta  _lx0
-        sta  _lx1
         lda  sh_ty2
         sta  _ly0
-        sta  _ly1
-        jmp  _draw_line_xor    ; plot P2 (tail call)
+        jmp  _plot_dot         ; plot P2 (tail call)
 
 ;-----------------------------------------------------------------
 ; _ship_draw / _ship_erase — XOR idempotent : même routine
