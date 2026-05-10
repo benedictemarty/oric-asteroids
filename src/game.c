@@ -74,7 +74,10 @@ void tune_stop(void);
 #define WY_SPAN         (WY_MAX - WY_MIN)
 
 #define SHIP_RADIUS         7
-#define INVINCIBLE_FRAMES   40
+/* Ship mort → invisible pendant DEBRIS_TTL frames (animation explosion),
+ * puis clignote pendant SHIP_BLINK_FRAMES (invincibilité). */
+#define SHIP_BLINK_FRAMES   20
+#define INVINCIBLE_FRAMES   (DEBRIS_TTL + SHIP_BLINK_FRAMES)
 
 /* Phase 7 — hyperespace */
 #define HYPER_COOLDOWN      35      /* ~2 s, edge-trigger sur DOWN */
@@ -149,7 +152,7 @@ static unsigned char wave_displayed;
  * SÉQUENTIELLE — les fragments disparaissent un par un dans le temps,
  * conformément au comportement arcade rev 4. */
 #define DEBRIS_COUNT      6
-#define DEBRIS_TTL        50
+#define DEBRIS_TTL        30    /* arcade tronqué : 30/25/20/15/10/5 frames @ 25 Hz */
 
 /* Vélocités exactes ShipExpVelTbl arcade rev 4 ($50EC), nibbles haut
  * sign-extended. Chaque pair = (vx, vy) pour un fragment. */
@@ -310,7 +313,7 @@ static void debris_spawn(unsigned char ax, unsigned char ay)
         dbr_y[i]   = ay;
         dbr_vx[i]  = ship_debris_vx[i];
         dbr_vy[i]  = ship_debris_vy[i];
-        dbr_ttl[i] = DEBRIS_TTL - i * 6;      /* séquentielle arcade */
+        dbr_ttl[i] = DEBRIS_TTL - i * 5;      /* 30/25/20/15/10/5 séquentielle */
     }
 }
 
@@ -408,7 +411,7 @@ static void ship_hyperspace(void)
     ship_y = WY_MIN + (rng8() % WY_SPAN);
     ship_vx = 0;
     ship_vy = 0;
-    ship_invincible = INVINCIBLE_FRAMES / 2;     /* mini-invincibilité */
+    ship_invincible = SHIP_BLINK_FRAMES;     /* clignotement court — pas d'animation explosion ici */
 }
 
 /* ------------------------------------------------------------------ */
@@ -838,7 +841,12 @@ void game_run(void)
         if (ship_invincible) ship_invincible--;
         check_next_wave();
 
+        /* Tant que ship_invincible > SHIP_BLINK_FRAMES, l'animation des
+         * débris est encore en cours → ship invisible. En dessous, le
+         * ship clignote (bit 1 du compteur) pendant SHIP_BLINK_FRAMES
+         * frames. À 0, ship pleinement visible. */
         ship_visible = !gameover &&
+                       (ship_invincible <= SHIP_BLINK_FRAMES) &&
                        (ship_invincible == 0 || (ship_invincible & 2));
 
         if (ship_visible) {
