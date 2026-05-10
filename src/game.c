@@ -173,6 +173,21 @@ static signed char    dbr_vx[DEBRIS_COUNT];
 static signed char    dbr_vy[DEBRIS_COUNT];
 static unsigned char  dbr_ttl[DEBRIS_COUNT];
 
+/* Phase 14 — pool asteroid explosion dots, séparé du ship debris.
+ * Inspiration : SharpPatPtrTbl arcade ($50F8) — 4 patterns SVEC qui
+ * tracent un nuage de "dots" autour de la position de l'asteroid détruit.
+ * Notre version simplifiée : 8 dots en étoile fixes, durée 10 frames,
+ * statiques (pas de vélocité). Effet "puff" éphémère.
+ *
+ * Coordonnées étoile 8 directions, rayon variable selon index. */
+#define ADBR_COUNT  8
+#define ADBR_TTL    10
+static unsigned char  adbr_x[ADBR_COUNT];
+static unsigned char  adbr_y[ADBR_COUNT];
+static unsigned char  adbr_ttl[ADBR_COUNT];
+static const signed char adbr_dx[ADBR_COUNT] = { -3, -2,  0, +2, +3, +2,  0, -2 };
+static const signed char adbr_dy[ADBR_COUNT] = {  0, -2, -3, -2,  0, +2, +3, +2 };
+
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
@@ -323,6 +338,45 @@ static void debris_init(void)
 {
     unsigned char i;
     for (i = 0; i < DEBRIS_COUNT; i++) dbr_ttl[i] = 0;
+    for (i = 0; i < ADBR_COUNT; i++) adbr_ttl[i] = 0;
+}
+
+/* Phase 14 — spawn explosion dots autour d'un point (asteroid détruit). */
+static void asteroid_debris_spawn(unsigned char ax, unsigned char ay)
+{
+    unsigned char i;
+    for (i = 0; i < ADBR_COUNT; i++) {
+        adbr_x[i]   = ax;
+        adbr_y[i]   = ay;
+        adbr_ttl[i] = ADBR_TTL;
+    }
+}
+
+/* Render des 8 dots en étoile (XOR — appel pair = effacement). */
+static void asteroid_debris_render(void)
+{
+    unsigned char i;
+    int x, y;
+    for (i = 0; i < ADBR_COUNT; i++) {
+        if (adbr_ttl[i] == 0) continue;
+        x = (int)(unsigned int)adbr_x[i] + (int)adbr_dx[i];
+        y = (int)(unsigned int)adbr_y[i] + (int)adbr_dy[i];
+        if (x < 0 || x > 239 || y < 0 || y > 199) continue;
+        lx0 = (unsigned char)x;
+        ly0 = (unsigned char)y;
+        lx1 = lx0;
+        ly1 = ly0;
+        draw_line_xor();
+    }
+}
+
+/* Décrémenter TTL (statique, pas de mouvement). */
+static void asteroid_debris_update(void)
+{
+    unsigned char i;
+    for (i = 0; i < ADBR_COUNT; i++) {
+        if (adbr_ttl[i]) adbr_ttl[i]--;
+    }
 }
 
 /* Hyperespace : téléportation aléatoire, 25% chance de mort.
@@ -430,6 +484,8 @@ static void collisions_bullets_asteroids(void)
             r = shape_radii[asteroids[a].size] + 1;
             if (collide(blt_x[b], blt_y[b], asteroids[a].x, asteroids[a].y, r)) {
                 hud_add_score(score_by_size[asteroids[a].size]);
+                /* Phase 14 : flash explosion à la position du hit */
+                asteroid_debris_spawn(asteroids[a].x, asteroids[a].y);
                 asteroids_fragment(a);
                 sound_play_fx(FX_EXPLODE);
                 blt_ttl[b] = 0;
@@ -449,6 +505,7 @@ static unsigned char collisions_ship_asteroids(void)
         if (collide(ship_x, ship_y, asteroids[a].x, asteroids[a].y, r)) {
             hud_lose_life();
             debris_spawn(ship_x, ship_y);
+            asteroid_debris_spawn(asteroids[a].x, asteroids[a].y);
             ship_respawn();
             sound_play_fx(FX_EXPLODE);
             return 1;
@@ -661,6 +718,7 @@ void game_run(void)
         key_scan();
 
         /* Effacer (XOR) — ordre inverse du tracé */
+        asteroid_debris_render();    /* erase explosion dots si actifs */
         debris_render();             /* erase debris si actifs */
         ufo_bullet_draw();
         ufo_draw();
@@ -715,6 +773,7 @@ void game_run(void)
         if (!gameover) ufo_tick(ship_x, ship_y, score);
         ufo_bullet_update();
         debris_update();
+        asteroid_debris_update();
 
         /* Collisions */
         collisions_bullets_asteroids();
@@ -788,6 +847,7 @@ void game_run(void)
         ufo_draw();
         ufo_bullet_draw();
         debris_render();             /* redraw debris aux nouvelles positions */
+        asteroid_debris_render();    /* redraw explosion dots */
         hud_draw();
         if (gameover) {
             hiscores_draw_table();

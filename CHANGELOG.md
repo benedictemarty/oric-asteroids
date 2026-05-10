@@ -7,12 +7,70 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 14+ :
+À venir Phase 15+ :
 - Persistance high scores en `.tap` / `.dsk`.
 - Variables nommées arcade (`statusShip`, `horzVelShip`, etc.).
 - Mix multi-canaux (thump + UFO simultanés).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage.
 - Clipping Cohen-Sutherland (segments tronqués propres aux bords).
+
+## [1.2.3] - 2026-05-10
+
+### Phase 14 — Explosion asteroid (dots éphémères) ✅
+
+**Effet visuel d'explosion à la destruction d'un asteroid** —
+manquant jusqu'à présent (Phase 4 fragmentait l'asteroid en sous-asteroids
+sans flash visuel d'impact).
+
+**Inspiration** : `SharpPatPtrTbl` arcade ($50F8) — 4 patterns SVEC
+qui tracent un nuage de "dots" autour de la position de l'asteroid détruit
+(`b=7` SVECs zero-vector entre des moves SVEC = tracé de points lumineux).
+
+### Implémentation simplifiée
+
+Notre version : pool séparé `adbr_*[8]` avec **8 dots en étoile**
+disposés autour du centre de l'asteroid détruit, statiques (pas de
+vélocité), durée 10 frames :
+
+```c
+adbr_dx = { -3, -2,  0, +2, +3, +2,  0, -2 }
+adbr_dy = {  0, -2, -3, -2,  0, +2, +3, +2 }
+```
+
+Effet "puff" éphémère qui marque la destruction visuellement.
+
+### Hooks
+
+- `bullet vs asteroid` : `asteroid_debris_spawn(ax, ay)` à la position du hit
+- `ship vs asteroid` : flash sur l'asteroid + ship debris (déjà géré)
+- Render : XOR effacement avant update + redraw après position update
+
+### Pourquoi pas le port direct des SharpPatPtrTbl
+
+Le pattern arcade pattern 1 ($5100) contient **9 SVEC moves entrelacés
+avec des SVEC b=7 dots** — décodage cumul + extraction des positions
+finales. Pour Phase 14 simplifiée, on garde 8 positions étoile fixes
+sans cumul (une approximation). Phase 14b pourra porter les 4 patterns
+distincts si la fidélité visuelle l'exige.
+
+### Changed
+
+- `src/game.c` :
+  - Pool `adbr_x/y/ttl[8]` (BSS, 24 octets) + tables `adbr_dx/dy` (16 RODATA).
+  - 4 fonctions : `asteroid_debris_spawn/render/update` + init via `debris_init`.
+  - 4 hooks dans la boucle (erase + update + redraw + render dans collisions).
+
+### Décisions techniques Phase 14
+
+- **Pool séparé** du ship debris (`dbr_*` vs `adbr_*`) : permet à un
+  ship debris (en cours pendant `ship vs asteroid`) de coexister avec
+  une explosion asteroid sans écraser les fragments.
+- **Statique (pas de vélocité)** : les dots restent fixes pendant 10
+  frames puis disparaissent. Plus simple qu'animer 8 trajectoires.
+  Effet "boom" puis "poof".
+- **8 dots fixes** vs 9 dots arcade par pattern : compromis visuel
+  (8 directions cardinales + diagonales = étoile parfaite), 16 octets
+  RODATA.
 
 ## [1.2.2] - 2026-05-10
 
