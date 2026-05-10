@@ -84,8 +84,9 @@ des 9 phases.
 | 10m | Clignotement PRESS SPACE écran titre (pulse arcade) | `phase10m-done` / `v1.1.12` |
 | 10n | FX_UFO bip-bip continu (8 effets sons total) | `phase10n-done` / `v1.1.13` |
 | 11  | **Sons Mine Storm Vectrex** (port AY-3-8912) | `phase11-done` / `v1.2.0` |
+| 12  | Destruction ship + UFO arcade rev 4 (ShipExpVelTbl) | `phase12-done` / `v1.2.1` |
 
-## Différé Phase 12+
+## Différé Phase 13+
 
 - Persistance high scores en `.tap` ou `.dsk` (driver cassette résident).
 - Image `.dsk` Microdisc avec sauvegarde native.

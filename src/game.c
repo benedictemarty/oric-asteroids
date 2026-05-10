@@ -137,12 +137,19 @@ static unsigned char lives_prev;
 static unsigned char wave_displayed;
 #define WAVE_HUD_Y  16
 
-/* Phase 10i — debris ship (port DoShipExplsn $7465 simplifié) :
- * 5 fragments éphémères qui s'éparpillent depuis la position du ship
- * au moment de sa destruction. Chaque fragment = mini-segment animé.
- * Durée 30 frames (~1.8s à 17 Hz observés). */
-#define DEBRIS_COUNT      5
-#define DEBRIS_TTL        30
+/* Phase 12 — debris ship/UFO arcade-fidèle (port DoShipExplsn $7465 +
+ * ShipExpVelTbl $50EC). 6 fragments avec vélocités prédéfinies fixes
+ * (pas RNG comme Phase 10i), durée 50 frames avec disparition
+ * SÉQUENTIELLE — les fragments disparaissent un par un dans le temps,
+ * conformément au comportement arcade rev 4. */
+#define DEBRIS_COUNT      6
+#define DEBRIS_TTL        50
+
+/* Vélocités exactes ShipExpVelTbl arcade rev 4 ($50EC), nibbles haut
+ * sign-extended. Chaque pair = (vx, vy) pour un fragment. */
+static const signed char ship_debris_vx[DEBRIS_COUNT] = { -3, +3,  0, +3,  0, -3 };
+static const signed char ship_debris_vy[DEBRIS_COUNT] = { +1, -2, -4, +1, +4, -3 };
+
 static unsigned char  dbr_x[DEBRIS_COUNT];
 static unsigned char  dbr_y[DEBRIS_COUNT];
 static signed char    dbr_vx[DEBRIS_COUNT];
@@ -243,18 +250,20 @@ static void ship_respawn(void)
     ship_invincible = INVINCIBLE_FRAMES;
 }
 
-/* Phase 10i — Spawn de 5 fragments à la position passée (ship juste tué). */
+/* Phase 12 — Spawn de 6 fragments arcade-fidèles à la position passée.
+ * Vélocités prédéfinies depuis ShipExpVelTbl arcade ; disparition
+ * séquentielle via TTL décroissant (-6 par fragment) → fragment 0
+ * disparaît à 50 frames, fragment 5 à 20 frames. Effet "explosion
+ * qui se dissout en éclats successifs" reconnaissable de l'arcade. */
 static void debris_spawn(unsigned char ax, unsigned char ay)
 {
-    unsigned char i, r;
+    unsigned char i;
     for (i = 0; i < DEBRIS_COUNT; i++) {
         dbr_x[i]   = ax;
         dbr_y[i]   = ay;
-        r = rng8();
-        /* Vélocité radiale ~3 px/frame en 8 directions, légèrement perturbée */
-        dbr_vx[i]  = ((r & 1) ? 1 : -1) * (1 + ((r >> 1) & 1) * 2);   /* ±1 ou ±3 */
-        dbr_vy[i]  = ((r & 4) ? 1 : -1) * (1 + ((r >> 3) & 1) * 2);
-        dbr_ttl[i] = DEBRIS_TTL - (i & 3);    /* légère désync */
+        dbr_vx[i]  = ship_debris_vx[i];
+        dbr_vy[i]  = ship_debris_vy[i];
+        dbr_ttl[i] = DEBRIS_TTL - i * 6;      /* séquentielle arcade */
     }
 }
 
@@ -389,6 +398,9 @@ static void collisions_bullets_asteroids(void)
             if (collide(blt_x[b], blt_y[b], ufo_x, ufo_y, r)) {
                 hud_add_score((ufo_type == UFO_LARGE) ? UFO_SCORE_LARGE
                                                        : UFO_SCORE_SMALL);
+                /* Phase 12 : debris UFO arcade-fidèle à sa position */
+                debris_spawn(ufo_x, ufo_y);
+                sound_play_fx(FX_EXPLODE);
                 ufo_kill();
                 blt_ttl[b] = 0;
                 continue;
@@ -427,6 +439,10 @@ static unsigned char collisions_ship_asteroids(void)
         r = ufo_radius() + SHIP_RADIUS;
         if (collide(ship_x, ship_y, ufo_x, ufo_y, r)) {
             hud_lose_life();
+            debris_spawn(ship_x, ship_y);
+            /* Phase 12 : debris UFO aussi (collision mutuelle) */
+            debris_spawn(ufo_x, ufo_y);
+            sound_play_fx(FX_EXPLODE);
             ship_respawn();
             ufo_kill();
             return 1;
@@ -435,6 +451,8 @@ static unsigned char collisions_ship_asteroids(void)
     if (ufo_bullet_active) {
         if (collide(ship_x, ship_y, ufo_bullet_x, ufo_bullet_y, SHIP_RADIUS)) {
             hud_lose_life();
+            debris_spawn(ship_x, ship_y);
+            sound_play_fx(FX_EXPLODE);
             ship_respawn();
             ufo_bullet_active = 0;
             return 1;

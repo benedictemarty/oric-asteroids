@@ -7,12 +7,89 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-À venir Phase 12+ :
+À venir Phase 13+ :
 - Persistance high scores en `.tap` / `.dsk`.
 - Variables nommées arcade (`statusShip`, `horzVelShip`, etc.).
 - Mix multi-canaux (thump + UFO simultanés).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage.
 - Clipping Cohen-Sutherland (segments tronqués propres aux bords).
+
+## [1.2.1] - 2026-05-10
+
+### Phase 12 — Destruction ship + UFO arcade-fidèle ✅
+
+**Port direct de `ShipExpVelTbl` rev 4** depuis `$50EC` du désasm.
+Notre debris RNG aléatoire (Phase 10i) est remplacé par les **6 vélocités
+prédéfinies** de l'arcade Atari 1979.
+
+### Vélocités exactes ShipExpVelTbl ($50EC)
+
+```
+ShipExpVelTbl:  .bulk $d8,$1e   ; debris 0 : vx=-3, vy=+1
+                .bulk $32,$ec   ; debris 1 : vx=+3, vy=-2
+                .bulk $00,$c4   ; debris 2 : vx= 0, vy=-4
+                .bulk $3c,$14   ; debris 3 : vx=+3, vy=+1
+                .bulk $0a,$46   ; debris 4 : vx= 0, vy=+4
+                .bulk $d8,$d8   ; debris 5 : vx=-3, vy=-3
+```
+
+(Format arcade : nibbles haut sign-extendus → valeurs signées)
+
+### Disparition séquentielle
+
+Conformément au comportement arcade (commentaire $7493 : *"the debris
+disappear one by one over time"*), chaque fragment a un TTL différent :
+- Fragment 0 : 50 frames
+- Fragment 1 : 44 frames
+- Fragment 2 : 38 frames
+- ...
+- Fragment 5 : 20 frames
+
+→ Effet "explosion qui se dissout en éclats successifs", reconnaissable
+de l'arcade.
+
+### UFO debris (extension Phase 12)
+
+L'arcade rev 4 utilise les `SharpPatPtrTbl` ($50F8) — 4 patterns
+"shrapnel" — pour les explosions asteroid et UFO. Notre approche
+simplifiée : on **réutilise les mêmes 6 fragments** que le ship
+pour le UFO (vélocités identiques). Cohérent avec l'esprit arcade
+sans dupliquer 4 patterns SVEC.
+
+Hooks UFO :
+- `bullet vs UFO` : `debris_spawn(ufo_x, ufo_y)` + son explosion
+- `ship vs UFO` : `debris_spawn` aux DEUX positions + son
+- `ship vs UFO bullet` : debris ship uniquement + son
+- `ship vs asteroid` : debris ship + son
+
+### Changed
+
+- `DEBRIS_COUNT` : 5 → **6** (arcade exact)
+- `DEBRIS_TTL` : 30 → 50 frames (~plus long)
+- Vélocités : RNG → **prédéfinies fixes** (déterminisme arcade)
+- Disparition : décrément parallèle → **séquentielle décalée**
+- 4 hooks `debris_spawn` au lieu de 1 (UFO maintenant couvert)
+
+### Décisions techniques Phase 12
+
+- **Vélocités exactes du désasm rev 4** : c'est pas une recréation
+  approximative, c'est les VRAIES valeurs Atari. La destruction du
+  ship sur Oric est maintenant déterministe et reconnaissable
+  (l'arcade fait toujours la même explosion — comme nous).
+- **Décrément TTL `-= 6`** par fragment : compromis entre fade-out
+  rapide et visibilité. Arcade utilise un compteur 4-bit (`ShipStatus`)
+  avec décrément implicite, traduit en TTL séquentiel chez nous.
+- **UFO partage les mêmes 6 fragments** que ship : simplifie le code
+  (pas de 4 patterns shrapnel séparés). Acceptable car l'œil ne
+  distingue pas la différence à 4-5 px par fragment.
+- **Pas de morceaux du ship vectoriel SVEC** : l'arcade dessine 6
+  morceaux distincts du triangle ship (pointe, gauche, droite,
+  base haut, base bas...), chacun avec une orientation propre.
+  Notre version trace des mini-segments dans la direction du
+  mouvement (cohérent avec Phase 10i) — moins iconique mais
+  fonctionnellement équivalent.
+
+## [1.2.0] - 2026-05-10
 - Variables Atari arcade (`statusShip`, `horzVelShip`, etc.) côté code.
 - Persistance high scores en `.tap` / `.dsk`.
 - UFO oscillant + enveloppe AY.
