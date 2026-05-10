@@ -16,7 +16,8 @@ typedef struct {
     unsigned char prev_x, prev_y;  /* pos en sortie de frame précédente — utilisée
                                      * par asteroids_render pour effacer l'ancien
                                      * tracé avant de redessiner à (x, y). */
-    signed char   vx, vy;
+    unsigned char x_frac, y_frac;  /* 8.8 fixed-point partie basse (sub-pixel) */
+    int           vx, vy;          /* signed 16 bits (8.8 fixed-point) — scale 64 */
     unsigned char shape;     /* 0-3 */
     unsigned char size;      /* SIZE_SMALL / MEDIUM / LARGE */
     unsigned char active;

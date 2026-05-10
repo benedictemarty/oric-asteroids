@@ -120,11 +120,14 @@ void asteroids_spawn_wave(void)
         }
         asteroids[i].prev_x = asteroids[i].x;
         asteroids[i].prev_y = asteroids[i].y;
+        asteroids[i].x_frac = 0;
+        asteroids[i].y_frac = 0;
 
-        /* Vélocité : RNG sur signe + magnitude (1 ou 2) */
+        /* Vélocité 8.8 (scale ×64) : base RNG (1 ou 2 px) × 64
+         * → 64 ou 128 = 0.25 ou 0.5 px/frame initial. */
         r = rng8();
-        asteroids[i].vx = ((r & 1) ? 1 : -1) * ((r & 2) ? 2 : 1);
-        asteroids[i].vy = ((r & 4) ? 1 : -1) * ((r & 8) ? 2 : 1);
+        asteroids[i].vx = ((r & 1) ? 1 : -1) * ((r & 2) ? 128 : 64);
+        asteroids[i].vy = ((r & 4) ? 1 : -1) * ((r & 8) ? 128 : 64);
     }
     /* Marquer les autres comme libres */
     for (; i < MAX_ASTEROIDS; i++) {
@@ -149,21 +152,30 @@ void asteroids_spawn_wave(void)
 void asteroids_update(void)
 {
     unsigned char i;
-    int nx, ny;
+    unsigned int pos16;
     for (i = 0; i < MAX_ASTEROIDS; i++) {
         if (!asteroids[i].active) continue;
         /* Sauver pos courante comme prev (= pos où l'astéroïde est tracé en
          * sortie de frame précédente) avant de calculer la nouvelle pos. */
         asteroids[i].prev_x = asteroids[i].x;
         asteroids[i].prev_y = asteroids[i].y;
-        nx = (int)asteroids[i].x + (int)asteroids[i].vx;
-        ny = (int)asteroids[i].y + (int)asteroids[i].vy;
-        if (nx < WRAP_X_MIN) nx += WRAP_X_SPAN;
-        if (nx > WRAP_X_MAX) nx -= WRAP_X_SPAN;
-        if (ny < WRAP_Y_MIN) ny += WRAP_Y_SPAN;
-        if (ny > WRAP_Y_MAX) ny -= WRAP_Y_SPAN;
-        asteroids[i].x = (unsigned char)nx;
-        asteroids[i].y = (unsigned char)ny;
+
+        /* 8.8 fixed-point : recompose pos16 = (x<<8)|x_frac, ajoute vx
+         * (signed → unsigned cast modulaire), reséparer. Mouvement
+         * sub-pixel lisse à 25 Hz. */
+        pos16 = ((unsigned int)asteroids[i].x << 8) | asteroids[i].x_frac;
+        pos16 += (unsigned int)asteroids[i].vx;
+        asteroids[i].x      = (unsigned char)(pos16 >> 8);
+        asteroids[i].x_frac = (unsigned char)(pos16 & 0xFF);
+        if (asteroids[i].x < WRAP_X_MIN) asteroids[i].x += WRAP_X_SPAN;
+        if (asteroids[i].x > WRAP_X_MAX) asteroids[i].x -= WRAP_X_SPAN;
+
+        pos16 = ((unsigned int)asteroids[i].y << 8) | asteroids[i].y_frac;
+        pos16 += (unsigned int)asteroids[i].vy;
+        asteroids[i].y      = (unsigned char)(pos16 >> 8);
+        asteroids[i].y_frac = (unsigned char)(pos16 & 0xFF);
+        if (asteroids[i].y < WRAP_Y_MIN) asteroids[i].y += WRAP_Y_SPAN;
+        if (asteroids[i].y > WRAP_Y_MAX) asteroids[i].y -= WRAP_Y_SPAN;
     }
 }
 
@@ -299,28 +311,32 @@ void asteroids_render(void)
     }
 }
 
-/* RNG signé dans [-15, +15] — port de SetAstVel ($7203) :
- *   AND #$8F garde sign + 4 bits magnitude
- *   Si négatif : ORA #$F0 (sign extension) → range complète.  */
-static signed char rand_offset(void)
+/* 8.8 fixed-point pour asteroid velocities — scale ×64 (= 0.25 px/unit) :
+ *   V_MAX_AST = 15 × 64 = 960 ≈ 3.75 px/frame max
+ *   V_MIN_AST =  3 × 64 = 192 ≈ 0.75 px/frame min (asteroid ne peut pas s'arrêter)
+ */
+#define V_MAX_AST   960
+#define V_MIN_AST   192
+
+/* RNG signé en 8.8 — port de SetAstVel ($7203) :
+ *   AND #$8F garde sign + 4 bits magnitude, scale ×64.  */
+static int rand_offset(void)
 {
     unsigned char r = rng8() & 0x8F;
+    signed char s;
     if (r & 0x80) r |= 0xF0;
-    return (signed char)r;
+    s = (signed char)r;
+    return ((int)s) << 6;     /* ×64 = scale 8.8 */
 }
 
-/* Clamp arcade GetAstVelocity ($7233) adapté au format vx/vy 8-bit Oric :
- *   - max |v| = 15 (arcade : 31, divisé par 2 pour notre échelle)
- *   - min |v| = 3 (arcade : 6, idem)
- *   - signe préservé (asteroid ne peut pas s'arrêter)
- */
-static signed char clamp_vel(int v)
+/* Clamp arcade GetAstVelocity ($7233) en 8.8 fixed-point. */
+static int clamp_vel(int v)
 {
-    if (v > 15)  v = 15;
-    if (v < -15) v = -15;
-    if (v > 0  && v < 3)  v = 3;
-    if (v < 0  && v > -3) v = -3;
-    return (signed char)v;
+    if (v >  V_MAX_AST)        v =  V_MAX_AST;
+    if (v < -V_MAX_AST)        v = -V_MAX_AST;
+    if (v > 0 && v <  V_MIN_AST) v =  V_MIN_AST;
+    if (v < 0 && v > -V_MIN_AST) v = -V_MIN_AST;
+    return v;
 }
 
 /* Fragmentation arcade-fidèle — Phase 10f.
@@ -336,7 +352,7 @@ void asteroids_fragment(unsigned char idx)
 {
     unsigned char child_size;
     unsigned char i, found, sh;
-    signed char vx_p, vy_p;
+    int vx_p, vy_p;                  /* 8.8 fixed-point : int 16-bit */
     unsigned char ax, ay;
 
     if (!asteroids[idx].active) return;
@@ -375,8 +391,8 @@ void asteroids_fragment(unsigned char idx)
     /* 1. Parent : taille réduite, slot conservé, vélocité perturbée */
     asteroids[idx].size  = child_size;
     asteroids[idx].shape = (sh + 1) & 3;
-    asteroids[idx].vx    = clamp_vel((int)vx_p + (int)rand_offset());
-    asteroids[idx].vy    = clamp_vel((int)vy_p + (int)rand_offset());
+    asteroids[idx].vx    = clamp_vel(vx_p + rand_offset());
+    asteroids[idx].vy    = clamp_vel(vy_p + rand_offset());
 
     /* 2. Créer 2 NOUVEAUX asteroids dans des slots libres */
     found = 0;
@@ -390,8 +406,10 @@ void asteroids_fragment(unsigned char idx)
         asteroids[i].y      = ay;
         asteroids[i].prev_x = ax;
         asteroids[i].prev_y = ay;
-        asteroids[i].vx     = clamp_vel((int)vx_p + (int)rand_offset());
-        asteroids[i].vy     = clamp_vel((int)vy_p + (int)rand_offset());
+        asteroids[i].x_frac = 0;
+        asteroids[i].y_frac = 0;
+        asteroids[i].vx     = clamp_vel(vx_p + rand_offset());
+        asteroids[i].vy     = clamp_vel(vy_p + rand_offset());
         found++;
     }
     /* Si pas assez de slots libres : pool plein, on accepte la perte

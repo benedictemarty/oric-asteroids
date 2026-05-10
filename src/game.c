@@ -139,6 +139,7 @@ static unsigned char hyper_cd;
 
 static unsigned char ship_invincible;
 static unsigned char ship_was_drawn;
+static unsigned char rot_tick;       /* ralentit la rotation à 1/2 frames */
 
 /* Phase 7 — high scores en RAM (persistance .tap reportée Phase 9) */
 static unsigned int  hiscores[HISCORE_COUNT];
@@ -853,8 +854,15 @@ void game_run(void)
         if (ship_was_drawn) ship_erase();    /* erase à pos/angle N-1 */
 
         if (!gameover) {
-            if (key_state & 0x01) ship_rotate((signed char)-1);
-            if (key_state & 0x02) ship_rotate((signed char)+1);
+            /* Rotation à 1 angle/2 frames pour réduire la saccade visuelle
+             * (32 angles × 25 Hz = 25 angles/s → tour en 1.3 s = trop rapide
+             * et chaque pas de 11.25° très visible). Ralenti à 12.5 angles/s
+             * = tour en 2.6 s, plus contrôlable et moins saccadé. */
+            rot_tick ^= 1;
+            if (rot_tick) {
+                if (key_state & 0x01) ship_rotate((signed char)-1);
+                if (key_state & 0x02) ship_rotate((signed char)+1);
+            }
             if (key_state & 0x04) {
                 ship_apply_thrust();
                 if (sfx_id == FX_NONE) sound_play_fx(FX_THRUST);
