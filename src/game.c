@@ -433,8 +433,10 @@ static void bullet_fire(void)
         if (blt_ttl[i] == 0) {
             blt_x[i]   = ship_x;
             blt_y[i]   = ship_y;
-            blt_vx[i]  = ship_thrx[ship_angle];
-            blt_vy[i]  = ship_thry[ship_angle];
+            /* Vitesse bullet = 2× le thrust ship (~12 px/frame max au
+             * lieu de 6) — proche du ratio arcade Atari. */
+            blt_vx[i]  = (signed char)(ship_thrx[ship_angle] << 1);
+            blt_vy[i]  = (signed char)(ship_thry[ship_angle] << 1);
             blt_ttl[i] = BULLET_TTL;
             fire_cd    = FIRE_COOLDOWN;
             sound_play_fx(FX_FIRE);
@@ -467,7 +469,12 @@ static void bullets_render(void)
     unsigned char i;
     for (i = 0; i < BULLETS; i++) {
         if (blt_ttl[i] == 0) continue;
-        plot(blt_x[i], blt_y[i]);
+        /* Torpille = 2 pixels adjacents (mini-trait horizontal) pour
+         * être lisible à 240×200. Un seul pixel était quasi invisible
+         * surtout en mouvement. blt_x reste dans [1..238] (cf. clip
+         * bullets_update), donc blt_x+1 ≤ 239, pas d'overflow. */
+        plot(blt_x[i],          blt_y[i]);
+        plot(blt_x[i] + 1,      blt_y[i]);
     }
 }
 
