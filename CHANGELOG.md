@@ -134,6 +134,15 @@ Période du toggle réduite de 24 à 8 frames (de ~1.4 s à ~0.5 s à
   attendus : timing changé par `asteroids_render` + cadence du
   toggle PRESS SPACE).
 
+### Polish — écran titre : durée + ambiance sonore ✅
+
+- Durée max sans appui SPACE réduite de 200 à 96 frames
+  (~12 s → ~5.6 s à 17 Hz).
+- Ajout du `FX_THUMP` cadencé toutes les 16 frames (~1 s), comme
+  l'arcade Atari originale (rythme "thump…thump…" lent).
+- `sound_tick` appelé chaque frame dans la boucle titre pour
+  permettre au FX de s'éteindre proprement après sa durée.
+
 ### Fix — DDRB pendant scan clavier ✅
 
 **Symptôme** : tirs SPACE ratés dans le jeu, rotation incohérente

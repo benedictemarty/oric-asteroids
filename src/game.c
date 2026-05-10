@@ -686,7 +686,7 @@ void game_run(void)
         unsigned char i;
         unsigned char prev_space = 0;
         unsigned char ps_visible = 1;     /* PRESS SPACE actuellement affiché */
-        for (i = 0; i < 200; i++) {
+        for (i = 0; i < 96; i++) {
             /* Double-scan par frame pour rattraper les appuis brefs.
              * La frame du titre dure ~60 ms (17 Hz) : un appui SPACE
              * < 60 ms tombant entre deux scans serait sinon manqué. */
@@ -712,6 +712,12 @@ void game_run(void)
                     ps_visible = 1;
                 }
             }
+            /* "Musique" écran titre : thump cadencé tous les 16 frames
+             * (~1 s à 17 Hz), comme l'arcade Atari originale. */
+            if ((i & 0x0F) == 0 && sfx_id == FX_NONE) {
+                sound_play_fx(FX_THUMP);
+            }
+            sound_tick();
             frame_wait();
         }
         /* Garantir l'état "effacé" en sortie (XOR cohérence) */
