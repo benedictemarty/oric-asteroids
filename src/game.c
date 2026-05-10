@@ -207,7 +207,7 @@ static unsigned char  dbr_ttl[DEBRIS_COUNT];
  *
  * 8 dots fixes (rayon de 1 à 5 px du centre), durée 10 frames. */
 #define ADBR_COUNT  8
-#define ADBR_TTL    10
+#define ADBR_TTL    5     /* ~200 ms à 25 Hz — flash bref, pas un nuage qui traîne */
 static unsigned char  adbr_x[ADBR_COUNT];
 static unsigned char  adbr_y[ADBR_COUNT];
 static unsigned char  adbr_ttl[ADBR_COUNT];
