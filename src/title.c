@@ -142,6 +142,16 @@ static const unsigned char letter_W[] = {
     0xFE
 };
 
+/* Phase 15 — lettre H (2 verticales + barre milieu) */
+static const unsigned char letter_H[] = {
+    0, 0, 0, 9,         /* verticale gauche */
+    8, 0, 8, 9,         /* verticale droite */
+    0, 4, 8, 4,         /* barre milieu */
+    0xFF,
+    0, 4,  8, 4,        /* sommets partagés barre/verticales */
+    0xFE
+};
+
 /* Phase 9e — lettres pour "PRESS SPACE" */
 
 static const unsigned char letter_P[] = {
@@ -287,4 +297,27 @@ void wave_label_draw(unsigned char py, unsigned char digit)
 void wave_label_erase(unsigned char py, unsigned char digit)
 {
     wave_label_draw(py, digit);
+}
+
+/* Phase 15 — affichage "HIGH SCORES" centré horizontal.
+ * 11 caractères × 12 = 132 px, x = (240-132)/2 = 54. */
+void hiscores_label_draw(unsigned char py)
+{
+    unsigned char x = 54;
+    draw_letter(letter_H, x +   0, py);
+    draw_letter(letter_I, x +  12, py);
+    draw_letter(letter_G, x +  24, py);
+    draw_letter(letter_H, x +  36, py);
+    /* (espace en x+48) */
+    draw_letter(letter_S, x +  60, py);
+    draw_letter(letter_C, x +  72, py);
+    draw_letter(letter_O, x +  84, py);
+    draw_letter(letter_R, x +  96, py);
+    draw_letter(letter_E, x + 108, py);
+    draw_letter(letter_S, x + 120, py);
+}
+
+void hiscores_label_erase(unsigned char py)
+{
+    hiscores_label_draw(py);
 }

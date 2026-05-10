@@ -8,11 +8,41 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 À venir Phase 16+ :
+- Optimisation Bresenham (Phase 2b) : SMC + déroulage pour 40-50 c/px
+  → augmenter framerate (objectif utilisateur).
+
+(Différé Phase 10g/m hors-roadmap : `.tap`/`.dsk` persistance, mix
+multi-canaux — abandonnés selon directives utilisateur.)
 - Persistance high scores en `.tap` / `.dsk`.
 - Variables nommées arcade (`statusShip`, `horzVelShip`, etc.).
 - Mix multi-canaux (thump + UFO simultanés).
 - Optimisation Bresenham (Phase 2b) : SMC + déroulage.
 - Clipping Cohen-Sutherland (segments tronqués propres aux bords).
+
+## [1.2.5] - 2026-05-10
+
+### Phase 15 — Lettre H + label "HIGH SCORES" en game over ✅
+
+- Lettre `H` ajoutée (3 segments + 2 plots — 2 verticales + barre milieu).
+- `hiscores_label_draw(py)` : "HIGH SCORES" centré horizontal x=54
+  (10 lettres + 1 espace × 12 = 132 px, x = (240-132)/2).
+- Label affiché à y=55 au-dessus de la table des high scores en game over.
+- Table des scores décalée de y=70 → y=75 pour laisser de la place au label.
+- 13 lettres alphabétiques au total : `A C D E G H I M O P R S T V W`.
+
+### Changed
+
+- `src/title.c/h` : `letter_H`, `hiscores_label_draw/erase`.
+- `src/game.c` : `HISCORES_LABEL_Y = 55`, label drawn dans
+  `hiscores_draw_table` (XOR symétrique avec la table elle-même).
+
+### Décisions techniques Phase 15
+
+- **Label unique pour erase + draw** : `hiscores_label_draw` est XOR
+  idempotente (comme tout le reste). Le toggle de la table via
+  `hiscores_drawn` flag couvre aussi le label par effet de symétrie.
+- **Décalage table -5 px** : maintient la zone des 5 lignes de score
+  dans la zone safe sans chevaucher le ship si centré.
 
 ## [1.2.4] - 2026-05-10
 

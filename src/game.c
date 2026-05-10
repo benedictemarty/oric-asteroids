@@ -16,6 +16,7 @@
 #include "ufo.h"
 #include "sound.h"
 #include "title.h"
+/* hiscores_label_draw exposé via title.h depuis Phase 15 */
 
 /* ------------------------------------------------------------------ */
 /* Symboles importés                                                   */
@@ -606,12 +607,15 @@ static void hiscores_insert(unsigned int final_score)
 }
 
 /* Dessine la table des high scores en game over (centre écran).
- * Phase 9 : utilise hud_xor_5digits (rendu 7-seg propre). */
+ * Phase 9 : utilise hud_xor_5digits (rendu 7-seg propre).
+ * Phase 15 : ajout label "HIGH SCORES" au-dessus à y=55. */
+#define HISCORES_LABEL_Y  55
 static void hiscores_draw_table(void)
 {
     unsigned char i, py;
+    hiscores_label_draw(HISCORES_LABEL_Y);
     for (i = 0; i < HISCORE_COUNT; i++) {
-        py = 70 + i * 14;
+        py = 75 + i * 14;
         hud_xor_5digits(hiscores[i], 105, py);
     }
 }

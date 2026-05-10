@@ -88,6 +88,7 @@ des 9 phases.
 | 13  | Fragments morceaux du ship (ShipExpPtrTbl) | `phase13-done` / `v1.2.2` |
 | 14  | Explosion asteroid (dots éphémères) | `phase14-done` / `v1.2.3` |
 | 14b | Pattern shrapnel 1 arcade exact | `phase14b-done` / `v1.2.4` |
+| 15  | Lettre H + label "HIGH SCORES" en game over | `phase15-done` / `v1.2.5` |
 
 ## Différé Phase 16+
 
