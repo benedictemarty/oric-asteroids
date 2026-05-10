@@ -122,6 +122,18 @@ _key_scan:
         lda  #$F7
         sta  VIA_DDRB
 
+        ; PSG reg 7 = $7F : mixer tout muet + Port A en input (bit 6 = 1).
+        ; CRITIQUE : si bit 6 du reg 7 = 0 (Port A en output côté PSG),
+        ; le matériel ne peut PAS lire la matrice clavier → PB3 reste à 0
+        ; quoi qu'il arrive, et toutes les touches sont vues comme non
+        ; pressées. La ROM Oric peut laisser le PSG dans cet état (ou un
+        ; FX précédent dont le mixer n'aurait pas préservé bit 6).
+        ; On force ici pour garantir le scan ; le prochain sound_play_fx
+        ; restaurera le mixer voulu.
+        lda  #$7F
+        ldy  #7
+        jsr  psg_write
+
         ; PSG reg14 = $EF (rangée 4 active, autres désactivées)
         lda  #$EF
         ldy  #14
