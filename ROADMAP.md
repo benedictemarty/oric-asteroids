@@ -49,6 +49,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 17 | Compteur pixels Bresenham + suppression updates _lx0/_ly0 (v1.2.7) | — | 1 j |
 | ✅ | 18 | Main-axis split Bresenham (refactor algo, gain 2.47%) (v1.2.8) | — | 1 j |
 | ✅ | 18b | Anti-flicker `game_run` (resserrage fenêtre erase→draw) | — | 1 j |
+| ✅ | 18c | Anti-flicker per-entity asteroids (prev_x/prev_y, asteroids_render) | — | 1 j |
 | ⏳ | 19 | Vaisseau arcade-fidèle (5 segments avec barre cockpit + encoches) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 

@@ -693,18 +693,17 @@ void game_run(void)
             key_scan();
             if ((key_state & 0x08) && !prev_space) break;
             prev_space = key_state & 0x08;
-            asteroids_draw();
             asteroids_update();
-            asteroids_draw();
+            asteroids_render();   /* erase à prev + draw à curr per-entity */
             key_scan();
             if ((key_state & 0x08) && !prev_space) break;
             prev_space = key_state & 0x08;
-            /* Phase 10m : toggle PRESS SPACE tous les 24 frames (~1.4 s à 17 Hz).
+            /* Toggle PRESS SPACE tous les 8 frames (~0.5 s à 17 Hz).
              * Bug originel : `erase(); if(visible) draw();` faisait XOR XOR
              * = identité aux toggles impairs → texte effectivement caché 100 %
              * du temps après le 2e toggle, et état `ps_visible` désynchronisé.
              * Fix : un seul XOR par toggle (erase si visible, draw si caché). */
-            if ((i & 0x17) == 0x17) {
+            if ((i & 0x07) == 0x07) {
                 if (ps_visible) {
                     presspace_erase(110);
                     ps_visible = 0;
@@ -806,17 +805,19 @@ void game_run(void)
         debris_update();
         asteroid_debris_update();
 
-        /* 4. ===== BLOC COMPACT ASTEROIDS =====
-         * Erase → update → collisions → draw consécutifs.
-         * Fenêtre pendant laquelle un astéroïde est absent de l'écran :
-         * uniquement le temps de asteroids_update + 3 collisions
-         * (~7 ms à 1 MHz vs ~20 ms en pré-refactor). */
-        asteroids_draw();              /* erase à pos N-1 */
-        asteroids_update();            /* pos N-1 → pos N */
+        /* 4. ===== ASTEROIDS — étape B per-entity =====
+         * asteroids_update sauve prev_x/prev_y (= pos en sortie de
+         * frame précédente) avant de calculer la nouvelle pos.
+         * asteroids_render fait erase à prev puis draw à curr
+         * consécutivement par entité. Fenêtre pendant laquelle un
+         * astéroïde donné est absent de l'écran = quelques centaines
+         * de cycles (entre les deux appels à asteroid_draw_one pour
+         * cet astéroïde précisément), pas la durée totale du frame. */
+        asteroids_update();
         collisions_bullets_asteroids();
         collisions_ufobullet_asteroids();
         if (!gameover) collisions_ship_asteroids();
-        asteroids_draw();              /* draw actifs à pos N */
+        asteroids_render();
         /* ===== FIN BLOC ASTEROIDS ===== */
 
         if (ship_invincible) ship_invincible--;

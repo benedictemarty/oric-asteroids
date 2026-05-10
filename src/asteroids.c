@@ -69,7 +69,10 @@ void asteroids_init(unsigned char seed)
     ast_per_wave = 0;
     scr_speedup = 5;            /* arcade : init à 5 */
     ast_break_timer = 0;        /* arcade : aucun hit en attente */
-    for (i = 0; i < MAX_ASTEROIDS; i++) asteroids[i].active = 0;
+    for (i = 0; i < MAX_ASTEROIDS; i++) {
+        asteroids[i].active = 0;
+        asteroids[i].drawn  = 0;
+    }
 }
 
 /* Spawn d'une vague — Phase 10c arcade-fidèle.
@@ -99,6 +102,7 @@ void asteroids_spawn_wave(void)
 
     for (i = 0; i < n; i++) {
         asteroids[i].active = 1;
+        asteroids[i].drawn  = 0;            /* pas encore tracé : skip erase au 1er render */
         asteroids[i].size   = SIZE_LARGE;
         /* Shape aléatoire 0-3 (cf. arcade : AND #$18 puis ORA #$04 → status) */
         asteroids[i].shape  = (rng8() >> 3) & 3;
@@ -114,6 +118,8 @@ void asteroids_spawn_wave(void)
             asteroids[i].x = 20 + (rng8() % 192);     /* zone safe X */
             asteroids[i].y = (r & 2) ? 20 : 180;
         }
+        asteroids[i].prev_x = asteroids[i].x;
+        asteroids[i].prev_y = asteroids[i].y;
 
         /* Vélocité : RNG sur signe + magnitude (1 ou 2) */
         r = rng8();
@@ -121,7 +127,10 @@ void asteroids_spawn_wave(void)
         asteroids[i].vy = ((r & 4) ? 1 : -1) * ((r & 8) ? 2 : 1);
     }
     /* Marquer les autres comme libres */
-    for (; i < MAX_ASTEROIDS; i++) asteroids[i].active = 0;
+    for (; i < MAX_ASTEROIDS; i++) {
+        asteroids[i].active = 0;
+        asteroids[i].drawn  = 0;
+    }
 }
 
 /* Mise à jour : intégration + wraparound écran complet (Phase 10l).
@@ -143,6 +152,10 @@ void asteroids_update(void)
     int nx, ny;
     for (i = 0; i < MAX_ASTEROIDS; i++) {
         if (!asteroids[i].active) continue;
+        /* Sauver pos courante comme prev (= pos où l'astéroïde est tracé en
+         * sortie de frame précédente) avant de calculer la nouvelle pos. */
+        asteroids[i].prev_x = asteroids[i].x;
+        asteroids[i].prev_y = asteroids[i].y;
         nx = (int)asteroids[i].x + (int)asteroids[i].vx;
         ny = (int)asteroids[i].y + (int)asteroids[i].vy;
         if (nx < WRAP_X_MIN) nx += WRAP_X_SPAN;
@@ -159,11 +172,15 @@ void asteroids_update(void)
  * segment par segment lors de la duplication d'instance. */
 #define IN_BOUNDS(x, y)  ((x) >= 0 && (x) <= 239 && (y) >= 0 && (y) <= 199)
 
-/* Tracé d'un astéroïde à un offset arbitraire (ox, oy) en int signé.
+/* Tracé d'un astéroïde à un centre (cx, cy) avec offset (ox, oy).
+ * Le centre est passé en paramètre (au lieu de lire asteroids[idx].x/y)
+ * pour permettre erase à prev_x/prev_y et draw à x/y dans la même frame
+ * (pattern erase+draw consécutif anti-flicker).
  * Permet la duplication d'instance : (0, 0) pour l'instance principale,
  * (±240, 0) ou (0, ±200) pour les instances fantômes près des bords.
  * Clipping segment-par-segment : skip si une extrémité hors HIRES. */
-static void asteroid_draw_at(unsigned char idx, int ox, int oy)
+static void asteroid_draw_at(unsigned char idx, unsigned char cx, unsigned char cy,
+                             int ox, int oy)
 {
     unsigned char i, base, n, next;
     unsigned char shape_idx;
@@ -171,8 +188,8 @@ static void asteroid_draw_at(unsigned char idx, int ox, int oy)
     int x0, y0, x1, y1;
     signed char dx0, dy0, dx1, dy1;
 
-    ax = (int)(unsigned int)asteroids[idx].x + ox;
-    ay = (int)(unsigned int)asteroids[idx].y + oy;
+    ax = (int)(unsigned int)cx + ox;
+    ay = (int)(unsigned int)cy + oy;
     shape_idx = (asteroids[idx].size << 2) + asteroids[idx].shape;
     base = shape_off[shape_idx];
     n    = shape_len[shape_idx];
@@ -216,32 +233,69 @@ static void asteroid_draw_at(unsigned char idx, int ox, int oy)
  *   - x ≤ 14 : copie à x + 240
  *   - x ≥ 226 : copie à x - 240
  *   - idem Y avec 200
- *   - coins : 4× (1 + dx + dy + dx_dy) */
-static void asteroid_draw_one(unsigned char idx)
+ *   - coins : 4× (1 + dx + dy + dx_dy)
+ * Le centre (cx, cy) est passé en paramètre pour permettre le pattern
+ * erase à prev_pos puis draw à curr_pos sans modifier la struct. */
+static void asteroid_draw_one(unsigned char idx, unsigned char cx, unsigned char cy)
 {
-    unsigned char ax, ay;
     /* Rayon max conservateur : 14 (= rayon grand asteroid) */
     int dup_x = 0, dup_y = 0;
 
-    asteroid_draw_at(idx, 0, 0);
+    asteroid_draw_at(idx, cx, cy, 0, 0);
 
-    ax = asteroids[idx].x;
-    ay = asteroids[idx].y;
-    if (ax <= 14)        dup_x = +240;
-    else if (ax >= 226)  dup_x = -240;
-    if (ay <= 14)        dup_y = +200;
-    else if (ay >= 186)  dup_y = -200;
+    if (cx <= 14)        dup_x = +240;
+    else if (cx >= 226)  dup_x = -240;
+    if (cy <= 14)        dup_y = +200;
+    else if (cy >= 186)  dup_y = -200;
 
-    if (dup_x) asteroid_draw_at(idx, dup_x, 0);
-    if (dup_y) asteroid_draw_at(idx, 0, dup_y);
-    if (dup_x && dup_y) asteroid_draw_at(idx, dup_x, dup_y);
+    if (dup_x) asteroid_draw_at(idx, cx, cy, dup_x, 0);
+    if (dup_y) asteroid_draw_at(idx, cx, cy, 0, dup_y);
+    if (dup_x && dup_y) asteroid_draw_at(idx, cx, cy, dup_x, dup_y);
 }
 
+/* Trace XOR à pos courante (x, y) pour chaque actif.
+ * Met à jour prev_x/prev_y/drawn pour amorcer le pattern erase+draw
+ * de la frame suivante (asteroids_render). Utilisé pour init / game_reset
+ * / nettoyage : appel en paire (draw puis re-draw) = annule l'XOR. */
 void asteroids_draw(void)
 {
     unsigned char i;
     for (i = 0; i < MAX_ASTEROIDS; i++) {
-        if (asteroids[i].active) asteroid_draw_one(i);
+        if (asteroids[i].active) {
+            asteroid_draw_one(i, asteroids[i].x, asteroids[i].y);
+            asteroids[i].prev_x = asteroids[i].x;
+            asteroids[i].prev_y = asteroids[i].y;
+            asteroids[i].drawn  = !asteroids[i].drawn;  /* toggle XOR */
+        }
+    }
+}
+
+/* Pattern par-frame anti-flicker : pour chaque asteroid, erase à prev
+ * (= pos en sortie de frame précédente) puis draw à curr consécutivement.
+ * La fenêtre pendant laquelle l'astéroïde est éteint à l'écran tombe à
+ * quelques centaines de cycles (les opérations entre les deux appels à
+ * asteroid_draw_one), au lieu de plusieurs ms si le couple était dispersé.
+ * Pré-conditions :
+ *   - asteroids_update doit avoir tourné cette frame (sauve prev_x/y).
+ *   - drawn = 1 ssi l'asteroid est actuellement tracé à (prev_x, prev_y).
+ * Post-conditions :
+ *   - chaque actif est tracé à (x, y), prev = (x, y), drawn = 1.
+ *   - chaque inactif (juste désactivé par collision) est effacé,
+ *     drawn = 0. */
+void asteroids_render(void)
+{
+    unsigned char i;
+    for (i = 0; i < MAX_ASTEROIDS; i++) {
+        if (asteroids[i].drawn) {
+            asteroid_draw_one(i, asteroids[i].prev_x, asteroids[i].prev_y);
+            asteroids[i].drawn = 0;
+        }
+        if (asteroids[i].active) {
+            asteroid_draw_one(i, asteroids[i].x, asteroids[i].y);
+            asteroids[i].prev_x = asteroids[i].x;
+            asteroids[i].prev_y = asteroids[i].y;
+            asteroids[i].drawn  = 1;
+        }
     }
 }
 
@@ -291,10 +345,23 @@ void asteroids_fragment(unsigned char idx)
      * d'asteroid retarde le prochain spawn saucer de 80 frames. */
     ast_break_timer = 80;
 
-    /* Petit détruit complètement (cf. arcade : size devient 0, asteroid disparu) */
+    /* Petit détruit complètement (cf. arcade : size devient 0, asteroid disparu).
+     * Le tracé existant à prev_x/prev_y sera effacé par asteroids_render
+     * (drawn=1, active=0 → erase puis drawn=0). */
     if (asteroids[idx].size == SIZE_SMALL) {
         asteroids[idx].active = 0;
         return;
+    }
+
+    /* L'astéroïde parent était tracé à prev_x/prev_y avec sa size/shape
+     * actuelles (= attrs OLD). On va modifier size/shape ci-dessous, ce
+     * qui changerait le shape utilisé par asteroids_render lors de l'erase.
+     * Pour préserver l'invariant, on efface immédiatement le tracé OLD
+     * avant de modifier les attrs. drawn=0 → render skip erase, draw à
+     * x/y avec NEW attrs. */
+    if (asteroids[idx].drawn) {
+        asteroid_draw_one(idx, asteroids[idx].prev_x, asteroids[idx].prev_y);
+        asteroids[idx].drawn = 0;
     }
 
     /* Conserver les attributs du parent avant modification */
@@ -316,10 +383,13 @@ void asteroids_fragment(unsigned char idx)
     for (i = 0; i < MAX_ASTEROIDS && found < 2; i++) {
         if (i == idx || asteroids[i].active) continue;
         asteroids[i].active = 1;
+        asteroids[i].drawn  = 0;            /* jamais tracés : skip erase au render */
         asteroids[i].size   = child_size;
         asteroids[i].shape  = (sh + 2 + found) & 3;
         asteroids[i].x      = ax;
         asteroids[i].y      = ay;
+        asteroids[i].prev_x = ax;
+        asteroids[i].prev_y = ay;
         asteroids[i].vx     = clamp_vel((int)vx_p + (int)rand_offset());
         asteroids[i].vy     = clamp_vel((int)vy_p + (int)rand_offset());
         found++;

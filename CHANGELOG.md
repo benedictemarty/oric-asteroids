@@ -87,6 +87,53 @@ tirs manqués.
   l'affichage correct de "PRESS SPACE" (le snapshot précédent
   capturait l'état buggy du toggle).
 
+### Anti-flicker — étape B complète : per-entity asteroids ✅
+
+**Symptôme** : après étape A + B simplifiée, les astéroïdes
+clignotaient encore visiblement.
+
+**Cause** : la fenêtre erase→draw d'un astéroïde restait de l'ordre
+de quelques ms (`asteroids_update` + 3 collisions globales) car le
+couple était posé autour de l'ensemble des opérations, pas autour
+de chaque astéroïde individuellement.
+
+**Correctif** :
+
+- Ajout de `prev_x`, `prev_y`, `drawn` à `Asteroid` (3 octets/slot
+  × 12 slots = 36 octets RAM).
+- `asteroid_draw_at` et `asteroid_draw_one` prennent désormais le
+  centre `(cx, cy)` en paramètre (au lieu de lire `.x, .y`), ce qui
+  permet de tracer le même astéroïde à n'importe quelle position
+  sans toucher à la struct.
+- `asteroids_update` sauve `prev_x = x ; prev_y = y` avant de
+  calculer la nouvelle pos.
+- Nouvelle `asteroids_render()` : pour chaque slot, si `drawn` →
+  erase à `prev` ; si `active` → draw à `curr`, met à jour
+  `prev = curr`, `drawn = 1`.
+- `asteroids_fragment` efface immédiatement le tracé du parent
+  avec ses attrs OLD (avant modification de `size`/`shape`) pour
+  préserver l'invariant XOR ; nouveaux fragments créés avec
+  `drawn = 0` (pas d'erase au prochain render, juste un draw).
+- `game_run` et boucle titre remplacent le triple
+  `asteroids_draw → update → asteroids_draw` par
+  `asteroids_update → asteroids_render`.
+
+Fenêtre flicker par astéroïde ramenée à quelques centaines de
+cycles (uniquement entre `asteroid_draw_one(prev)` et
+`asteroid_draw_one(curr)` pour ce slot précisément), soit un
+ratio < 1 % de la frame 25 Hz — théoriquement imperceptible.
+
+### Polish — clignotement PRESS SPACE accéléré
+
+Période du toggle réduite de 24 à 8 frames (de ~1.4 s à ~0.5 s à
+17 Hz), cadence arcade-fidèle.
+
+### Maintenance (étape B)
+
+- Mise à jour de `tests/ref/phase9_release.ppm` (1155 octets diff,
+  attendus : timing changé par `asteroids_render` + cadence du
+  toggle PRESS SPACE).
+
 À venir Phase 19 (planifiée) :
 - **Vaisseau arcade-fidèle** : passer de 3 à **5 segments** pour
   reproduire la forme exacte de l'Atari rev 4 (pointe + 2 côtés

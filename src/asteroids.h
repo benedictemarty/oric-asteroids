@@ -13,10 +13,14 @@
 
 typedef struct {
     unsigned char x, y;
+    unsigned char prev_x, prev_y;  /* pos en sortie de frame précédente — utilisée
+                                     * par asteroids_render pour effacer l'ancien
+                                     * tracé avant de redessiner à (x, y). */
     signed char   vx, vy;
     unsigned char shape;     /* 0-3 */
     unsigned char size;      /* SIZE_SMALL / MEDIUM / LARGE */
     unsigned char active;
+    unsigned char drawn;     /* 1 si actuellement tracé à prev_x, prev_y. */
 } Asteroid;
 
 extern Asteroid asteroids[MAX_ASTEROIDS];
@@ -27,7 +31,8 @@ extern unsigned char ast_break_timer;     /* Phase 10k — frames anti-spawn UFO
 void asteroids_init(unsigned char seed);
 void asteroids_spawn_wave(void);
 void asteroids_update(void);
-void asteroids_draw(void);
+void asteroids_draw(void);              /* XOR à pos courante (init/reset/cleanup) */
+void asteroids_render(void);             /* erase à prev + draw à curr — pattern par-frame */
 void asteroids_fragment(unsigned char idx);
 unsigned char asteroids_count(void);
 unsigned char rng8(void);
