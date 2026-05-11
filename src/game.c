@@ -793,23 +793,44 @@ void game_run(void)
     hud_draw();
 
     for (;;) {
+        /* Lock 2 s après passage en gameover : GAME OVER + HoF fixes,
+         * pas de touches acceptées et pas de prompt affiché pour laisser
+         * l'utilisateur lire son score. */
+        static unsigned char gameover_lock = 0;
+        static unsigned char prompt_drawn = 0;   /* PRESS SPACE + OR ESC */
         key_scan();
 
-        /* Restart en game over (avant le bloc render pour éviter
-         * d'effacer puis re-init dans la même frame). */
-        if (gameover && (key_state & 0x08)) {
-            /* SPACE → rejouer. game_reset() s'occupe d'effacer les
-             * entités et de tout ré-initialiser. */
-            game_reset();
-            prev_gameover = 0;
-            hiscores_drawn = 0;
-            gameover_text_drawn = 0;
-            continue;
+        if (gameover && !prev_gameover) {
+            gameover_lock = 50;        /* 2 s à 25 Hz */
         }
-        if (gameover && (key_state & 0x20)) {
-            /* ESC → quitter le jeu : return depuis game_run, depuis main,
-             * crt0 fait alors JMP $F800 (reset Oric → BASIC READY). */
-            return;
+
+        if (gameover && gameover_lock) {
+            /* Lock actif : ignorer SPACE/ESC. */
+        } else if (gameover) {
+            if (key_state & 0x08) {
+                /* SPACE → rejouer. */
+                if (prompt_drawn) {
+                    presspace_erase(140);
+                    quit_label_erase(155);
+                    prompt_drawn = 0;
+                }
+                if (gameover_text_drawn) {
+                    gameover_erase();
+                    gameover_text_drawn = 0;
+                }
+                if (hiscores_drawn) {
+                    hiscores_draw_table();   /* XOR : efface */
+                    hiscores_drawn = 0;
+                }
+                game_reset();
+                prev_gameover = 0;
+                continue;
+            }
+            if (key_state & 0x20) {
+                /* ESC → quitter (crt0 JMP $F800 → BASIC). L'écran sera
+                 * réinitialisé en mode TEXT par la ROM. */
+                return;
+            }
         }
 
         /* ============================================================
@@ -959,6 +980,10 @@ void game_run(void)
         }
         prev_gameover = gameover;
 
+        /* Décrémenter le timer de lock game over (~2 s sans accepter
+         * SPACE/ESC pour laisser le joueur lire son score + HoF). */
+        if (gameover_lock) gameover_lock--;
+
         /* Wave label — erase puis redraw consécutifs si vague changée */
         if (current_wave != wave_displayed) {
             if (wave_displayed != 0) wave_label_erase(WAVE_HUD_Y, wave_displayed);
@@ -968,20 +993,25 @@ void game_run(void)
 
         hud_draw();
 
-        /* Game over text : erase puis redraw consécutifs (XOR symétrique) */
+        /* Game over text : HoF + "GAME OVER" tracés dès le début ;
+         * "PRESS SPACE / OR ESC TO STOP" seulement après le lock 2 s. */
         if (gameover) {
             if (hiscores_drawn) hiscores_draw_table();
-            if (gameover_text_drawn) {
-                gameover_erase();
-                presspace_erase(140);
-                quit_label_erase(155);
-            }
+            if (gameover_text_drawn) gameover_erase();
             hiscores_draw_table();
             hiscores_drawn = 1;
             gameover_draw();
-            presspace_draw(140);
-            quit_label_draw(155);     /* "OR ESC TO STOP" */
             gameover_text_drawn = 1;
+
+            if (gameover_lock == 0) {
+                if (prompt_drawn) {
+                    presspace_erase(140);
+                    quit_label_erase(155);
+                }
+                presspace_draw(140);
+                quit_label_draw(155);
+                prompt_drawn = 1;
+            }
         }
 
         frame_wait();
