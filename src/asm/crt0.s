@@ -29,4 +29,6 @@ start:
         ; Cleanup (destructeurs CONDES)
         jsr     donelib
 
-hang:   jmp     hang
+        ; Retour au BASIC Oric-1 — JMP vecteur reset ROM. La ROM ré-init
+        ; le hardware (mode TEXT, clavier, etc.) et arrive au prompt READY.
+        jmp     $F800

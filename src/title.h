@@ -18,4 +18,8 @@ void wave_label_erase(unsigned char py, unsigned char digit);
 void hiscores_label_draw(unsigned char py);
 void hiscores_label_erase(unsigned char py);
 
+/* Phase 18i — "OR ESC TO STOP" sous PRESS SPACE en game over */
+void quit_label_draw(unsigned char py);
+void quit_label_erase(unsigned char py);
+
 #endif /* TITLE_H */

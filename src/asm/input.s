@@ -7,6 +7,7 @@
 ;   bit 2 : ↑ (UP, HW row 3 col 4) — thrust
 ;   bit 3 : SPACE (HW row 0 col 4) — tir
 ;   bit 4 : ↓ (DOWN, HW row 6 col 4) — hyperespace
+;   bit 5 : ESC (HW row 5 col 1) — quitter vers BASIC en game over
 ;
 ; Mapping HW Oric-1 (validé contre Phosphoric corrigé) : TOUTES les
 ; touches utilisées sont sur HW colonne 4 (la colonne LSHIFT/FUNCT
@@ -241,6 +242,28 @@ _key_scan:
         ora  #$02             ; bit 1 → RIGHT
         sta  _key_state
 @no_right:
+
+        ;------------------------------------------------------------
+        ; ESC = HW row 5, col 1 → reg14 = $DF (bit 5), ORB[0:2] = 1
+        ; Touche unique sur col différente : mise à jour ORB[0:2] avant
+        ; le scan.
+        ;------------------------------------------------------------
+        lda  VIA_ORB
+        and  #$F8
+        ora  #1
+        sta  VIA_ORB
+        lda  #$DF
+        ldy  #14
+        jsr  psg_write
+        nop
+        nop
+        lda  VIA_ORB
+        and  #$08
+        beq  @no_esc
+        lda  _key_state
+        ora  #$20             ; bit 5 → ESC
+        sta  _key_state
+@no_esc:
 
         ; Restaurer reg14 = $FF (toutes rangées désactivées)
         lda  #$FF

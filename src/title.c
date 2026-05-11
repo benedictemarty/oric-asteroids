@@ -321,3 +321,29 @@ void hiscores_label_erase(unsigned char py)
 {
     hiscores_label_draw(py);
 }
+
+/* Phase 18i — "OR ESC TO STOP" sous "PRESS SPACE" en game over.
+ * 14 caractères (avec 3 espaces) × 12 = 168, x = (240-168)/2 = 36. */
+void quit_label_draw(unsigned char py)
+{
+    unsigned char x = 36;
+    draw_letter(letter_O, x +   0, py);
+    draw_letter(letter_R, x +  12, py);
+    /* (espace x+24) */
+    draw_letter(letter_E, x +  36, py);
+    draw_letter(letter_S, x +  48, py);
+    draw_letter(letter_C, x +  60, py);
+    /* (espace x+72) */
+    draw_letter(letter_T, x +  84, py);
+    draw_letter(letter_O, x +  96, py);
+    /* (espace x+108) */
+    draw_letter(letter_S, x + 120, py);
+    draw_letter(letter_T, x + 132, py);
+    draw_letter(letter_O, x + 144, py);
+    draw_letter(letter_P, x + 156, py);
+}
+
+void quit_label_erase(unsigned char py)
+{
+    quit_label_draw(py);
+}

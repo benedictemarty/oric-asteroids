@@ -798,13 +798,18 @@ void game_run(void)
         /* Restart en game over (avant le bloc render pour éviter
          * d'effacer puis re-init dans la même frame). */
         if (gameover && (key_state & 0x08)) {
-            /* L'erase de la frame précédente est encore à faire : game_reset
-             * s'en charge en appelant ship_erase + asteroids_draw + ufo_draw + ... */
+            /* SPACE → rejouer. game_reset() s'occupe d'effacer les
+             * entités et de tout ré-initialiser. */
             game_reset();
             prev_gameover = 0;
             hiscores_drawn = 0;
             gameover_text_drawn = 0;
             continue;
+        }
+        if (gameover && (key_state & 0x20)) {
+            /* ESC → quitter le jeu : return depuis game_run, depuis main,
+             * crt0 fait alors JMP $F800 (reset Oric → BASIC READY). */
+            return;
         }
 
         /* ============================================================
@@ -969,11 +974,13 @@ void game_run(void)
             if (gameover_text_drawn) {
                 gameover_erase();
                 presspace_erase(140);
+                quit_label_erase(155);
             }
             hiscores_draw_table();
             hiscores_drawn = 1;
             gameover_draw();
             presspace_draw(140);
+            quit_label_draw(155);     /* "OR ESC TO STOP" */
             gameover_text_drawn = 1;
         }
 
