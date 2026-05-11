@@ -645,8 +645,11 @@ static void hiscores_init(void)
     for (i = 5; i < HISCORE_COUNT; i++) hiscores[i] = 0;
 }
 
-/* Insère final_score dans la table triée si éligible */
-static void hiscores_insert(unsigned int final_score)
+/* Insère final_score dans la table triée si éligible.
+ * Retourne la position d'insertion (0..HISCORE_COUNT-1) ou 0xFF
+ * si le score n'entre pas dans le top. La position sert à déclencher
+ * la saisie du pseudo uniquement en cas de nouveau high score. */
+static unsigned char hiscores_insert(unsigned int final_score)
 {
     unsigned char i, j;
     for (i = 0; i < HISCORE_COUNT; i++) {
@@ -656,9 +659,10 @@ static void hiscores_insert(unsigned int final_score)
                 hiscores[j] = hiscores[j - 1];
             }
             hiscores[i] = final_score;
-            return;
+            return i;
         }
     }
+    return 0xFF;     /* score insuffisant pour entrer dans le top */
 }
 
 /* Dessine la table des high scores en game over (centre écran).
@@ -715,6 +719,7 @@ void game_run(void)
     unsigned char ship_visible;
     unsigned char prev_gameover;
     unsigned int  final_score;
+    unsigned char new_hiscore_pos = 0xFF;    /* 0..5 = nouveau hi-score, 0xFF = non */
 
     /* Init explicite — crt0 ne clear pas BSS (workaround Phase 6) */
     ship_invincible = 0;
@@ -972,10 +977,13 @@ void game_run(void)
         }
         sound_tick();
 
-        /* Passage en game over → insertion hi-scores + clean UFO */
+        /* Passage en game over → insertion hi-scores + clean UFO.
+         * hiscore_pos enregistre le rang d'insertion (0..5) ou 0xFF si
+         * le score n'entre pas dans le top — utilisé par la prochaine
+         * étape pour décider d'afficher l'écran saisie pseudo. */
         if (gameover && !prev_gameover) {
             final_score = score;
-            hiscores_insert(final_score);
+            new_hiscore_pos = hiscores_insert(final_score);
             ufo_kill();
         }
         prev_gameover = gameover;
