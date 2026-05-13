@@ -278,15 +278,9 @@ static unsigned char collide(unsigned char x1, unsigned char y1,
 static void timer_init(void)
 {
     /* Phase 9 : VSync ULA via CB1 (preferé, anti-tearing).
-     * Désactivons l'IRQ CB1 pour pouvoir poll IFR sans rejet.
-     *
-     * PCR bit 4 = CB1 active edge (0 = falling, 1 = rising). L'Oric
-     * VSync ULA est falling edge ⇒ on doit avoir bit 4 = 0. La ROM
-     * Oric le configure normalement, mais avec auto-exec via .tap
-     * autorun (Phosphoric v1.16.3+), le timing de l'init ROM peut
-     * laisser PCR avec bit 4 = 1 (capture oricutron debug : PCR=$DD).
-     * On force explicitement bit 4 = 0 pour garantir le polling. */
-    VIA_PCR = VIA_PCR & 0xEF;        /* CB1 falling edge */
+     * On laisse PCR tel que la ROM le configure (CB1 = falling edge,
+     * géré par la ROM IRQ). Désactivons l'IRQ CB1 pour pouvoir poll
+     * IFR sans rejet. */
     VIA_ACR = VIA_ACR & 0x3F;       /* Timer 1 one-shot (au cas où fallback) */
     VIA_IER = 0x40;                  /* Disable T1 IRQ */
     VIA_IFR = 0x50;                  /* Clear T1 + CB1 flags initialement */
