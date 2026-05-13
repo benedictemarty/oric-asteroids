@@ -40,6 +40,30 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Fix — FX_FIRE n'était plus distinguable de FX_EXPLODE ✅
+
+**Symptôme (utilisateur)** : "le bruit fire est identique à explode".
+
+**Cause double** :
+1. **Mixer FIRE = `$47`** (noise A+B+C all ON), commentaire trompeur
+   disait "noise A only". Bug latent depuis longtemps : avec l'ancien
+   FX_FIRE Mine Storm (tone B + noise grave), la tone masquait le
+   souci ; depuis le passage en noise pur (étape 2), FIRE et EXPLODE
+   utilisaient **le même mixer noise tous canaux**.
+2. **Table FIRE commençait à R6 = `$02`** — pile la valeur de l'impact
+   initial de bang_l/m/s (étape "tables multi-segments"). Frame 0
+   identique entre FIRE et EXPLODE.
+
+**Fix** :
+- Mixer FIRE → `$77` (noise A **only**, bits 4-5 = 1 pour couper
+  noise B/C). Vrai isolement vs EXPLODE.
+- Table `fire_noise_per` décalée vers l'aigu :
+  `$01/$01/$02/$02/$01/$01/$01` (1953/1953/977/977/1953/1953/1953 Hz).
+  Plus aigu et stable → "psssht" qui ne s'enfonce pas dans le grave
+  comme EXPLODE.
+- Vol A passé en mode enveloppe (R8=`$10`, R11/R12=`$0445` ≈ 280 ms,
+  R13=`$00` shape \___ decay + hold) → fade naturel au lieu de cut sec.
+
 ### Sons raffinement — tables multi-segments arcade-fidèles ✅
 
 Strategy : à défaut de DAC (l'AY-3-8912 ne peut pas rejouer un sample

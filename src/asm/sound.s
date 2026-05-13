@@ -110,11 +110,13 @@ ufo_s_per_lo:
 ufo_s_per_hi:
         .byte $00, $00, $00, $00
 
-; FX_FIRE noise sweep — table R6 (noise period) sur 7 ticks ≈ 280 ms.
-; Profil arcade MP3 (42 ms/segment) : 1220 / 770 / 687 / 557 / 770 / 947 / 1753 Hz
-; → R6 ≈ 2 / 3 / 3 / 4 / 3 / 2 / 1
+; FX_FIRE noise sweep — table R6 décalée vers l'aigu pour bien distinguer
+; de l'EXPLODE qui démarre à R6=02 (~977 Hz). Table à valeurs ≤ 02 :
+;   $01 = 1953 Hz / $02 = 977 Hz
+; Profil "psssht" aigu qui module rapidement, vs EXPLODE qui s'enfonce
+; dans le grave.
 fire_noise_per:
-        .byte $02, $03, $03, $04, $03, $02, $01
+        .byte $01, $01, $02, $02, $01, $01, $01
 
 ; Explosions — table R6 noise pour profil "impact aigu + corps grave".
 ; Arcade : 1ère frame ~1000 Hz (R6=2), corps suivant ~150/250/300 Hz selon
@@ -225,25 +227,36 @@ _sound_play_fx:
         lda  #$FF
         sta  VIA_DDRA
 
-        ; Cas FX_FIRE — re-analyse MP3 22 kHz : noise SWEEP non-linéaire
-        ; (1220→770→687→557→770→947→1753 Hz) ≈ "psssht" qui module en
-        ; pitch. Table fire_noise_per[7] pilote R6 au fil des ticks.
+        ; Cas FX_FIRE — "psssht" aigu modulé. Table fire_noise_per pilote
+        ; R6 au fil des ticks. Volume A en mode enveloppe pour fade-out
+        ; naturel (vs cut sec). Mixer = noise A only (différent de l'EXPLODE
+        ; qui ouvre noise A+B+C avec vol C en enveloppe).
         lda  _sfx_id
         cmp  #FX_FIRE
         bne  @not_fire
-        lda  fire_noise_per           ; R6 init
+        lda  fire_noise_per           ; R6 init = $01 (aigu)
         ldy  #6
         jsr  _psg_write
-        lda  #$0F
+        lda  #$10                     ; volume A en mode enveloppe
         ldy  #8
-        jsr  _psg_write       ; volume A max
-        lda  #$47             ; mixer noise A only + port A input
+        jsr  _psg_write
+        lda  #$45                     ; env period lo (~280 ms à 25 Hz)
+        ldy  #11
+        jsr  _psg_write
+        lda  #$04                     ; env period hi
+        ldy  #12
+        jsr  _psg_write
+        lda  #$00                     ; env shape : \___ decay + hold
+        ldy  #13
+        jsr  _psg_write
+        lda  #$77                     ; mixer : NOISE A ONLY (bit 3 = 0,
+                                       ; bits 4-5 = 1 noise B/C off) + port A in
         ldy  #7
         jsr  _psg_write
         lda  #1
         sta  sweep_idx        ; tick suivant utilisera fire_noise_per[1]
         lda  #6
-        sta  _sfx_timer       ; 6 ticks (+ init) = 7 frames
+        sta  _sfx_timer       ; 6 ticks (+ init) = 7 frames ≈ 280 ms
         jmp  @done
 @not_fire:
 
