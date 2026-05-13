@@ -24,11 +24,14 @@
 
 extern unsigned char sfx_id;
 extern unsigned char sfx_timer;
+extern unsigned char frame_cnt;       /* incrémenté par IRQ T1 (50 Hz) */
 #pragma zpsym ("sfx_id")
 #pragma zpsym ("sfx_timer")
+#pragma zpsym ("frame_cnt")
 
 void sound_init(void);
-void sound_tick(void);
+void sound_tick(void);                /* appelé par _irq_handler à 50 Hz */
 void sound_play_fx(unsigned char fx_id);
+void irq_install(void);               /* installe handler IRQ T1 — appeler après timer_init */
 
 #endif /* SOUND_H */

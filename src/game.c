@@ -290,41 +290,31 @@ static unsigned char collide(unsigned char x1, unsigned char y1,
 
 static void timer_init(void)
 {
-    /* Programmer Timer 1 du VIA en mode free-run @ 20 ms.
+    /* Programmer Timer 1 du VIA en mode free-run @ 20 ms (50 Hz).
      *
-     * Sur Oric-1 (1 MHz), 20 ms = 20 000 cycles = $4E1F (T1 décrémente
-     * à chaque cycle, IRQ flag à 0). Le timer se réarme automatiquement
-     * en mode free-run, donc le flag IFR T1 se latche tous les 20 ms.
+     * Sur Oric-1 (1 MHz), 20 ms = 20 000 cycles = $4E1F. ACR bits 6-7 :
+     * 01 = T1 continuous mode (réarmement auto depuis latch).
      *
-     * ACR bits 6-7 : 01 = T1 continuous mode, pas de sortie PB7.
-     * On désactive T1 IRQ pour pouvoir poller IFR (sans dispatch ROM).
-     *
-     * Charger T1CL puis T1CH dans cet ordre : l'écriture de T1CH
-     * recharge le compteur depuis (T1CL, T1CH) et démarre le décompte.
+     * Depuis le sprint Player AY IRQ T1 : T1 IRQ est activée par
+     * irq_install() (appelé juste après) qui hooke _irq_handler.
+     * Ce dernier incrémente frame_cnt à chaque tick. frame_wait()
+     * poll frame_cnt au lieu d'IFR.
      */
     VIA_ACR = (VIA_ACR & 0x3F) | 0x40;   /* T1 free-run, no PB7 */
     VIA_T1CL = T1_PERIOD_LO;             /* low latch */
     VIA_T1CH = T1_PERIOD_HI;             /* high latch + start countdown */
-    VIA_IER = 0x40;                       /* disable T1 IRQ */
-    VIA_IFR = 0x40;                       /* clear flag initial */
+    /* IER configurée par irq_install() : disable all, puis enable T1 */
 }
 
 static void frame_wait(void)
 {
-    /* Attendre VSYNCS_PER_FRAME tics T1 (= 2 × 20 ms = 40 ms = 25 Hz).
-     *
-     * Le flag T1 (IFR bit 6) se latche à chaque expiration du compteur.
-     * Pour le clear, il faut LIRE T1CL (relire le low byte) ou écrire
-     * T1CH (recharge le compteur depuis le latch et clear). On utilise
-     * la lecture de T1CL, plus rapide et conserve le pacing free-run.
+    /* Attendre VSYNCS_PER_FRAME tics IRQ T1 (= 2 × 20 ms = 40 ms = 25 Hz).
+     * frame_cnt est incrémenté par _irq_handler à chaque tick T1 (50 Hz).
+     * On échantillonne la valeur initiale puis attend que le delta atteigne
+     * VSYNCS_PER_FRAME. Robuste au wraparound 8-bit modulo 256.
      */
-    unsigned char i;
-    volatile unsigned char dummy;
-    for (i = 0; i < VSYNCS_PER_FRAME; i++) {
-        while (!(VIA_IFR & T1_FLAG)) { }
-        dummy = VIA_T1CL;                /* read clears IFR T1 flag */
-        (void)dummy;
-    }
+    unsigned char start = frame_cnt;
+    while ((unsigned char)(frame_cnt - start) < VSYNCS_PER_FRAME) { }
 }
 
 /* ------------------------------------------------------------------ */
@@ -822,6 +812,7 @@ void game_run(void)
     hires_init();
     timer_init();
     sound_init();
+    irq_install();                    /* active T1 IRQ + handler sound */
 
     /* Phase 9c/9e/10e/10m — écran titre :
      *   - "ASTEROIDS" statique
@@ -1110,7 +1101,8 @@ void game_run(void)
                 thump_timer--;
             }
         }
-        sound_tick();
+        /* sound_tick() est désormais appelée par _irq_handler à 50 Hz
+         * via T1 IRQ (cf. sprint Player AY). Plus d'appel main loop. */
 
         /* Transition gameover=0→1 : la collision (bloc ship) vient de
          * passer gameover à 1 ; prev_gameover est encore à 0. C'est

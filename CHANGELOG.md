@@ -7,6 +7,39 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 20 — Player AY sous IRQ Timer 1 ✅
+
+`sound_tick()` est désormais appelée à 50 Hz par un handler IRQ T1
+installé par `irq_install()` (`src/asm/sound.s`), au lieu d'être
+appelée une fois par frame depuis le main loop. Libère du CPU dans
+la boucle de jeu et fiabilise le timing du player AY.
+
+**Architecture** :
+- T1 free-run @ 20 ms, IRQ T1 activée (`VIA_IER = $C0`).
+- Handler asm hooké aux deux vecteurs IRQ user pour portabilité :
+  `$0228` (Oric-1) et `$0244` (Atmos). La machine non concernée a
+  juste de la RAM normale à ces adresses → safe.
+- Handler : `PHA/TXA-PHA/TYA-PHA`, check IFR T1, clear flag, JSR
+  `_sound_tick`, INC `frame_cnt`, `PLA-TAY/PLA-TAX/PLA/RTI`.
+- `frame_wait()` poll `frame_cnt` au lieu d'IFR T1. Robuste au
+  wraparound 8-bit modulo 256.
+
+**Fixes critiques** (issus de la réponse équipe Phosphoric,
+`docs/notes/2026-05-13-asteroids-irq-debug-response.md`) :
+1. **Save A/X/Y nous-mêmes** : la ROM Oric‑1/Atmos n'a PAS fait
+   PHA A/X/Y avant `JMP $0228`. Le CPU 6502 push seulement PC+P
+   sur IRQ ; le PHA registres se fait *à l'intérieur* du handler
+   ROM ($EC0C/$EE22), qu'on bypasse en patchant le vecteur user.
+   Sans ce save, le PLA*3 final dépile P+PCL+PCH → RTI vers PC
+   garbage → hang du jeu.
+2. **Disable all VIA IRQ sources avant d'activer T1** : si CB1/CA1/
+   T2 IRQ étaient encore active (résidu ROM), elles firaient via
+   notre handler qui skip @not_t1 sans clear → boucle infinie.
+
+Test Phosphoric Oric-1 (basic10.rom, 10M cycles) : écran titre
+complet "ASTEROIDS PRESS SPACE" + 2 astéroïdes rendus. Tests host
+4/4 PASS.
+
 ### Rectification — Atmos ne fonctionne pas avec ROM Atmos
 
 Le précédent commit `6631fc7` annonçait "Atmos OK sur Oricutron" mais

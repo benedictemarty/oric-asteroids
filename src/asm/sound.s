@@ -28,7 +28,8 @@
         .export   _psg_write, _sound_init, _sound_tick
         .export   _sound_play_fx
         .export   _tune_play_note, _tune_stop
-        .exportzp _sfx_id, _sfx_timer
+        .export   _irq_handler, _irq_install
+        .exportzp _sfx_id, _sfx_timer, _frame_cnt
 
         .importzp kb_pcr_save        ; partagée avec input.s
 
@@ -59,6 +60,7 @@
 _sfx_id:    .res 1
 _sfx_timer: .res 1
 sound_tmp:  .res 1
+_frame_cnt: .res 1     ; incrémenté par _irq_handler à chaque tick T1 (50 Hz)
 sweep_idx:  .res 1     ; index générique des sweeps (FX_LIFE / FX_THUMP / FX_UFO)
 
 ;-----------------------------------------------------------------
@@ -795,4 +797,91 @@ _tune_stop:
         pla
         sta  VIA_DDRA
         cli
+        rts
+
+;-----------------------------------------------------------------
+; _irq_handler — Handler IRQ T1 portable Oric-1 / Atmos
+;
+; Contrat (validé équipe Phosphoric, cf docs/notes/2026-05-13-asteroids-
+; irq-debug-response.md) :
+; - Le CPU 6502 push automatiquement PC + P sur IRQ (3 bytes)
+; - Le CPU dispatch DIRECTEMENT vers $0228 (Oric-1) / $0244 (Atmos)
+;   via le vecteur en $FFFE-$FFFF
+; - Quand on patche $0228/$0244, la ROM est ENTIÈREMENT bypassée
+; - Notre handler est le PREMIER code exécuté : il DOIT push A/X/Y
+;   et les restaurer avant RTI
+;-----------------------------------------------------------------
+        VIA_IFR    = $030D
+        VIA_T1CL   = $0304
+
+_irq_handler:
+        pha                       ; save A
+        txa
+        pha                       ; save X
+        tya
+        pha                       ; save Y
+
+        lda  VIA_IFR
+        and  #$40                 ; T1 flag set ?
+        beq  @not_t1
+        lda  VIA_T1CL             ; lire T1CL -> clear T1 flag dans IFR
+        jsr  _sound_tick
+        inc  _frame_cnt
+@not_t1:
+        pla                       ; restore Y
+        tay
+        pla                       ; restore X
+        tax
+        pla                       ; restore A
+        rti
+
+;-----------------------------------------------------------------
+; _irq_install — installe _irq_handler aux vecteurs ROM (Oric-1 et Atmos),
+; désactive toutes les autres sources VIA IRQ, active T1 IRQ, CLI.
+;
+; Fix Phosphoric : disable+clear toutes les sources VIA IRQ AVANT
+; d'activer T1, sinon une IRQ CB1/CA1/T2 résiduelle de la ROM fire,
+; notre handler skip @not_t1 sans clear -> boucle infinie.
+;-----------------------------------------------------------------
+        VIA_IER    = $030E
+
+_irq_install:
+        sei                       ; CPU IRQ disabled pendant config
+
+        ; Fix Phosphoric Q3 : désactiver TOUTES les sources VIA IRQ
+        lda  #$7F                 ; bit 7=0 (clear mode) + bits 0-6=1 (toutes sources)
+        sta  VIA_IER              ; -> disable T1, T2, CB1, CB2, SR, CA1, CA2
+        lda  #$7F                 ; clear tous les flags IFR
+        sta  VIA_IFR
+
+        ; Patch Oric-1 vecteur IRQ ($0228) : JMP _irq_handler
+        ; Note : c'est exactement ce que la ROM écrit elle-même au boot
+        ; (`4C 03 EC` = JMP $EC03). On remplace par notre handler.
+        lda  #$4C                 ; opcode JMP abs
+        sta  $0228
+        lda  #<_irq_handler
+        sta  $0229
+        lda  #>_irq_handler
+        sta  $022A
+
+        ; Patch Atmos vecteur IRQ ($0244) : JMP _irq_handler
+        lda  #$4C
+        sta  $0244
+        lda  #<_irq_handler
+        sta  $0245
+        lda  #>_irq_handler
+        sta  $0246
+
+        ; Activer T1 IRQ uniquement (bit 7=1 set, bit 6=1 T1)
+        lda  #$C0
+        sta  VIA_IER
+
+        ; Clear T1 flag initial pour partir propre
+        lda  VIA_T1CL
+
+        ; frame_cnt = 0
+        lda  #0
+        sta  _frame_cnt
+
+        cli                       ; CPU IRQ enabled
         rts

@@ -55,6 +55,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 18g | Asteroids 8.8 fixed-point + rotation ship ralentie (1/2 frames) | — | 1 j |
 | ✅ | 18h | Performances : MAX_ASTEROIDS 12→6, shapes décimées step=2 | — | 1 j |
 | ✅ | 19 | Vaisseau arcade-fidèle (5 segments avec barre cockpit + encoches) (v1.2.9) | — | 1 j |
+| ✅ | 20 | Player AY sous IRQ Timer 1 (50 Hz, libère CPU main loop) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.
