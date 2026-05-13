@@ -40,6 +40,32 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Sons étape 1 — Triple explosion S/M/L arcade-fidèle ✅
+
+D'après analyse FFT des `.wav` arcade (cf.
+`docs/arcade-sounds-analysis.md`), les 3 explosions arcade diffèrent
+uniquement par leur **fréquence de bruit** (durées similaires
+~870-980 ms) :
+- Large (gros asteroid) : noise ~167 Hz → R6 = 12 ($0C)
+- Medium (moyen) : noise ~246 Hz → R6 = 8 ($08)
+- Small (petit) : noise ~306 Hz → R6 = 6 ($06)
+
+Avant : un seul `FX_EXPLODE` avec R6=31 ($1F) = noise très grave (63 Hz),
+identique quelle que soit la cible.
+
+**Changements** :
+- `sound.h` / `sound.s` : ajout `FX_BANG_MEDIUM` (8) et `FX_BANG_SMALL` (9).
+  `FX_EXPLODE` reste à 2 mais devient explicitement "large bang"
+  (R6 ajusté à 12).
+- Setup PSG factorisé : les 3 explosions partagent même mixer (R7=$47),
+  même enveloppe (R10..R13), même timer (25 frames). Seul R6 varie.
+- `game.c collisions_bullets_asteroids` : capture `size` avant
+  `asteroids_fragment` (qui le modifie) et mappe vers FX_BANG_*.
+- `game.c collisions_ufobullet_asteroids` : ajoute le son d'explosion
+  (oubli précédent — l'UFO cassait un asteroid en silence).
+- `FX_EXPLODE` reste utilisé pour ship/UFO morts (= large par défaut,
+  cohérent : ce sont les "gros" objets du jeu).
+
 ### Anti-flicker UFO — bloc compact erase → tick → draw ✅
 
 **Symptôme** : l'UFO clignotait beaucoup vs le reste (ship, asteroids).

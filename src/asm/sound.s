@@ -38,14 +38,16 @@
         VIA_PCR    = $030C
 
         ; SFX IDs
-        FX_NONE    = 0
-        FX_FIRE    = 1
-        FX_EXPLODE = 2
-        FX_THUMP   = 3
-        FX_HYPER   = 4    ; Phase 9b — whoosh hyperespace
-        FX_THRUST  = 5    ; Phase 9f — noise court continu (override par hold)
-        FX_LIFE    = 6    ; Phase 9f — chime extra ship
-        FX_UFO     = 7    ; Phase 10n — bip-bip UFO (canal C, re-déclenché)
+        FX_NONE        = 0
+        FX_FIRE        = 1
+        FX_EXPLODE     = 2    ; Étape sons 1 — large bang (R6=12, ≈167 Hz arcade)
+        FX_THUMP       = 3
+        FX_HYPER       = 4    ; Phase 9b — whoosh hyperespace
+        FX_THRUST      = 5    ; Phase 9f — noise court continu (override par hold)
+        FX_LIFE        = 6    ; Phase 9f — chime extra ship
+        FX_UFO         = 7    ; Phase 10n — bip-bip UFO (canal C, re-déclenché)
+        FX_BANG_MEDIUM = 8    ; Étape sons 1 — medium bang (R6=8, ≈246 Hz)
+        FX_BANG_SMALL  = 9    ; Étape sons 1 — small bang  (R6=6, ≈306 Hz)
 
 ;-----------------------------------------------------------------
 ; Variables ZP
@@ -179,14 +181,30 @@ _sound_play_fx:
 @not_fire:
 
         cmp  #FX_EXPLODE
-        bne  @not_explode
-        ; SS.EXP Mine Storm : reg 6=$1F (noise grave), reg 7=$07+$40
-        ; (mixer noise tous canaux, port A input), reg 10=$10 (vol C
-        ; en mode enveloppe), regs 11-12=$0038 (envelope period), reg
-        ; 13=$00 (envelope shape : decay puis hold à 0). Fade-out AY natif.
-        lda  #$1F
+        bne  @not_explode_large
+        ; Large bang — noise R6=$0C (12) ≈ 167 Hz (arcade authentique).
+        lda  #$0C
+        jmp  @bang_setup
+@not_explode_large:
+
+        cmp  #FX_BANG_MEDIUM
+        bne  @not_bang_med
+        ; Medium bang — noise R6=$08 (8) ≈ 246 Hz.
+        lda  #$08
+        jmp  @bang_setup
+@not_bang_med:
+
+        cmp  #FX_BANG_SMALL
+        bne  @not_bang_small
+        ; Small bang — noise R6=$06 (6) ≈ 306 Hz.
+        lda  #$06
+@bang_setup:
+        ; A = noise period (R6). Setup commun aux 3 explosions :
+        ; reg 7=$47 (mixer noise A+B+C + port A input), reg 10=$10
+        ; (vol C en mode enveloppe), regs 11-12=$0038 (envelope period),
+        ; reg 13=$00 (decay + hold à 0). Fade-out AY natif.
         ldy  #6
-        jsr  _psg_write       ; noise grave max
+        jsr  _psg_write       ; noise period (varie selon taille)
         lda  #$10              ; volume C en mode enveloppe
         ldy  #10
         jsr  _psg_write
@@ -205,7 +223,7 @@ _sound_play_fx:
         lda  #25
         sta  _sfx_timer
         jmp  @done
-@not_explode:
+@not_bang_small:
 
         cmp  #FX_THUMP
         bne  @not_thump

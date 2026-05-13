@@ -587,14 +587,21 @@ static void collisions_bullets_asteroids(void)
             }
         }
         for (a = 0; a < MAX_ASTEROIDS; a++) {
+            unsigned char sz;
             if (!asteroids[a].active) continue;
             r = shape_radii[asteroids[a].size] + 1;
             if (collide(blt_x[b], blt_y[b], asteroids[a].x, asteroids[a].y, r)) {
-                hud_add_score(score_by_size[asteroids[a].size]);
+                /* Capturer size AVANT fragment (qui peut le modifier). */
+                sz = asteroids[a].size;
+                hud_add_score(score_by_size[sz]);
                 /* Phase 14 : flash explosion à la position du hit */
                 asteroid_debris_spawn(asteroids[a].x, asteroids[a].y);
                 asteroids_fragment(a);
-                sound_play_fx(FX_EXPLODE);
+                /* Étape sons 1 : explosion arcade-fidèle selon taille
+                 * (SIZE_LARGE=2 → grave, SIZE_SMALL=0 → aigu). */
+                sound_play_fx(sz == SIZE_LARGE  ? FX_EXPLODE
+                            : sz == SIZE_MEDIUM ? FX_BANG_MEDIUM
+                                                : FX_BANG_SMALL);
                 blt_ttl[b] = 0;
                 break;
             }
@@ -649,11 +656,18 @@ static void collisions_ufobullet_asteroids(void)
     unsigned char a, r;
     if (!ufo_bullet_active) return;
     for (a = 0; a < MAX_ASTEROIDS; a++) {
+        unsigned char sz;
         if (!asteroids[a].active) continue;
         r = shape_radii[asteroids[a].size] + 1;
         if (collide(ufo_bullet_x, ufo_bullet_y,
                     asteroids[a].x, asteroids[a].y, r)) {
+            sz = asteroids[a].size;
             asteroids_fragment(a);
+            /* Étape sons 1 : son aussi quand l'UFO casse un asteroid
+             * (oubli précédent — pas de feedback audio sur ces hits). */
+            sound_play_fx(sz == SIZE_LARGE  ? FX_EXPLODE
+                        : sz == SIZE_MEDIUM ? FX_BANG_MEDIUM
+                                            : FX_BANG_SMALL);
             ufo_bullet_active = 0;
             return;
         }
