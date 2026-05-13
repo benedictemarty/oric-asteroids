@@ -20,12 +20,17 @@ start:
         ; oricutron, la ROM peut laisser le VIA dans un état imprévu
         ; (PCR bit 4 = 1 = CB1 rising edge ⇒ frame_wait bloque).
         ; On force ici un état standard Oric-1 :
-        ;   PCR = $1D : CA1 pos, CA2 mode 6 (BC1 = 0),
-        ;               CB1 falling, CB2 mode 6 (BDIR = 0)
+        ;   PCR = $CD : CA1 positive (bit 0=1), CA2 mode 6 (BC1 low,
+        ;               bits 1-3 = 110), CB1 FALLING EDGE (bit 4 = 0),
+        ;               CB2 mode 6 (BDIR low, bits 5-7 = 110).
+        ;               Valeur "idle PSG" + CB1 OK pour poll VSync.
+        ;               ATTENTION : $1D = bit 4 = 1 (CB1 RISING) → bug,
+        ;               le flag CB1 IFR ne se latche jamais sur VSync ULA
+        ;               qui est falling edge.
         ;   IER = $7F : disable toutes les IRQ
         ;   IFR = $7F : clear tous les flags latched
         ;   ACR = $00 : timers disabled
-        lda     #$1D
+        lda     #$CD
         sta     $030C           ; VIA_PCR — CB1 falling edge (bit 4 = 0)
         lda     #$7F
         sta     $030E           ; VIA_IER — disable all IRQ
