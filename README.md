@@ -17,12 +17,26 @@ make run        # charge le .tap dans Phosphoric et lance le jeu
 make test       # capture headless (tests/out/phase9_release.ppm)
 make ref        # met à jour la capture de référence
 make check      # vérifie que la capture courante == la référence
+make host-test  # tests host x86 portables (rng8 + rand_offset)
+make bench      # profil CPU 25 M cycles, top instructions/cycles
 make clean      # nettoie build/ et tests/out/
 ```
 
 Cibles auxiliaires :
 - `make gen_ship`   → régénère `src/asm/ship_verts.s` (32 angles)
 - `make gen_shapes` → régénère `src/asm/shapes.s` (4 formes × 3 tailles)
+
+## Lancement
+
+À partir de Phosphoric **v1.16.3-alpha**, le `.tap` produit par `bin2tap`
+contient un **flag autorun (`$C7`)** — le binaire s'auto-exécute au
+chargement. **Plus besoin de taper `CALL 1280` manuellement** depuis le
+BASIC : le mode HIRES + le jeu démarrent automatiquement.
+
+Si tu vois `ILLEGAL QUANTITY ERROR` après `CALL 1280`, c'est que tu as
+tapé la commande **après** l'auto-exec — le binaire a déjà tourné et
+l'adresse `$0500` pointe sur du code potentiellement corrompu. Solution :
+relance simplement `make run` sans rien taper.
 
 ## Touches
 
