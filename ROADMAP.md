@@ -294,3 +294,26 @@ n'est pas validée par :
 - Variations cosmétiques (bonus shapes type Battlezone tank, easter egg).
 
 Ces points ne sont pas planifiés et ne doivent pas dévier la roadmap principale.
+
+---
+
+## Validation finale avant clôture du projet
+
+Checklist obligatoire à exécuter **avant de marquer le projet "Done"** :
+
+- [ ] **Compatibilité oricutron** : charger `build/asteroids.tap` sur
+      oricutron (`oricutron -t build/asteroids.tap`, puis `CLOAD""`
+      en BASIC, puis `CALL#500`). Vérifier que le binaire se charge
+      sans planter et qu'une partie complète se joue normalement.
+      *État actuel (2026-05-13) : oricutron plante au CLOAD — format
+      `.tap` produit par `bin2tap` non standard (pas de pré-amble $00,
+      type bytes `$80 $80` inhabituels). Phosphoric tolère, oricutron
+      non. À investiguer/patcher en fin de projet.*
+- [ ] **Test Oric‑1 physique** (si disponible) : charger le `.tap` sur
+      un Oric‑1 réel via interface cassette ou disque dur, vérifier
+      gameplay 5 min minimum.
+- [ ] **Glitch zone TEXT du bas en HIRES** : voir
+      `docs/phosphoric-hires-text-glitch.md`. Soit retour positif de
+      l'équipe Phosphoric (fix émulateur), soit workaround acté côté
+      projet (pollution HIRES tolérée ou autre).
+- [ ] Tag git `v1.x.0-release` après validation des 3 points.
