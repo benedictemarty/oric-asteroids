@@ -40,6 +40,34 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Sons fix — FX_LIFE tone plateau 2956 Hz (re-analyse MP3) ✅
+
+**Cause** : l'analyse FFT initiale utilisait les `.wav` 1994 (8-bit /
+11 kHz) de classicgaming.cc — qualité dégradée par aliasing. L'utilisateur
+m'a signalé des MP3 22 kHz dans `~/Téléchargements` (qualité supérieure).
+
+Re-analyse fine (10 segments) sur les MP3 :
+
+| Son | Avant (wav 11kHz) | Après (MP3 22kHz) |
+|---|---|---|
+| extra-ship | SWEEP 2786→0 Hz | **TONE PLATEAU 2956 Hz** + fade 85 ms |
+| fire | NOISE 740 Hz | Noise sweep ~1200→600 Hz puis remontant |
+| explosions | OK | OK (corps grave 130-400 Hz confirmé) |
+| UFO | sweep 1259→879 | Multiple bips successifs ~700-1100 Hz |
+
+**Fix `FX_LIFE`** : tone plateau au lieu du sweep faux.
+- R0/R1 = $0015 (period 21 ≈ 2976 Hz, proche 2956 Hz arcade).
+- R7 = $7E (tone A only + port A input).
+- R8 = $10 (vol A en mode enveloppe pour fade naturel).
+- R11/R12 = $0080 (env period 128 → ~32.8 ms par phase).
+- R13 = $00 (shape \___ decay + hold à 0).
+- Timer = 4 frames (~160 ms à 25 Hz).
+- `sweep_idx` mis à 4 pour court-circuiter le hook sweep (devenu inutile
+  pour FX_LIFE).
+
+Documentation `docs/arcade-sounds-analysis.md` complétée avec la section
+"Corrections suite à l'analyse MP3" listant les valeurs révisées par effet.
+
 ### Sons étape 4 — FX_THUMP sweep Beat1 + alternance Beat2 ✅
 
 L'arcade alterne 2 cadences de "thump" très proches (beat1 134→81 Hz

@@ -1,9 +1,68 @@
 # Analyse des sons arcade Asteroids (1979) — calibration AY-3-8912
 
-**Date** : 2026-05-13
-**Source** : https://www.classicgaming.cc/classics/asteroids/sounds
-**Méthode** : analyse FFT/zero-crossings/cv des 10 fichiers `.wav` 8-bit
-mono 11025 Hz fournis par classicgaming.cc, archives `.zip` extraites.
+**Date** : 2026-05-13 (analyse initiale .wav)
+**Mise à jour** : 2026-05-13 (re-analyse depuis MP3 22 kHz, qualité supérieure)
+**Source initiale** : https://www.classicgaming.cc/classics/asteroids/sounds
+  (`.wav` 8-bit mono 11025 Hz datés de 1994, qualité dégradée)
+**Source MP3** : fichiers téléchargés ailleurs par l'utilisateur dans
+  `~/Téléchargements` (22050 Hz 16-bit, qualité bien supérieure)
+**Méthode** : décodage MP3 → WAV mono 22050 Hz via `ffmpeg`, puis analyse
+  zero-crossings / RMS par segments de 10 % de la durée.
+
+---
+
+## ⚠ Corrections suite à l'analyse MP3 (mise à jour)
+
+L'analyse initiale sur `.wav` 1994 8-bit/11kHz a donné des fréquences
+biaisées par l'aliasing/distortion. Avec les MP3 22 kHz récents, plusieurs
+caractéristiques changent significativement :
+
+### extra-ship — TONE PLATEAU, pas sweep
+
+| Segment | Temps | Freq    | RMS    |
+|---------|-------|---------|--------|
+| 0       |   0ms | (sil)   |    32  |
+| 1       |  21ms | (sil)   |    35  |
+| 2       |  43ms | **2956 Hz** | 10661 |
+| 3       |  64ms | **2956 Hz** | 10852 |
+| 4       |  85ms | **2956 Hz** | 10757 |
+| 5       | 107ms | 3049 Hz |  6228  |
+| 6       | 128ms | 3190 Hz |     7  |
+
+⇒ **Tone plateau ~2956 Hz pendant 85-130 ms** suivi d'un fade rapide.
+Pas un sweep descendant comme l'analyse .wav suggérait.
+
+### fire — Noise SWEEP descendant 1200→600 Hz puis remontant
+
+| Segment | Temps | Freq    | RMS    |
+|---------|-------|---------|--------|
+| 0       |   0ms | (sil)   |    38  |
+| 1       |  42ms | 1220 Hz | 14548  |
+| 2       |  84ms |  770 Hz | 10587  |
+| 3       | 127ms |  687 Hz |  7533  |
+| 4       | 169ms |  557 Hz |  5706  |
+| 5       | 211ms |  770 Hz |  4673  |
+| 6       | 253ms |  947 Hz |  3471  |
+
+⇒ Noise burst avec fréquence centrale **descendante** initiale puis
+re-modulée. Notre `R6=3` (~651 Hz constant) reste un compromis acceptable
+mais pas parfait.
+
+### Explosions S/M/L — confirmation
+
+Profil RMS : impact initial aigu (917-1124 Hz, ~100 ms) puis **corps grave**
+(130-400 Hz) qui décroît sur 600-700 ms, puis fade. Les valeurs `R6=12/8/6`
+de l'étape 1 correspondent au **corps grave** (167/246/306 Hz), ce qui est
+le bon choix pour AY-3-8912 qui n'a pas d'enveloppe de pitch noise.
+
+### UFO — multiples bips sur 4 secondes
+
+Le fichier `asteroid-ufo.mp3` fait **4181 ms** ⇒ enregistrement de plusieurs
+bips successifs (l'UFO arcade émet en continu). Les bips individuels
+oscillent **700-1100 Hz**, donc nos valeurs `1259→879` (large) sont un
+poil trop aiguës. Acceptable mais pourrait être abaissé.
+
+---
 
 ---
 

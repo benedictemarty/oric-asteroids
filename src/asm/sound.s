@@ -360,26 +360,42 @@ _sound_play_fx:
 
         cmp  #FX_LIFE
         bne  @not_life
-        ; Extra ship — arcade : SWEEP descendant 2786 Hz → ~350 Hz, 136 ms.
-        ; Implémentation : table 4 periods, écrites par sound_tick dans
-        ; R0/R1 au fil des ticks. sweep_idx 0 = init (cet handler), 1..3 =
-        ; ticks suivants.
-        lda  life_per_lo
+        ; Extra ship — re-analysé depuis MP3 22 kHz arcade :
+        ; TONE PLATEAU à ~2956 Hz pendant ~85 ms puis fade-out rapide.
+        ; (Le sweep descendant déduit du .wav 11 kHz dégradé était faux.)
+        ;
+        ; Period 2956 Hz = 1 MHz / (16 × 2956) ≈ 21 = $0015.
+        ; Canal A en mode enveloppe pour fade-out naturel :
+        ;   R8 = $10 → vol piloté par enveloppe
+        ;   R11/R12 = $0080 → period 128 × 256 µs = 32.8 ms par phase
+        ;   R13 = $00 → shape \___ (decay puis hold à 0)
+        ; Timer = 4 frames (~160 ms à 25 Hz) — couvre attaque + fade.
+        ; sweep_idx mis à 4 pour court-circuiter le hook sweep sound_tick.
+        lda  #$15
         ldy  #0
-        jsr  _psg_write       ; period init (R0 lo)
-        lda  life_per_hi
+        jsr  _psg_write       ; R0 period lo
+        lda  #$00
         ldy  #1
-        jsr  _psg_write       ; period init (R1 hi)
-        lda  #$0C
+        jsr  _psg_write       ; R1 period hi
+        lda  #$10
         ldy  #8
-        jsr  _psg_write       ; vol A
-        lda  #$7E              ; mixer : tone A on, port A input
+        jsr  _psg_write       ; vol A en mode enveloppe
+        lda  #$80
+        ldy  #11
+        jsr  _psg_write       ; env period lo
+        lda  #$00
+        ldy  #12
+        jsr  _psg_write       ; env period hi
+        lda  #$00
+        ldy  #13
+        jsr  _psg_write       ; env shape : decay + hold
+        lda  #$7E             ; mixer : tone A on, port A input
         ldy  #7
         jsr  _psg_write
-        lda  #1
-        sta  sweep_idx          ; prochain tick utilisera life_per[1]
-        lda  #3
-        sta  _sfx_timer        ; 3 ticks restants après l'init (4 frames total)
+        lda  #4
+        sta  sweep_idx        ; ≥ 4 : pas de sweep dans sound_tick
+        lda  #4
+        sta  _sfx_timer
         jmp  @done
 @not_life:
 
