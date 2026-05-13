@@ -40,6 +40,31 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Sons raffinement — tables multi-segments arcade-fidèles ✅
+
+Strategy : à défaut de DAC (l'AY-3-8912 ne peut pas rejouer un sample
+PCM), reproduire le **profil temporel** de chaque effet via tables R6
+(noise) ou R0/R1, R4/R5 (tone) plus longues, appliquées au fil des
+ticks par le hook `sound_tick`.
+
+**Changements `sound.s`** :
+- `fire_noise_per[7]` : nouvelle table R6 = $02/$03/$03/$04/$03/$02/$01,
+  reproduit le sweep noise 1220→770→687→557→770→947→1753 Hz observé
+  arcade. FX_FIRE handler init R6 = $02, hook fait évoluer.
+- `bang_l_noise_per[2]`, `bang_m_noise_per[2]`, `bang_s_noise_per[2]` :
+  profil "impact aigu + corps grave". Frame 0 = R6 $02 (~1000 Hz),
+  Frame 1+ = R6 corps ($0C/$08/$06 selon taille = 167/246/306 Hz).
+  Plus authentique que noise constant.
+- `ufo_l_per[4]` : oscillation 1000/800/1000/800 Hz (bip-bip arcade).
+- `ufo_s_per[4]` : sweep MONTANT 700/1000/1100/1300 Hz.
+- Timers UFO portés à 4 ticks (au lieu de 3) pour parcourir 4 entries.
+
+**Refactor du switch dans `_sound_tick`** :
+- Le code grossissant, plusieurs `beq @sw_*` dépassaient le range
+  ±127 (branch out of range). Remplacés par pattern `bne local + jmp`
+  pour 9 cases : FIRE / EXPLODE / BANG_M / BANG_S / LIFE / THUMP /
+  THUMP_2 / UFO / UFO_SMALL.
+
 ### Sons fix — FX_LIFE tone plateau 2956 Hz (re-analyse MP3) ✅
 
 **Cause** : l'analyse FFT initiale utilisait les `.wav` 1994 (8-bit /

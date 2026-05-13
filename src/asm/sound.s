@@ -97,14 +97,38 @@ thump2_per_lo:
         .byte $E4, $2C
 thump2_per_hi:
         .byte $01, $03
+; UFO Large — oscillation 1000/800/1000/800 Hz (4 entries), bip-bip arcade.
+; Periods : 1000 Hz → $3E ; 800 Hz → $4E.
 ufo_l_per_lo:
-        .byte $31, $47
+        .byte $3E, $4E, $3E, $4E
 ufo_l_per_hi:
-        .byte $00, $00
+        .byte $00, $00, $00, $00
+; UFO Small — sweep MONTANT 700→1300 Hz (4 entries).
+; Periods : 700 Hz → $59 ; 1000 → $3E ; 1100 → $39 ; 1300 → $30.
 ufo_s_per_lo:
-        .byte $3F, $2E
+        .byte $59, $3E, $39, $30
 ufo_s_per_hi:
-        .byte $00, $00
+        .byte $00, $00, $00, $00
+
+; FX_FIRE noise sweep — table R6 (noise period) sur 7 ticks ≈ 280 ms.
+; Profil arcade MP3 (42 ms/segment) : 1220 / 770 / 687 / 557 / 770 / 947 / 1753 Hz
+; → R6 ≈ 2 / 3 / 3 / 4 / 3 / 2 / 1
+fire_noise_per:
+        .byte $02, $03, $03, $04, $03, $02, $01
+
+; Explosions — table R6 noise pour profil "impact aigu + corps grave".
+; Arcade : 1ère frame ~1000 Hz (R6=2), corps suivant ~150/250/300 Hz selon
+; taille (R6=12/8/6). 2 entries par taille, le hook sweep s'arrête à idx=2.
+;
+; bang_large : impact $02 puis corps $0C (167 Hz)
+; bang_med   : impact $02 puis corps $08 (246 Hz)
+; bang_small : impact $02 puis corps $06 (306 Hz)
+bang_l_noise_per:
+        .byte $02, $0C
+bang_m_noise_per:
+        .byte $02, $08
+bang_s_noise_per:
+        .byte $02, $06
 
 ;-----------------------------------------------------------------
 ; _psg_write — A = valeur, Y = numéro de registre
@@ -201,52 +225,55 @@ _sound_play_fx:
         lda  #$FF
         sta  VIA_DDRA
 
-        ; Cas FX_FIRE — arcade authentique (cf. docs/arcade-sounds-analysis.md)
-        ; NOISE 740 Hz, durée 267 ms ≈ 7 frames à 25 Hz. Pas de tone.
-        ; R6 noise period = 3 ⇒ freq = 1 MHz / (16 × 32 × 3) ≈ 651 Hz
-        ; (proche de 740 Hz, ajustement 1 cran plus aigu = R6=2 si trop grave).
+        ; Cas FX_FIRE — re-analyse MP3 22 kHz : noise SWEEP non-linéaire
+        ; (1220→770→687→557→770→947→1753 Hz) ≈ "psssht" qui module en
+        ; pitch. Table fire_noise_per[7] pilote R6 au fil des ticks.
         lda  _sfx_id
         cmp  #FX_FIRE
         bne  @not_fire
-        lda  #$03
+        lda  fire_noise_per           ; R6 init
         ldy  #6
-        jsr  _psg_write       ; noise period 3 (≈ 740 Hz)
+        jsr  _psg_write
         lda  #$0F
         ldy  #8
-        jsr  _psg_write       ; volume A max (fixe, pas d'enveloppe)
+        jsr  _psg_write       ; volume A max
         lda  #$47             ; mixer noise A only + port A input
         ldy  #7
         jsr  _psg_write
-        lda  #7
-        sta  _sfx_timer
+        lda  #1
+        sta  sweep_idx        ; tick suivant utilisera fire_noise_per[1]
+        lda  #6
+        sta  _sfx_timer       ; 6 ticks (+ init) = 7 frames
         jmp  @done
 @not_fire:
 
         cmp  #FX_EXPLODE
         bne  @not_explode_large
-        ; Large bang — noise R6=$0C (12) ≈ 167 Hz (arcade authentique).
-        lda  #$0C
+        ; Large bang — impact $02 (~1000 Hz) puis corps $0C (167 Hz).
+        lda  #$02              ; R6 impact aigu (entry 0 de bang_l)
         jmp  @bang_setup
 @not_explode_large:
 
         cmp  #FX_BANG_MEDIUM
         bne  @not_bang_med
-        ; Medium bang — noise R6=$08 (8) ≈ 246 Hz.
-        lda  #$08
+        ; Medium bang — impact $02 puis corps $08 (246 Hz).
+        lda  #$02
         jmp  @bang_setup
 @not_bang_med:
 
         cmp  #FX_BANG_SMALL
         bne  @not_bang_small
-        ; Small bang — noise R6=$06 (6) ≈ 306 Hz.
-        lda  #$06
+        ; Small bang — impact $02 puis corps $06 (306 Hz).
+        lda  #$02
 @bang_setup:
-        ; A = noise period (R6). Setup commun aux 3 explosions :
+        ; A = R6 impact ($02 pour tous). Setup commun :
         ; reg 7=$47 (mixer noise A+B+C + port A input), reg 10=$10
         ; (vol C en mode enveloppe), regs 11-12=$0038 (envelope period),
         ; reg 13=$00 (decay + hold à 0). Fade-out AY natif.
+        ; Le hook sweep dans sound_tick basculera vers le corps grave
+        ; à la frame suivante (entry 1 de la table selon FX_id).
         ldy  #6
-        jsr  _psg_write       ; noise period (varie selon taille)
+        jsr  _psg_write       ; noise period (impact = $02)
         lda  #$10              ; volume C en mode enveloppe
         ldy  #10
         jsr  _psg_write
@@ -262,6 +289,8 @@ _sound_play_fx:
         lda  #$47              ; mixer noise tous canaux + port A input
         ldy  #7
         jsr  _psg_write
+        lda  #1
+        sta  sweep_idx        ; next tick : corps grave (entry 1)
         lda  #25
         sta  _sfx_timer
         jmp  @done
@@ -417,8 +446,8 @@ _sound_play_fx:
         jsr  _psg_write
         lda  #1
         sta  sweep_idx        ; next tick uses ufo_l_per[1]
-        lda  #3
-        sta  _sfx_timer
+        lda  #4
+        sta  _sfx_timer       ; 4 ticks pour parcourir les 4 entries (~5 frames)
         jmp  @done
 @not_ufo_large:
 
@@ -439,8 +468,8 @@ _sound_play_fx:
         jsr  _psg_write
         lda  #1
         sta  sweep_idx
-        lda  #3
-        sta  _sfx_timer
+        lda  #4
+        sta  _sfx_timer       ; 4 ticks (~5 frames)
         jmp  @done
 @not_ufo_small:
 
@@ -482,17 +511,89 @@ _sound_tick:
         lda  _sfx_id
         ldx  sweep_idx
 
+        ; Switch sur _sfx_id vers la routine de sweep correspondante.
+        ; bne local + jmp à cause des distances qui peuvent dépasser 128.
+        cmp  #FX_FIRE
+        bne  @ck_bang_l
+        jmp  @sw_fire
+@ck_bang_l:
+        cmp  #FX_EXPLODE
+        bne  @ck_bang_m
+        jmp  @sw_bang_l
+@ck_bang_m:
+        cmp  #FX_BANG_MEDIUM
+        bne  @ck_bang_s
+        jmp  @sw_bang_m
+@ck_bang_s:
+        cmp  #FX_BANG_SMALL
+        bne  @ck_life
+        jmp  @sw_bang_s
+@ck_life:
         cmp  #FX_LIFE
-        beq  @sw_life
+        bne  @ck_thump1
+        jmp  @sw_life
+@ck_thump1:
         cmp  #FX_THUMP
-        beq  @sw_thump1
+        bne  @ck_thump2
+        jmp  @sw_thump1
+@ck_thump2:
         cmp  #FX_THUMP_2
-        beq  @sw_thump2
+        bne  @ck_ufo_l
+        jmp  @sw_thump2
+@ck_ufo_l:
         cmp  #FX_UFO
-        beq  @sw_ufo_l
+        bne  @ck_ufo_s
+        jmp  @sw_ufo_l
+@ck_ufo_s:
         cmp  #FX_UFO_SMALL
-        beq  @sw_ufo_s
+        bne  @sw_no_match
+        jmp  @sw_ufo_s
+@sw_no_match:
         jmp  @sw_done                 ; pas de sweep pour ce fx
+
+@sw_fire:
+        cpx  #7
+        bcc  @sw_fire_ok
+        jmp  @sw_done
+@sw_fire_ok:
+        lda  fire_noise_per,x
+        ldy  #6                        ; R6 = noise period
+        jsr  _psg_write
+        inc  sweep_idx
+        jmp  @sw_done
+
+@sw_bang_l:
+        cpx  #2
+        bcc  @sw_bang_l_ok
+        jmp  @sw_done
+@sw_bang_l_ok:
+        lda  bang_l_noise_per,x
+        ldy  #6
+        jsr  _psg_write
+        inc  sweep_idx
+        jmp  @sw_done
+
+@sw_bang_m:
+        cpx  #2
+        bcc  @sw_bang_m_ok
+        jmp  @sw_done
+@sw_bang_m_ok:
+        lda  bang_m_noise_per,x
+        ldy  #6
+        jsr  _psg_write
+        inc  sweep_idx
+        jmp  @sw_done
+
+@sw_bang_s:
+        cpx  #2
+        bcc  @sw_bang_s_ok
+        jmp  @sw_done
+@sw_bang_s_ok:
+        lda  bang_s_noise_per,x
+        ldy  #6
+        jsr  _psg_write
+        inc  sweep_idx
+        jmp  @sw_done
 
 @sw_life:
         cpx  #4
@@ -531,7 +632,7 @@ _sound_tick:
         jmp  @sw_done
 
 @sw_ufo_l:
-        cpx  #2
+        cpx  #4
         bcs  @sw_done
         lda  ufo_l_per_lo,x
         ldy  #4
@@ -543,7 +644,7 @@ _sound_tick:
         jmp  @sw_done
 
 @sw_ufo_s:
-        cpx  #2
+        cpx  #4
         bcs  @sw_done
         lda  ufo_s_per_lo,x
         ldy  #4
