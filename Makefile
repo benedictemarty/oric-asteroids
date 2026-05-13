@@ -59,12 +59,19 @@ REF_SHOT       = tests/ref/phase9_release.ppm
 BENCH_CYCLES   = $(shell echo $$(($(FASTLOAD_DONE) + 25000000)))
 BENCH_PROF     = tests/out/phase6_bench.prof
 
-# Inputs scriptés Phase 3 :
-#   après 3.5M cycles : CALL 1280 (lance le jeu)
-#   après 4.0M cycles : appui RIGHT ARROW (tourne 0.5 s)
-#   après 4.5M cycles : appui UP ARROW (thrust)
-#   après 5.5M cycles : appui SPACE (tir)
-TEST_INPUT     = "$(FASTLOAD_DONE):CALL $(LOAD_ADDR)\n"
+# Inputs scriptés.
+#
+# Phosphoric v1.16.9+ : autorun $C7 du .tap + délai fast-load 5M cycles
+# ⇒ le binaire s'auto-exécute proprement (VIA/ULA stables au démarrage).
+# Pas de CALL 1280 nécessaire — et CALL ne marcherait pas sur BASIC 1.0
+# Oric-1 de toute façon (ROM Tangerine : ILLEGAL QUANTITY ERROR sur
+# tout argument numérique, cf. docs/phosphoric-autorun-timing.md).
+#
+# TEST_INPUT = "0:\n" est un placeholder vide (format cycles:texte exigé
+# par --type-keys ; juste un ENTER au tick 0, sans effet sur le binaire
+# qui a déjà la main). Pour scripter SPACE/touches en bench gameplay,
+# redéfinir au cas par cas.
+TEST_INPUT     = "0:\n"
 
 .PHONY: all clean run test ref check bench gen_ship host-test
 
@@ -163,13 +170,11 @@ $(BIN): $(OBJS) $(CFG)
 $(TAP): $(BIN)
 	$(BIN2TAP) $(BIN) --start $(LOAD_ADDR) --exec $(EXEC_ADDR) \
 	           --name "$(PROJECT)" -o $@
-	@# Désactive le flag autorun (byte 7 = $C7 → $00) sur le .tap
-	@# produit par bin2tap Phosphoric v1.16.3+. L'auto-exec déclenche le
-	@# code AVANT que la ROM Oric ait fini ses inits VSync/PCR ⇒ glitch
-	@# graphique et frame_wait bloqué. Avec autorun off, le user tape
-	@# CALL 1280 manuellement → la ROM est dans son état stable.
-	@python3 -c "import sys; d=open('$@','r+b'); d.seek(7); d.write(b'\x00'); d.close()"
-	@echo ">>> $(TAP) prêt (autorun désactivé — taper CALL 1280)"
+	@# Phosphoric v1.16.9+ : délai fast-load auto-exec porté à 5M cycles
+	@# (la ROM atteint READY ~3.6M, donc 5M garantit VIA/ULA stables).
+	@# L'autorun ($C7) peut rester actif. Pour debug, ajouter --no-autorun
+	@# à bin2tap (option v1.16.9+) ou lancer sans -f (auto-CLOAD via ROM).
+	@echo ">>> $(TAP) prêt (autorun \$$C7 actif — auto-exec à 5M cycles)"
 
 run: $(TAP)
 	$(EMU) -m oric1 -r $(ROM) -t $(TAP) -f \
