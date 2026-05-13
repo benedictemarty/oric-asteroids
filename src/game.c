@@ -827,10 +827,11 @@ void game_run(void)
         static unsigned char prompt_drawn = 0;     /* PRESS SPACE + OR ESC */
         key_scan();
 
-        if (gameover && !prev_gameover) {
-            gameover_lock = 125;       /* 5 s à 25 Hz */
-            gameover_armed = 1;        /* exiger relâchement avant prochain appui */
-        }
+        /* Note : la transition gameover=0→1 se produit DANS la frame
+         * courante (bloc ship, collisions), pas avant. Donc à cette
+         * ligne, gameover est encore à sa valeur de fin-de-frame N-1.
+         * Le vrai check de transition est plus bas (ligne ~1023), où
+         * on initialise aussi gameover_lock + gameover_armed. */
 
         /* Désarmer le wait-release uniquement quand le lock est terminé
          * ET SPACE/ESC sont relâchés. Tant que l'utilisateur maintient
@@ -1016,14 +1017,19 @@ void game_run(void)
         }
         sound_tick();
 
-        /* Passage en game over → insertion hi-scores + clean UFO.
-         * hiscore_pos enregistre le rang d'insertion (0..5) ou 0xFF si
-         * le score n'entre pas dans le top — utilisé par la prochaine
-         * étape pour décider d'afficher l'écran saisie pseudo. */
+        /* Passage en game over → insertion hi-scores + clean UFO +
+         * armement du lock 5 s et du wait-release. C'est ICI que la
+         * transition est correctement détectée : la collision (qui
+         * set gameover=1) s'est produite plus tôt dans cette même
+         * frame, et prev_gameover est encore à sa valeur N-1 (=0).
+         * Le hiscore_pos enregistre le rang d'insertion (0..5) ou
+         * 0xFF si le score n'entre pas dans le top. */
         if (gameover && !prev_gameover) {
             final_score = score;
             new_hiscore_pos = hiscores_insert(final_score);
             ufo_kill();
+            gameover_lock = 125;       /* 5 s à 25 Hz */
+            gameover_armed = 1;        /* exiger relâchement SPACE/ESC */
         }
         prev_gameover = gameover;
 

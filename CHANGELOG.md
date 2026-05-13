@@ -40,6 +40,29 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Fix — game over lock jamais armé (bug du séquencement) ✅
+
+**Symptôme** : malgré le séquencement supposé (Phase 1 explosion seule,
+Phase 2 GAME OVER + HoF, Phase 3 prompt), **tout s'affichait toujours
+simultanément** à la mort.
+
+**Cause** : le check `if (gameover && !prev_gameover) { gameover_lock = 125; }`
+était placé en **haut de boucle** (ligne 830), AVANT le bloc ship qui
+contient `collisions_ship_asteroids` → c'est dans cette collision que
+`gameover` passe à 1. Conséquence :
+- Frame N (mort) : ligne 830 → `gameover=0` encore → condition false.
+  Plus tard dans la frame, collision set `gameover=1`. À la fin de
+  frame, ligne 1028 set `prev_gameover = gameover = 1`.
+- Frame N+1 : ligne 830 → `gameover=1, prev_gameover=1` → condition
+  false. **`gameover_lock` reste à 0** → tout s'affiche tout de suite.
+
+**Fix** : déplacer l'init de `gameover_lock = 125` et `gameover_armed = 1`
+**au check qui détecte vraiment la transition** (ligne ~1023, juste avant
+`prev_gameover = gameover`). À cet endroit, `gameover=1` (set dans la
+frame courante) et `prev_gameover=0` encore — la condition s'évalue
+correctement. Le check du haut de boucle (ligne 830) est devenu un
+commentaire explicatif.
+
 ### Tune — game over : séquencer explosion → GAME OVER + HoF ✅
 
 **Symptôme** : à la mort du dernier vaisseau, tout s'affichait
