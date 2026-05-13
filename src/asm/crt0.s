@@ -29,11 +29,11 @@ start:
         ; Cleanup (destructeurs CONDES)
         jsr     donelib
 
-        ; Retour au BASIC — JMP vecteur RESET ROM. La ROM ré-init
-        ; le hardware (mode TEXT, clavier, etc.) et arrive au prompt READY.
-        ;
-        ; ATTENTION — Oric-1 ONLY ! Vecteur reset diffère sur Atmos :
-        ;   Oric-1 BASIC 1.0/1.1 : $F800
-        ;   Atmos BASIC 1.1      : $F88F (ou $FAA5 selon contexte)
-        ; Un futur port Atmos devra conditionner cette adresse.
-        jmp     $F800
+        ; Retour au BASIC — JMP indirect via vecteur RESET hardware
+        ; ($FFFC/$FFFD). Convention 6502 : pointe vers le cold-start
+        ; spécifique de la machine. Portable Oric-1 / Atmos sans
+        ; détection runtime :
+        ;   Oric-1 BASIC 1.0/1.1 : $FFFC/$FFFD = $00/$F8 → reset $F800
+        ;   Atmos  BASIC 1.1     : $FFFC/$FFFD = $8F/$F8 → reset $F88F
+        ; Pas de bug NMOS 6502 JMP indirect : $FFFC n'est pas en $xxFF.
+        jmp     ($FFFC)

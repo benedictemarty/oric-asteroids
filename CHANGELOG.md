@@ -7,6 +7,28 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Portabilité — `crt0.s` : retour BASIC via vecteur RESET hardware
+
+**Changement** : `crt0.s:39` `JMP $F800` → `JMP ($FFFC)`.
+
+**Pourquoi** : `$F800` est le vecteur reset spécifique Oric‑1 BASIC 1.0/1.1.
+Sur Atmos BASIC 1.1, le vecteur est `$F88F`. `$FFFC/$FFFD` (vecteur reset
+hardware, convention 6502) pointe vers le bon cold‑start sur n'importe
+quelle machine de la famille Oric sans détection runtime :
+- Oric‑1 BASIC 1.0/1.1 : `$FFFC/$FFFD = $00/$F8` → `$F800` ✓
+- Atmos BASIC 1.1     : `$FFFC/$FFFD = $8F/$F8` → `$F88F` ✓
+
+Test Phosphoric headless 10M cycles :
+- ✅ Oric‑1 (`-m oric1 -r basic10.rom`) : écran titre ASTEROIDS rendu OK
+- ✅ Atmos (`-m atmos -r basic11b.rom`) : pas de régression (le binaire
+  charge et exécute, PC dans le code asteroids)
+
+**Bug Atmos résiduel (NON traité par ce changement)** : sur Atmos, le
+rendu HIRES affiche un pattern régulier de points au lieu de l'écran
+titre. Reproduit avec le binaire AVANT et APRÈS la modif `JMP ($FFFC)`.
+Cause à investiguer (peut-être init `_hires_init` ou autorun `$C7` qui
+diffère côté BASIC 1.1 Atmos). Voir `docs/notes/atmos-hires-bug.md`.
+
 ## [1.2.10] - 2026-05-13
 
 ### Fix — frame_wait : Timer 1 free-run au lieu de CB1 (VSync hardware-réel) ✅
