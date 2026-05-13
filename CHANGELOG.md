@@ -7,6 +7,29 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Documentation — glitch zone TEXT du bas en HIRES (à reporter à Phosphoric)
+
+**Symptôme** : au passage en mode HIRES, les 3 lignes texte du bas
+(scanlines 200-223) affichent un pattern de "lignes verticales"
+glitché sur fond blanc, au lieu d'être noires ou de conserver le
+texte BASIC initial.
+
+**Investigation** : tentative d'effacement à `$BF68-$BFDF` (candidat
+naturel = 3 dernières lignes du screen TEXT) — n'a affecté que la
+première cellule de chaque ligne. La zone TEXT du bas semble lue
+ailleurs (probablement `$BB80-$BBF7`, dans la zone HIRES qui contient
+des `$40` = caractère `'@'`).
+
+**Pas de fix appliqué côté projet** : un effacement de `$BB80-$BBF7`
+polluerait 3 scanlines HIRES (176-178) avec des pixels parasites
+dans la zone de jeu (1 px / cellule de 6 px sur la largeur). On
+préfère préserver la zone HIRES propre.
+
+**Action** : rapport rédigé pour l'équipe Phosphoric
+(`docs/phosphoric-hires-text-glitch.md`) avec reproduction minimale,
+hypothèses et demandes. Commentaire détaillé dans `src/asm/line.s`
+au niveau de `_hires_init`.
+
 ### Fix — écran titre attend vraiment SPACE (suppression timeout) ✅
 
 **Symptôme** : au lancement du jeu, l'écran titre se fermait

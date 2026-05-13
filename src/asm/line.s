@@ -104,6 +104,29 @@ _hires_init:
         bne  @clr_tail
         rts
 
+        ; ----------------------------------------------------------------
+        ; NOTE — Zone TEXT du bas en mode HIRES Oric :
+        ;
+        ; Les 24 scanlines du bas (200-223) affichent 3 lignes texte de
+        ; caractères. Sur Phosphoric, ces lignes apparaissent altérées
+        ; (pattern de lignes verticales / "glitch") après notre passage
+        ; en HIRES, indépendamment du contenu mémoire qu'on écrit à
+        ; $BF68-$BFDF (lignes texte 25-27 du screen TEXT, candidat
+        ; naturel).
+        ;
+        ; Investigation empirique (cf. docs/phosphoric-hires-text-glitch.md) :
+        ; écrire $20 (espace) dans $BF68-$BFDF n'efface que la 1re cellule
+        ; visible — la suite garde le pattern du remplissage HIRES ($40).
+        ; Hypothèse : l'ULA Oric (ou l'émulation Phosphoric) lit la zone
+        ; TEXT du bas depuis une adresse qui chevauche la zone HIRES
+        ; ($BB80-$BBF7), créant un conflit RAM. $40 en TEXT = '@', d'où
+        ; le pattern visible.
+        ;
+        ; Bug reporté à l'équipe Phosphoric — pas de fix possible côté
+        ; ROM Oric standard sans polluer la zone HIRES par 1 px/cellule
+        ; sur les lignes 176-178. Comportement laissé en l'état.
+        ; ----------------------------------------------------------------
+
 ;-----------------------------------------------------------------
 ; _draw_line_xor — Bresenham XOR entre (_lx0,_ly0) et (_lx1,_ly1)
 ;
