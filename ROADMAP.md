@@ -57,6 +57,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 19 | Vaisseau arcade-fidèle (5 segments avec barre cockpit + encoches) (v1.2.9) | — | 1 j |
 | ✅ | 20 | Player AY sous IRQ Timer 1 (50 Hz, libère CPU main loop) | — | 1 j |
 | ✅ | 21 | Enveloppe AY (R11-R13) — decay naturel HYPER/THUMP | — | 1 j |
+| ✅ | 21b | Fix régression Phase 20 — sound_tick à 25 Hz effectif (1 IRQ/2) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.

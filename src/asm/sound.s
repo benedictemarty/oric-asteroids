@@ -528,16 +528,26 @@ _sound_play_fx:
         rts
 
 ;-----------------------------------------------------------------
-; _sound_tick — appelé chaque frame de jeu
+; _sound_tick — appelé par _irq_handler à 50 Hz (Phase 20).
 ;
-; Si sfx_id != 0, décrémente timer.
-; Quand timer = 0 : coupe le son (mixer = $7F, volumes = 0).
-; Phase 8 : pas d'enveloppe progressive, juste cut net.
+; Phase 21b — fix régression Phase 20 : tous les _sfx_timer ont été
+; calibrés pour un sound_tick à 25 Hz (durées exprimées en frames).
+; Depuis Phase 20, sound_tick tourne à 50 Hz → toutes les durées
+; étaient divisées par 2 (explosion ship ~500 ms au lieu d'1 s,
+; trop court pour être perçu une fois l'enveloppe AY déclenchée).
+;
+; Fix : skip 1 IRQ sur 2 via le LSB de _frame_cnt → cadence effective
+; 25 Hz comme avant, mais le main loop reste libéré (handler IRQ minimal).
 ;-----------------------------------------------------------------
 _sound_tick:
+        lda  _frame_cnt
+        and  #1
+        bne  @tick_skip            ; IRQ impaire → skip
         lda  _sfx_id
         bne  @go_sweep
         jmp  @no_sfx
+@tick_skip:
+        rts
 @go_sweep:
 
         ; ==============================================================

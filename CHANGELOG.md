@@ -7,6 +7,38 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 21b — Fix régression Phase 20 : `sound_tick` 25 Hz effectif ✅
+
+**Symptôme** (signalé utilisateur) : pas de son d'explosion quand le
+vaisseau explose.
+
+**Cause racine** : Phase 20 a déplacé `sound_tick()` sous IRQ T1 à
+**50 Hz**, alors que tous les `_sfx_timer` sont calibrés en "frames
+25 Hz". Conséquence : toutes les durées audio ont été divisées par 2.
+FX_EXPLODE (25 ticks) passait de ~1 s à ~500 ms. Combiné à l'enveloppe
+AY de Phase 21 qui démarre à volume max sur le canal C (cf. mixer
+`$47` noise A+B+C), le son devient imperceptible une fois le visuel
+ship terminé.
+
+**Fix** : skip `sound_tick` 1 IRQ sur 2 via `_frame_cnt LSB`. Cadence
+effective = 25 Hz comme avant Phase 20, mais le main loop reste
+libéré (IRQ handler appelle `sound_tick` toujours à 50 Hz, et
+`sound_tick` early-return immédiatement la moitié du temps).
+
+`src/asm/sound.s::_sound_tick` :
+```asm
+        lda  _frame_cnt
+        and  #1
+        bne  @tick_skip      ; IRQ impaire → skip
+        ; ... décrément timer, sweep, etc.
+@tick_skip:
+        rts
+```
+
+Coût ajouté par tick : ~9 cycles (lda zp + and + bne + rts). Négligeable.
+
+Smoke test : 493 IRQ-ENTRY inchangé, tests host 4/4 PASS.
+
 ### Phase 21 — Enveloppe AY pour decay naturel sur FX_HYPER / FX_THUMP ✅
 
 Active l'enveloppe matérielle AY-3-8912 (registres R11/R12 période,
