@@ -175,7 +175,11 @@ static unsigned char wave_displayed;
  * SÉQUENTIELLE — les fragments disparaissent un par un dans le temps,
  * conformément au comportement arcade rev 4. */
 #define DEBRIS_COUNT      6
-#define DEBRIS_TTL        30    /* arcade tronqué : 30/25/20/15/10/5 frames @ 25 Hz */
+/* Phase 19+ : DEBRIS_TTL augmenté à 60 (2.4 s à 25 Hz) — l'animation
+ * à 30 frames passait trop vite, l'utilisateur ne percevait pas le
+ * vaisseau exploser. Séquence séquentielle 60/55/50/45/40/35 frames :
+ * fragment 0 dure 2.4 s, fragment 5 dure 1.4 s. */
+#define DEBRIS_TTL        60
 
 /* Vélocités exactes ShipExpVelTbl arcade rev 4 ($50EC), nibbles haut
  * sign-extended. Chaque pair = (vx, vy) pour un fragment. */
@@ -1028,7 +1032,7 @@ void game_run(void)
             final_score = score;
             new_hiscore_pos = hiscores_insert(final_score);
             ufo_kill();
-            gameover_lock = 125;       /* 5 s à 25 Hz */
+            gameover_lock = 150;       /* 6 s à 25 Hz : 2.4s explosion + 3.6s lecture */
             gameover_armed = 1;        /* exiger relâchement SPACE/ESC */
         }
         prev_gameover = gameover;
@@ -1046,16 +1050,16 @@ void game_run(void)
 
         hud_draw();
 
-        /* Séquencement écran game over :
-         *   Phase 1 (lock 125→96, ~30 frames ≈ 1.2 s) : explosion debris
-         *     seule à l'écran — laisse le joueur voir mourir son ship.
-         *   Phase 2 (lock ≤ 95) : ajout de GAME OVER + HIGH SCORES.
-         *     Les debris ont fini leur animation (TTL max = 30 frames).
-         *   Phase 3 (lock = 0 ET wait-release OK) : prompt "PRESS SPACE
-         *     / OR ESC TO STOP" accepté.
-         * Évite l'effet "tout s'affiche d'un coup" qui était visuellement
-         * surchargé (debris + GAME OVER + HoF en même temps). */
-        if (gameover && gameover_lock <= 95) {
+        /* Séquencement écran game over (lock 150 = 6 s à 25 Hz) :
+         *   Phase 1 (lock 150→91, ~60 frames ≈ 2.4 s) : explosion debris
+         *     seule — fragment 0 dure 60 frames (DEBRIS_TTL), durée
+         *     suffisante pour bien percevoir l'animation.
+         *   Phase 2 (lock ≤ 90, ~90 frames ≈ 3.6 s) : + GAME OVER + HoF.
+         *   Phase 3 (lock = 0 ET wait-release OK) : + prompt "PRESS
+         *     SPACE / OR ESC TO STOP".
+         * Évite l'effet "tout s'affiche d'un coup" et donne à l'animation
+         * d'explosion le temps de se développer. */
+        if (gameover && gameover_lock <= 90) {
             if (hiscores_drawn) hiscores_draw_table();
             if (gameover_text_drawn) gameover_erase();
             hiscores_draw_table();

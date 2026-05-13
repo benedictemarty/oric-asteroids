@@ -40,6 +40,24 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Tune — explosion ship plus longue + ajustement séquencement ✅
+
+**Symptôme** (suite au fix du lock placement) : malgré le séquencement
+fonctionnel, l'utilisateur ne percevait pas le vaisseau exploser —
+l'animation était trop brève (1.2 s à `DEBRIS_TTL = 30`).
+
+**Fix** :
+- `DEBRIS_TTL` 30 → **60 frames** (2.4 s à 25 Hz). Séquence séquentielle
+  60/55/50/45/40/35 : fragment 0 dure 2.4 s, fragment 5 dure 1.4 s.
+- `gameover_lock` 125 → **150 frames** (6 s total) pour s'adapter.
+- Condition Phase 2 : `lock ≤ 95` → `lock ≤ 90` (= 60 frames de
+  Phase 1 explosion).
+
+Séquence finale post-mort :
+- **Phase 1** (0 → 2.4 s) : animation debris seule, bien visible.
+- **Phase 2** (2.4 s → 6 s) : ajout GAME OVER + HIGH SCORES.
+- **Phase 3** (6 s + wait-release) : + prompt "PRESS SPACE".
+
 ### Fix — game over lock jamais armé (bug du séquencement) ✅
 
 **Symptôme** : malgré le séquencement supposé (Phase 1 explosion seule,
