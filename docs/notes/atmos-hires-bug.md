@@ -72,3 +72,49 @@ Bug reproduit aussi bien avec `JMP $F800` (ancien crt0) qu'avec
 **Différé.** Le projet cible Oric‑1 48 Ko nominal (cf. CLAUDE.md).
 La compat Atmos est un bonus, pas un objectif primaire. Ce bug n'empêche
 pas de tagger le fix vecteur reset comme amélioration de portabilité.
+
+## Investigation 2026-05-13 — découvertes
+
+**Forme exacte du pattern** :
+- Lignes HIRES 7, 15, 23, 31, …, 191 (multiples de 8, +7) : 80 pixels
+  blancs sur 240 = 1 pixel sur 3.
+- Chaque byte de ces lignes vaut **`$4C`** (= opcode 6502 `JMP abs`,
+  bits 6, 3, 2 set → safety + 2 pixels au milieu de chaque sextet).
+- Autres lignes : `$40` (vide) comme attendu.
+- Lignes 192-199 (zone TEXT du bas) : entièrement blanches (autre
+  symptôme, à investiguer séparément).
+
+Décodage : chaque ligne "spike" contient 40 octets `$4C` consécutifs
+(une ligne HIRES complète). Période = 320 octets (= 8 × 40) en RAM
+HIRES, c.-à-d. **toutes les 8 scanlines HIRES**.
+
+**Tests croisés model × ROM** (Phosphoric v1.16.11-alpha) :
+
+| `-m` | ROM | Résultat 25M cycles |
+|---|---|---|
+| `oric1` | `basic10.rom` (Oric-1 BASIC 1.0) | ✅ Titre ASTEROIDS rendu OK |
+| `atmos` | `basic11b.rom` (Atmos BASIC 1.1) | ❌ Pattern `$4C` toutes les 8 lignes |
+| `atmos` | `basic10.rom` | ✅ Pas de pattern (boot lent mais OK) |
+| `oric1` | `basic11b.rom` | ✅ Pas de pattern (boot lent mais OK) |
+
+→ Bug **isolé à la combo `-m atmos -r basic11b.rom`** uniquement.
+N'apparaît pas si on swap soit le model, soit la ROM.
+
+**Test SEI + IER disable au boot (`crt0.s`)** : pas d'effet sur le
+pattern Atmos, et **cause une régression Oric-1** (écran titre ne
+s'affiche plus). Le code aval dépend de l'état IRQ laissé par la ROM.
+Piste écartée — la cause **n'est pas une IRQ ROM** qui ré-écrirait le
+HIRES, et désactiver les IRQ au crt0 casse autre chose.
+
+**Hypothèses restantes** :
+1. **Timing autorun `$C7`** : sur Atmos+atmos_rom, le binaire est
+   peut-être exécuté pendant qu'un splash HIRES ROM est en cours de
+   rendu, et notre `_hires_init` cohabite avec une routine ROM résidente.
+2. **Comportement ULA Atmos émulé** : Phosphoric `-m atmos` modélise
+   peut-être un raster effect ou un wait-state HIRES propre à l'Atmos.
+3. **Fast-load Phosphoric** : `-f` injecte le binaire en RAM mais peut
+   laisser des résidus en mode `-m atmos`.
+
+**Validation potentielle hors Phosphoric** : tester `asteroids.tap`
+sur Oricutron en mode Atmos et/ou sur hardware Atmos réel pour
+déterminer si c'est un bug Phosphoric ou un vrai problème de portage.
