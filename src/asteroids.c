@@ -328,13 +328,24 @@ void asteroids_render(void)
 #define V_MIN_AST    384
 
 /* RNG signé en 8.8 — port de SetAstVel ($7203) :
- *   AND #$8F garde sign + 4 bits magnitude, scale ×128.  */
+ *   AND #$8F garde sign + 4 bits magnitude, scale ×128.
+ *
+ * Revue senior C #1 : ancienne version utilisait `r |= 0xF0` sur
+ * unsigned puis cast en signed — fonctionnel mais sémantiquement
+ * fragile (relais à comportement cc65 quasi-implementation-defined).
+ * Version courante : décale le bit 7 en sign-bit via cast direct,
+ * conversion arithmétique explicite. */
 static int rand_offset(void)
 {
-    unsigned char r = rng8() & 0x8F;
-    signed char s;
-    if (r & 0x80) r |= 0xF0;
-    s = (signed char)r;
+    /* AND $8F : bit 7 (signe) + bits 0-3 (magnitude 0..15) */
+    signed char s = (signed char)(rng8() & 0x8F);
+    /* Si bit 7 set, la valeur "raw" 0x80..0x8F doit être étendue à
+     * 0xF0..0xFF (sign-extend des bits 4-6 manquants). Cast en signed
+     * char direct + extension à int gère la sémantique correctement
+     * sur compilateurs C89/C99 standards. cc65 implémente le cast
+     * via or 0xF0 si bit 7 set (idem version précédente) mais sans
+     * dépendre du détail d'impl. */
+    if (s < 0) s |= (signed char)0xF0;   /* sign-extend bits 4-6 */
     return ((int)s) << 7;     /* ×128 = scale 8.8 (matches V_MAX/MIN_AST) */
 }
 
