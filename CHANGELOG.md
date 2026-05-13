@@ -40,6 +40,55 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Sons étape 4 — FX_THUMP sweep Beat1 + alternance Beat2 ✅
+
+L'arcade alterne 2 cadences de "thump" très proches (beat1 134→81 Hz
+et beat2 129→77 Hz, ~74-78 ms chacune), donnant la pulsation
+"THUMP-thump-THUMP-thump" caractéristique. Notre `FX_THUMP` était un
+tone B statique 8 frames, sans sweep ni alternance.
+
+**Implémentation** :
+- 2 tables RODATA (`thump1_per_*` et `thump2_per_*`, 2 entries chacune).
+- `FX_THUMP` (3) = Beat1 (handler refait, sweep via hook tick).
+- `FX_THUMP_2` (10) = Beat2 (handler identique, table différente).
+- Timer = 2 (init + 1 sweep + decay ≈ 3 frames ≈ 120 ms).
+- `game.c` : variable static `thump_toggle` alterne entre FX_THUMP et
+  FX_THUMP_2 à chaque cycle de thump.
+
+### Sons étape 5 — FX_UFO S/L différenciés (sweep) ✅
+
+Arcade : large UFO = sweep **descendant** 1259→879 Hz (menaçant) ;
+small UFO = sweep **MONTANT** 983→1354 Hz (nerveux). Notre `FX_UFO`
+était un bip statique tone C grave $C0, identique pour les 2 types.
+
+**Implémentation** :
+- 2 tables RODATA (`ufo_l_per_*` et `ufo_s_per_*`, 2 entries chacune).
+- `FX_UFO` (7) renommé conceptuellement en "large UFO" — handler refait
+  pour utiliser `ufo_l_per`.
+- `FX_UFO_SMALL` (11) = sweep montant via `ufo_s_per`.
+- `game.c` : choisit `FX_UFO` ou `FX_UFO_SMALL` selon `ufo_type`.
+
+### Sons étape 6 — FX_THRUST tone 82 Hz arcade-fidèle ✅
+
+Arcade : thrust = TONE grave 82 Hz, 288 ms (rumble caractéristique).
+Notre version Mine Storm SS.THR mélangeait tone A grave + noise tous
+canaux — son "vrombissement spatial" générique, pas du tout 82 Hz.
+
+**Implémentation `sound.s FX_THRUST`** :
+- R0/R1 = period $02FA (82.05 Hz à 1 MHz / (16 × 762)).
+- R7 = $7E mixer **tone A only** + port A input (suppression noise).
+- R8 = $0E vol A presque max.
+- Timer = 7 frames (~280 ms vs 288 ms arcade). Re-déclenché par game.c
+  pendant que UP est maintenu (effet continu).
+
+### Refactor sound_tick : hook sweep générique
+
+Refactor avant les étapes 4-5 : variable ZP `life_idx` renommée
+`sweep_idx` (générique). Hook unique dans `_sound_tick` qui switche
+sur `_sfx_id` pour choisir la bonne table et le bon canal (R0/R1
+pour LIFE, R2/R3 pour THUMP_*, R4/R5 pour UFO_*). Évite la duplication
+SEI/CLI et le code dispersé.
+
 ### Sons étape 3 — FX_LIFE sweep descendant 2786→348 Hz ✅
 
 L'arcade Asteroids fait un **whoosh descendant** (extraShip = SWEEP

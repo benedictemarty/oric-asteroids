@@ -1065,19 +1065,26 @@ void game_run(void)
         if (!gameover && sfx_id == FX_NONE) {
             if (ufo_active) {
                 if (ufo_sound_timer == 0) {
-                    sound_play_fx(FX_UFO);
+                    /* Étape sons 5 : différencier S/L UFO selon ufo_type
+                     * (large = sweep descendant menaçant, small = sweep
+                     * montant nerveux). */
+                    sound_play_fx(ufo_type == UFO_LARGE ? FX_UFO : FX_UFO_SMALL);
                     ufo_sound_timer = UFO_SOUND_PERIOD;
                 } else {
                     ufo_sound_timer--;
                 }
             } else if (thump_timer == 0) {
+                static unsigned char thump_toggle = 0;   /* alterne Beat1/Beat2 */
                 unsigned char n = asteroids_count();
                 unsigned char period;
                 if (n >= 8)      period = THUMP_PERIOD_BASE;
                 else if (n >= 4) period = THUMP_PERIOD_BASE - 8;
                 else if (n >= 2) period = THUMP_PERIOD_BASE - 16;
                 else             period = THUMP_PERIOD_MIN;
-                sound_play_fx(FX_THUMP);
+                /* Étape sons 4 : alternance Beat1/Beat2 arcade-fidèle
+                 * (THUMP-thump-THUMP-thump). */
+                sound_play_fx(thump_toggle ? FX_THUMP_2 : FX_THUMP);
+                thump_toggle = !thump_toggle;
                 thump_timer = period;
             } else {
                 thump_timer--;

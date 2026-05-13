@@ -18,6 +18,9 @@
 #define FX_UFO          7   /* UFO bip-bip          (~4 frames, re-déclenché) */
 #define FX_BANG_MEDIUM  8   /* explosion MEDIUM     (~25 fr, noise R6=8  ≈246 Hz arcade) */
 #define FX_BANG_SMALL   9   /* explosion SMALL      (~22 fr, noise R6=6  ≈306 Hz arcade) */
+#define FX_THUMP_2     10   /* thump cadencé Beat2  (sym. Beat1, sweep 129→77 Hz) */
+#define FX_UFO_SMALL   11   /* UFO small bip       (sweep MONTANT 983→1354 Hz)   */
+/* FX_THUMP (3) = Beat1 (sweep 134→81 Hz) ; FX_UFO (7) = large UFO (sweep 1259→879 Hz) */
 
 extern unsigned char sfx_id;
 extern unsigned char sfx_timer;

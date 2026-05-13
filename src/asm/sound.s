@@ -48,6 +48,9 @@
         FX_UFO         = 7    ; Phase 10n — bip-bip UFO (canal C, re-déclenché)
         FX_BANG_MEDIUM = 8    ; Étape sons 1 — medium bang (R6=8, ≈246 Hz)
         FX_BANG_SMALL  = 9    ; Étape sons 1 — small bang  (R6=6, ≈306 Hz)
+        FX_THUMP_2     = 10   ; Étape sons 4 — Beat2 (sym. au FX_THUMP/Beat1)
+        FX_UFO_SMALL   = 11   ; Étape sons 5 — petit UFO (sweep MONTANT)
+        ; Note : FX_THUMP (3) = Beat1 ; FX_UFO (7) = large UFO (sweep descendant)
 
 ;-----------------------------------------------------------------
 ; Variables ZP
@@ -56,22 +59,52 @@
 _sfx_id:    .res 1
 _sfx_timer: .res 1
 sound_tmp:  .res 1
-life_idx:   .res 1     ; index sweep FX_LIFE (0=init, 1..3=ticks)
+sweep_idx:  .res 1     ; index générique des sweeps (FX_LIFE / FX_THUMP / FX_UFO)
 
 ;-----------------------------------------------------------------
-; Tables RODATA — sweep FX_LIFE
+; Tables RODATA — sweeps arcade-fidèles (cf. docs/arcade-sounds-analysis.md)
 ;
-; Period AY = 1 MHz / (16 × freq_Hz). 4 valeurs descendantes :
-;   index 0 : 2786 Hz → period $0016 (init dans play_fx)
-;   index 1 : 1393 Hz → period $002D
-;   index 2 :  696 Hz → period $005A
-;   index 3 :  348 Hz → period $00B3
+; Period AY = 1 MHz / (16 × freq_Hz). Toutes les tables sont indexées
+; par sweep_idx. Index 0 = valeur initiale (écrite par play_fx), index N
+; = valeur appliquée au tick N par sound_tick. Au-delà du max, sweep
+; arrêté (period reste figée jusqu'au timeout du fx).
+;
+; FX_LIFE (canal A, R0/R1, 4 entries) — extra ship whoosh descendant :
+;   0: 2786 Hz / 1: 1393 Hz / 2: 696 Hz / 3: 348 Hz
+;
+; FX_THUMP (canal B, R2/R3, 2 entries) — beat1, 134→81 Hz :
+;   0: period $01D2 / 1: $0304
+;
+; FX_THUMP_2 (canal B, R2/R3, 2 entries) — beat2, 129→77 Hz :
+;   0: period $01E4 / 1: $032C
+;
+; FX_UFO (canal C, R4/R5, 2 entries) — large UFO, 1259→879 Hz descendant :
+;   0: period $0031 / 1: $0047
+;
+; FX_UFO_SMALL (canal C, R4/R5, 2 entries) — small UFO, 983→1354 Hz MONTANT :
+;   0: period $003F / 1: $002E
 ;-----------------------------------------------------------------
         .segment "RODATA"
 life_per_lo:
         .byte $16, $2D, $5A, $B3
 life_per_hi:
         .byte $00, $00, $00, $00
+thump1_per_lo:
+        .byte $D2, $04
+thump1_per_hi:
+        .byte $01, $03
+thump2_per_lo:
+        .byte $E4, $2C
+thump2_per_hi:
+        .byte $01, $03
+ufo_l_per_lo:
+        .byte $31, $47
+ufo_l_per_hi:
+        .byte $00, $00
+ufo_s_per_lo:
+        .byte $3F, $2E
+ufo_s_per_hi:
+        .byte $00, $00
 
 ;-----------------------------------------------------------------
 ; _psg_write — A = valeur, Y = numéro de registre
@@ -236,28 +269,48 @@ _sound_play_fx:
 
         cmp  #FX_THUMP
         bne  @not_thump
-        ; SS.POP Mine Storm (mine pop) — adapté pour notre thump :
-        ; reg 2=$30 (tone B freq lo grave), reg 3=$00, reg 6=$1F, reg
-        ; 7=$3D+$40 (mixer tone B on uniquement), reg 9=$0F. Durée 8.
-        lda  #$30
+        ; Beat1 arcade — SWEEP descendant 134→81 Hz, ~74 ms.
+        ; Tone canal B, period from thump1_per[] via sweep_idx.
+        lda  thump1_per_lo
         ldy  #2
-        jsr  _psg_write       ; freq B lo (~155 Hz à 1.79 MHz / 16)
-        lda  #$00
+        jsr  _psg_write       ; period init (R2 lo)
+        lda  thump1_per_hi
         ldy  #3
-        jsr  _psg_write
-        lda  #$1F
-        ldy  #6
-        jsr  _psg_write       ; noise (silencieux car bits 4-5 = 1)
+        jsr  _psg_write       ; period init (R3 hi)
         lda  #$0F
         ldy  #9
-        jsr  _psg_write       ; volume B max
-        lda  #$7D             ; mixer : tone B on, port A input ($3D + $40)
+        jsr  _psg_write       ; vol B max
+        lda  #$7D             ; mixer : tone B on, port A input
         ldy  #7
         jsr  _psg_write
-        lda  #8
-        sta  _sfx_timer
+        lda  #1
+        sta  sweep_idx        ; next tick uses thump1_per[1]
+        lda  #2
+        sta  _sfx_timer       ; 2 ticks (init + 1 sweep + decay = ~3 frames)
         jmp  @done
 @not_thump:
+
+        cmp  #FX_THUMP_2
+        bne  @not_thump2
+        ; Beat2 arcade — SWEEP descendant 129→77 Hz, ~78 ms (sym. Beat1).
+        lda  thump2_per_lo
+        ldy  #2
+        jsr  _psg_write
+        lda  thump2_per_hi
+        ldy  #3
+        jsr  _psg_write
+        lda  #$0F
+        ldy  #9
+        jsr  _psg_write
+        lda  #$7D
+        ldy  #7
+        jsr  _psg_write
+        lda  #1
+        sta  sweep_idx
+        lda  #2
+        sta  _sfx_timer
+        jmp  @done
+@not_thump2:
 
         cmp  #FX_HYPER
         bne  @not_hyper
@@ -284,26 +337,24 @@ _sound_play_fx:
 
         cmp  #FX_THRUST
         bne  @not_thrust
-        ; SS.THR Mine Storm : reg 0=$10, reg 1=$00 (tone A grave), reg
-        ; 6=$1F (noise grave), reg 7=$06+$40 (tone A + noise A+B+C on,
-        ; port A input), reg 8=$0F (volume A max). Re-déclenché 3 frames.
-        lda  #$10
+        ; Arcade : TONE 82 Hz rumble grave, 288 ms. Pas de noise principal.
+        ; Period 82 Hz = 1 MHz / (16 × 82) ≈ 762 = $02FA.
+        ; Canal A, tone only. Re-déclenché chaque ~3-7 frames par game.c
+        ; pendant que UP est maintenu (effet continu).
+        lda  #$FA
         ldy  #0
         jsr  _psg_write       ; freq A lo
-        lda  #$00
+        lda  #$02
         ldy  #1
-        jsr  _psg_write
-        lda  #$1F
-        ldy  #6
-        jsr  _psg_write
-        lda  #$0F
+        jsr  _psg_write       ; freq A hi
+        lda  #$0E
         ldy  #8
-        jsr  _psg_write       ; volume A max
-        lda  #$46             ; mixer Vectrex $06 + port A input Oric
+        jsr  _psg_write       ; volume A presque max
+        lda  #$7E             ; mixer : tone A only + port A input
         ldy  #7
         jsr  _psg_write
-        lda  #3
-        sta  _sfx_timer
+        lda  #7
+        sta  _sfx_timer       ; ~280 ms si pas re-déclenché
         jmp  @done
 @not_thrust:
 
@@ -311,7 +362,7 @@ _sound_play_fx:
         bne  @not_life
         ; Extra ship — arcade : SWEEP descendant 2786 Hz → ~350 Hz, 136 ms.
         ; Implémentation : table 4 periods, écrites par sound_tick dans
-        ; R0/R1 au fil des ticks. life_idx 0 = init (cet handler), 1..3 =
+        ; R0/R1 au fil des ticks. sweep_idx 0 = init (cet handler), 1..3 =
         ; ticks suivants.
         lda  life_per_lo
         ldy  #0
@@ -326,32 +377,56 @@ _sound_play_fx:
         ldy  #7
         jsr  _psg_write
         lda  #1
-        sta  life_idx          ; prochain tick utilisera life_per[1]
+        sta  sweep_idx          ; prochain tick utilisera life_per[1]
         lda  #3
         sta  _sfx_timer        ; 3 ticks restants après l'init (4 frames total)
         jmp  @done
 @not_life:
 
         cmp  #FX_UFO
-        bne  @not_ufo
-        ; UFO : tone canal C grave (freq $C0), durée 4 frames.
-        ; Re-déclenché par game.c chaque ~16 frames pour effet bip-bip continu.
-        lda  #$C0
+        bne  @not_ufo_large
+        ; Large UFO — SWEEP descendant 1259→879 Hz, ~168 ms (menaçant).
+        ; Tone canal C, periods depuis ufo_l_per[].
+        lda  ufo_l_per_lo
         ldy  #4
-        jsr  _psg_write       ; freq C lo
-        lda  #$00
+        jsr  _psg_write       ; period init (R4 lo)
+        lda  ufo_l_per_hi
         ldy  #5
-        jsr  _psg_write       ; freq C hi
+        jsr  _psg_write       ; period init (R5 hi)
         lda  #$0A              ; volume C modéré
         ldy  #10
         jsr  _psg_write
-        lda  #$7B              ; mixer : tone C on (bit 2 = 0), autres off
+        lda  #$7B              ; mixer : tone C on, port A input
         ldy  #7
         jsr  _psg_write
-        lda  #4
+        lda  #1
+        sta  sweep_idx        ; next tick uses ufo_l_per[1]
+        lda  #3
         sta  _sfx_timer
         jmp  @done
-@not_ufo:
+@not_ufo_large:
+
+        cmp  #FX_UFO_SMALL
+        bne  @not_ufo_small
+        ; Small UFO — SWEEP MONTANT 983→1354 Hz, ~124 ms (nerveux).
+        lda  ufo_s_per_lo
+        ldy  #4
+        jsr  _psg_write
+        lda  ufo_s_per_hi
+        ldy  #5
+        jsr  _psg_write
+        lda  #$0A
+        ldy  #10
+        jsr  _psg_write
+        lda  #$7B
+        ldy  #7
+        jsr  _psg_write
+        lda  #1
+        sta  sweep_idx
+        lda  #3
+        sta  _sfx_timer
+        jmp  @done
+@not_ufo_small:
 
 @done:
         pla
@@ -368,33 +443,103 @@ _sound_play_fx:
 ;-----------------------------------------------------------------
 _sound_tick:
         lda  _sfx_id
-        beq  @no_sfx
+        bne  @go_sweep
+        jmp  @no_sfx
+@go_sweep:
 
-        ; Hook sweep FX_LIFE : si actif et life_idx < 4, écrit la prochaine
-        ; period dans R0/R1 puis avance l'index. Doit être fait AVANT le
-        ; décrément du timer (pour que les 3 ticks utiles touchent les 3
-        ; entrées restantes de la table).
-        cmp  #FX_LIFE
-        bne  @no_life_sweep
-        ldx  life_idx
-        cpx  #4
-        bcs  @no_life_sweep
+        ; ==============================================================
+        ; Hook sweeps : pour les effets qui modifient leur period au fil
+        ; des ticks (FX_LIFE / FX_THUMP / FX_THUMP_2 / FX_UFO / FX_UFO_SMALL).
+        ; Doit être fait AVANT le décrément du timer pour que les ticks
+        ; utiles touchent les entrées des tables.
+        ;
+        ; Convention : sweep_idx = index dans la table (0..max-1 entries
+        ; déjà écrites, max+ = sweep terminé). À l'init dans play_fx,
+        ; period[0] est écrite et sweep_idx = 1 (= prochain index à appliquer).
+        ; ==============================================================
         sei
         lda  VIA_DDRA
         pha
         lda  #$FF
         sta  VIA_DDRA
+
+        lda  _sfx_id
+        ldx  sweep_idx
+
+        cmp  #FX_LIFE
+        beq  @sw_life
+        cmp  #FX_THUMP
+        beq  @sw_thump1
+        cmp  #FX_THUMP_2
+        beq  @sw_thump2
+        cmp  #FX_UFO
+        beq  @sw_ufo_l
+        cmp  #FX_UFO_SMALL
+        beq  @sw_ufo_s
+        jmp  @sw_done                 ; pas de sweep pour ce fx
+
+@sw_life:
+        cpx  #4
+        bcs  @sw_done
         lda  life_per_lo,x
         ldy  #0
         jsr  _psg_write
         lda  life_per_hi,x
         ldy  #1
         jsr  _psg_write
+        inc  sweep_idx
+        jmp  @sw_done
+
+@sw_thump1:
+        cpx  #2
+        bcs  @sw_done
+        lda  thump1_per_lo,x
+        ldy  #2
+        jsr  _psg_write
+        lda  thump1_per_hi,x
+        ldy  #3
+        jsr  _psg_write
+        inc  sweep_idx
+        jmp  @sw_done
+
+@sw_thump2:
+        cpx  #2
+        bcs  @sw_done
+        lda  thump2_per_lo,x
+        ldy  #2
+        jsr  _psg_write
+        lda  thump2_per_hi,x
+        ldy  #3
+        jsr  _psg_write
+        inc  sweep_idx
+        jmp  @sw_done
+
+@sw_ufo_l:
+        cpx  #2
+        bcs  @sw_done
+        lda  ufo_l_per_lo,x
+        ldy  #4
+        jsr  _psg_write
+        lda  ufo_l_per_hi,x
+        ldy  #5
+        jsr  _psg_write
+        inc  sweep_idx
+        jmp  @sw_done
+
+@sw_ufo_s:
+        cpx  #2
+        bcs  @sw_done
+        lda  ufo_s_per_lo,x
+        ldy  #4
+        jsr  _psg_write
+        lda  ufo_s_per_hi,x
+        ldy  #5
+        jsr  _psg_write
+        inc  sweep_idx
+@sw_done:
         pla
         sta  VIA_DDRA
         cli
-        inc  life_idx
-@no_life_sweep:
 
         lda  _sfx_timer
         beq  @stop
