@@ -29,6 +29,11 @@ start:
         ; Cleanup (destructeurs CONDES)
         jsr     donelib
 
-        ; Retour au BASIC Oric-1 — JMP vecteur reset ROM. La ROM ré-init
+        ; Retour au BASIC — JMP vecteur RESET ROM. La ROM ré-init
         ; le hardware (mode TEXT, clavier, etc.) et arrive au prompt READY.
+        ;
+        ; ATTENTION — Oric-1 ONLY ! Vecteur reset diffère sur Atmos :
+        ;   Oric-1 BASIC 1.0/1.1 : $F800
+        ;   Atmos BASIC 1.1      : $F88F (ou $FAA5 selon contexte)
+        ; Un futur port Atmos devra conditionner cette adresse.
         jmp     $F800

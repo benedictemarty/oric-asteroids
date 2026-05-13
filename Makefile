@@ -13,6 +13,17 @@ EXEC_ADDR = 1280
 CFG       = cfg/oric1.cfg
 BUILD     = build
 
+# CFLAGS cc65 (revue senior 2026-05-13) :
+#   -O               optimisations standards
+#   -Or              register-load optimisations (regs Y/X dans boucles)
+#   -Cl              static-locals : locales en BSS au lieu de c-stack
+#                    (10-30 % perf sur fonctions hot comme bullets_update,
+#                    asteroids_update, ship_update — appelées chaque frame).
+#   --register-vars  permet `register int x;` (utile si on annote certains).
+#   -I src           includes du projet.
+CFLAGS    = -t none -O -Or -Cl --register-vars -I src
+ASFLAGS   = -t none
+
 SRCS_C    = src/main.c src/game.c src/asteroids.c src/hud.c src/ufo.c src/title.c
 SRCS_ASM  = src/asm/crt0.s src/asm/line.s src/asm/ship.s \
             src/asm/ship_verts.s src/asm/input.s src/asm/shapes.s \
@@ -73,61 +84,61 @@ gen_shapes: tools/gen_shapes.py
 	@echo ">>> src/asm/shapes.s régénéré"
 
 $(OBJ_CRT0): src/asm/crt0.s | $(BUILD)
-	$(CA65) -t none -o $@ $<
+	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(OBJ_LINE): src/asm/line.s | $(BUILD)
-	$(CA65) -t none -o $@ $<
+	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(OBJ_SHIP): src/asm/ship.s | $(BUILD)
-	$(CA65) -t none -o $@ $<
+	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(OBJ_VERTS): src/asm/ship_verts.s | $(BUILD)
-	$(CA65) -t none -o $@ $<
+	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(OBJ_INPUT): src/asm/input.s | $(BUILD)
-	$(CA65) -t none -o $@ $<
+	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(OBJ_SHAPES): src/asm/shapes.s | $(BUILD)
-	$(CA65) -t none -o $@ $<
+	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(OBJ_SOUND): src/asm/sound.s | $(BUILD)
-	$(CA65) -t none -o $@ $<
+	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(BUILD)/main.s: src/main.c | $(BUILD)
-	$(CC65) -t none -O -I src -o $@ $<
+	$(CC65) $(CFLAGS) -o $@ $<
 
 $(OBJ_MAIN): $(BUILD)/main.s
-	$(CA65) -t none -o $@ $<
+	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(BUILD)/game.s: src/game.c src/asteroids.h src/hud.h src/ufo.h src/sound.h | $(BUILD)
-	$(CC65) -t none -O -I src -o $@ $<
+	$(CC65) $(CFLAGS) -o $@ $<
 
 $(OBJ_GAME): $(BUILD)/game.s
-	$(CA65) -t none -o $@ $<
+	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(BUILD)/asteroids.s: src/asteroids.c src/asteroids.h | $(BUILD)
-	$(CC65) -t none -O -I src -o $@ $<
+	$(CC65) $(CFLAGS) -o $@ $<
 
 $(OBJ_ASTER): $(BUILD)/asteroids.s
-	$(CA65) -t none -o $@ $<
+	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(BUILD)/hud.s: src/hud.c src/hud.h | $(BUILD)
-	$(CC65) -t none -O -I src -o $@ $<
+	$(CC65) $(CFLAGS) -o $@ $<
 
 $(OBJ_HUD): $(BUILD)/hud.s
-	$(CA65) -t none -o $@ $<
+	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(BUILD)/ufo.s: src/ufo.c src/ufo.h src/asteroids.h | $(BUILD)
-	$(CC65) -t none -O -I src -o $@ $<
+	$(CC65) $(CFLAGS) -o $@ $<
 
 $(OBJ_UFO): $(BUILD)/ufo.s
-	$(CA65) -t none -o $@ $<
+	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(BUILD)/title.s: src/title.c src/title.h | $(BUILD)
-	$(CC65) -t none -O -I src -o $@ $<
+	$(CC65) $(CFLAGS) -o $@ $<
 
 $(OBJ_TITLE): $(BUILD)/title.s
-	$(CA65) -t none -o $@ $<
+	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(BIN): $(OBJS) $(CFG)
 	$(LD65) -C $(CFG) -o $@ $(OBJS) $(CC65LIB)

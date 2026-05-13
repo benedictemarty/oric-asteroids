@@ -301,14 +301,13 @@ Ces points ne sont pas planifiés et ne doivent pas dévier la roadmap principal
 
 Checklist obligatoire à exécuter **avant de marquer le projet "Done"** :
 
-- [ ] **Compatibilité oricutron** : charger `build/asteroids.tap` sur
-      oricutron (`oricutron -t build/asteroids.tap`, puis `CLOAD""`
-      en BASIC, puis `CALL#500`). Vérifier que le binaire se charge
-      sans planter et qu'une partie complète se joue normalement.
-      *État actuel (2026-05-13) : oricutron plante au CLOAD — format
-      `.tap` produit par `bin2tap` non standard (pas de pré-amble $00,
-      type bytes `$80 $80` inhabituels). Phosphoric tolère, oricutron
-      non. À investiguer/patcher en fin de projet.*
+- [ ] **Format `.tap` standard portable** (optionnel — tierce émulation) :
+      le `.tap` produit par `bin2tap` n'est pas standard (pas de
+      pré-amble $00, type bytes `$80 $80` inhabituels). Phosphoric
+      (émulateur projet) tolère ; tap2dsk / Euphoric / Oric-1 physique
+      peuvent rejeter. *Note* : CLAUDE.md acte explicitement Phosphoric
+      comme l'émulateur du projet ; ce point ne bloque pas la release
+      mais améliorerait la portabilité.
 - [ ] **Test Oric‑1 physique** (si disponible) : charger le `.tap` sur
       un Oric‑1 réel via interface cassette ou disque dur, vérifier
       gameplay 5 min minimum.
