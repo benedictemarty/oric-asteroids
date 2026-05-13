@@ -7,6 +7,22 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Tune — explosion asteroid : flash plus bref (TTL 5 → 2) ✅
+
+**Symptôme** : la marque d'explosion (8 dots étoile au point d'impact)
+restait visible bien après que les fragments aient commencé à se
+séparer, donnant une impression de "marque qui traîne".
+
+**Cause** : `ADBR_TTL = 5` ⇒ avec 2 renders/frame (erase + draw),
+~4 frames effectives visibles ≈ 160 ms à 25 Hz. À cette durée,
+les fragments d'astéroïdes ont parcouru plusieurs pixels et la
+marque résiduelle paraît désynchronisée.
+
+**Fix** : `ADBR_TTL = 5 → 2` ⇒ 1 frame visible (~40 ms). Le flash
+reste perceptible mais disparaît avant que les fragments aient
+bougé de plus de quelques pixels. Commentaire ajusté pour clarifier
+le calcul TTL → frames visibles.
+
 ### Fix — trace résiduelle "A" au mouvement du ship 5 segments ✅
 
 **Symptôme** : en déplaçant le vaisseau, des fantômes "A" (la moitié
