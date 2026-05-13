@@ -66,7 +66,24 @@ BENCH_PROF     = tests/out/phase6_bench.prof
 #   après 5.5M cycles : appui SPACE (tir)
 TEST_INPUT     = "$(FASTLOAD_DONE):CALL $(LOAD_ADDR)\n"
 
-.PHONY: all clean run test ref check bench gen_ship
+.PHONY: all clean run test ref check bench gen_ship host-test
+
+# ── Tests host (x86) ──────────────────────────────────────────────────
+# Vérifient le déterminisme et les bornes des routines portables
+# (rng8 / rand_offset). Compile en quelques ms, indépendant du SDK Oric.
+HOSTCC      = gcc
+HOSTCFLAGS  = -Wall -Wextra -std=c90 -O2
+HOST_TESTS  = $(BUILD)/test_rng
+
+host-test: $(HOST_TESTS)
+	@for t in $(HOST_TESTS); do \
+	  echo "=== $$t ==="; \
+	  $$t || exit 1; \
+	done
+	@echo ">>> Tests host PASS"
+
+$(BUILD)/test_rng: tests/host/test_rng.c | $(BUILD)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 
 all: $(TAP)
 
