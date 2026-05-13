@@ -7,6 +7,24 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 21 — Enveloppe AY pour decay naturel sur FX_HYPER / FX_THUMP ✅
+
+Active l'enveloppe matérielle AY-3-8912 (registres R11/R12 période,
+R13 shape) sur 3 effets sonores pour passer d'un cut sec à un decay
+naturel `\___` :
+
+| FX | Canal | Volume avant | Volume après | Env shape | Env period |
+|---|---|---|---|---|---|
+| FX_HYPER | A | `$0E` fixe | `$10` enveloppe | `$00` (`\___`) | `$0044` (~558 ms) |
+| FX_THUMP | B | `$0F` fixe | `$10` enveloppe | `$00` (`\___`) | `$000A` (~82 ms) |
+| FX_THUMP_2 | B | `$0F` fixe | `$10` enveloppe | `$00` (`\___`) | `$000A` (~82 ms) |
+
+L'enveloppe AY étant unique pour les 3 canaux, le partage est sûr
+sous la politique "1 effet à la fois" du driver (override sound_play_fx).
+
+Smoke test Oric-1 10M cycles : écran titre rendu nominal (684 px),
+493 IRQ-ENTRY (identique à pré-Phase 21), 4/4 host tests PASS.
+
 ### Phase 20 — Player AY sous IRQ Timer 1 ✅
 
 `sound_tick()` est désormais appelée à 50 Hz par un handler IRQ T1

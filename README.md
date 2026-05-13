@@ -114,8 +114,8 @@ des 9 phases.
 
 - Persistance high scores en `.tap` ou `.dsk` (driver cassette résident).
 - Image `.dsk` Microdisc avec sauvegarde native.
-- Enveloppe AY (registres 11-13) pour effets sonores enrichis.
-- Player AY sous IRQ Timer 1 (libération CPU pendant les frames).
+- ~~Enveloppe AY (registres 11-13)~~ — fait Phase 21 (HYPER/THUMP/THUMP_2).
+- ~~Player AY sous IRQ Timer 1~~ — fait Phase 20.
 - VSync Option B : vrai bit ULA pour anti-tearing parfait (bloqué côté
   Phosphoric — modélisation à ajouter).
 - Test sur Oric‑1 physique (revision PAL).

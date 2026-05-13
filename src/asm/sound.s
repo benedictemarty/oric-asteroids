@@ -315,15 +315,26 @@ _sound_play_fx:
         bne  @not_thump
         ; Beat1 arcade — SWEEP descendant 134→81 Hz, ~74 ms.
         ; Tone canal B, period from thump1_per[] via sweep_idx.
+        ; Phase 21 — enveloppe \___ pour decay percussif naturel (était cut sec).
+        ; Period env $0A → cycle 32 steps × 256 × 10 / 1MHz ≈ 82 ms ≈ 2 frames.
         lda  thump1_per_lo
         ldy  #2
         jsr  _psg_write       ; period init (R2 lo)
         lda  thump1_per_hi
         ldy  #3
         jsr  _psg_write       ; period init (R3 hi)
-        lda  #$0F
+        lda  #$10
         ldy  #9
-        jsr  _psg_write       ; vol B max
+        jsr  _psg_write       ; vol B en mode enveloppe (était $0F fixe)
+        lda  #$0A
+        ldy  #11
+        jsr  _psg_write       ; env period lo (~82 ms decay)
+        lda  #$00
+        ldy  #12
+        jsr  _psg_write       ; env period hi
+        lda  #$00
+        ldy  #13
+        jsr  _psg_write       ; env shape \___
         lda  #$7D             ; mixer : tone B on, port A input
         ldy  #7
         jsr  _psg_write
@@ -337,15 +348,25 @@ _sound_play_fx:
         cmp  #FX_THUMP_2
         bne  @not_thump2
         ; Beat2 arcade — SWEEP descendant 129→77 Hz, ~78 ms (sym. Beat1).
+        ; Phase 21 — enveloppe \___ pour decay percussif (sym. Beat1).
         lda  thump2_per_lo
         ldy  #2
         jsr  _psg_write
         lda  thump2_per_hi
         ldy  #3
         jsr  _psg_write
-        lda  #$0F
+        lda  #$10
         ldy  #9
+        jsr  _psg_write       ; vol B en mode enveloppe
+        lda  #$0A
+        ldy  #11
+        jsr  _psg_write       ; env period lo (~82 ms)
+        lda  #$00
+        ldy  #12
         jsr  _psg_write
+        lda  #$00
+        ldy  #13
+        jsr  _psg_write       ; env shape \___
         lda  #$7D
         ldy  #7
         jsr  _psg_write
@@ -358,7 +379,10 @@ _sound_play_fx:
 
         cmp  #FX_HYPER
         bne  @not_hyper
-        ; Hyperespace : noise + tone sweep grave, durée 14 frames
+        ; Hyperespace : noise + tone sweep grave, durée 14 frames (~560 ms)
+        ; Phase 21 — enveloppe AY pour decay naturel \___ au lieu du cut sec
+        ; Période env $0044 : un cycle de 32 steps = 32 × 256 × 68 / 1MHz
+        ; ≈ 558 ms ≈ 14 frames @ 25 Hz. Shape $00 = decay + hold low.
         lda  #$10              ; freq noise medium
         ldy  #6
         jsr  _psg_write
@@ -368,8 +392,17 @@ _sound_play_fx:
         lda  #$01              ; freq tone A hi
         ldy  #1
         jsr  _psg_write
-        lda  #$0E              ; volume A
+        lda  #$10              ; volume A en mode enveloppe (bit 4 set)
         ldy  #8
+        jsr  _psg_write
+        lda  #$44              ; env period lo (~558 ms decay)
+        ldy  #11
+        jsr  _psg_write
+        lda  #$00              ; env period hi
+        ldy  #12
+        jsr  _psg_write
+        lda  #$00              ; env shape \___ (decay + hold low)
+        ldy  #13
         jsr  _psg_write
         lda  #$76              ; mixer : tone A on (bit 0 = 0) + noise A on (bit 3 = 0)
         ldy  #7
