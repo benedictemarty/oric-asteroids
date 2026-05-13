@@ -40,6 +40,36 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Refactor senior — séquence game over en 3 phases exactes ✅
+
+**Cible** (spec utilisateur explicite, revue senior) :
+- **Phase 1** (0 → 2.4 s) : explosion debris seule
+- **Phase 2** (2.4 s → 7.4 s, **+5 s pile**) : `GAME OVER` seul
+- **Phase 3** (7.4 s + wait-release) : `GAME OVER` effacé, `HIGH SCORES`
+  apparaît, prompt après relâchement des touches
+
+**Refactor** :
+
+- Remplacement de `gameover_lock` (countdown) par `gameover_elapsed`
+  (compteur up). Plus lisible : les conditions deviennent
+  `elapsed >= DEATH_EXPLOSION_END` au lieu de `lock <= 90`.
+- Constantes nommées (au lieu de magic numbers) :
+  ```c
+  #define DEATH_EXPLOSION_END   60   // fin debris = DEBRIS_TTL
+  #define DEATH_GAMEOVER_HOLD   125  // 5 s pile à 25 Hz
+  #define DEATH_HOF_FRAME       (DEATH_EXPLOSION_END + DEATH_GAMEOVER_HOLD)
+  ```
+- Affichage **one-shot** via flags `*_drawn` (au lieu de redessiner à
+  chaque frame). Plus de surcoût CPU pendant l'attente.
+- Compteur clamped à 255 pour éviter le wrap après ~10 s.
+- Transitions exclusives :
+  - Phase 2 entry : `gameover_draw()` (une fois)
+  - Phase 3 entry : `gameover_erase()` + `hiscores_draw_table()` (une fois)
+  - Phase 3 + relâchement : `presspace_draw` + `quit_label_draw` (une fois)
+- Sur restart (SPACE), reset explicite de `gameover_elapsed` et
+  `gameover_armed` pour permettre une nouvelle séquence à la prochaine
+  mort.
+
 ### Tune — explosion ship plus longue + ajustement séquencement ✅
 
 **Symptôme** (suite au fix du lock placement) : malgré le séquencement

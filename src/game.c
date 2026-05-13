@@ -181,6 +181,17 @@ static unsigned char wave_displayed;
  * fragment 0 dure 2.4 s, fragment 5 dure 1.4 s. */
 #define DEBRIS_TTL        60
 
+/* Séquencement de l'écran game over (compteur frames @ 25 Hz) :
+ *   [0,  DEATH_EXPLOSION_END[   = Phase 1 : explosion debris seule.
+ *   [60, DEATH_HOF_FRAME[       = Phase 2 : + GAME OVER seul (5 s pile).
+ *   [DEATH_HOF_FRAME, ∞[        = Phase 3 : GAME OVER s'efface, +HoF +prompt.
+ *                                 (Le prompt n'apparaît qu'après relâchement
+ *                                  des touches SPACE/ESC — wait-release.)
+ * Toutes les durées sont en frames à 25 Hz (1 s = 25 frames). */
+#define DEATH_EXPLOSION_END     60    /* fin animation debris = DEBRIS_TTL */
+#define DEATH_GAMEOVER_HOLD     125   /* 5 s pile de GAME OVER seul */
+#define DEATH_HOF_FRAME         (DEATH_EXPLOSION_END + DEATH_GAMEOVER_HOLD)
+
 /* Vélocités exactes ShipExpVelTbl arcade rev 4 ($50EC), nibbles haut
  * sign-extended. Chaque pair = (vx, vy) pour un fragment. */
 static const signed char ship_debris_vx[DEBRIS_COUNT] = { -3, +3,  0, +3,  0, -3 };
@@ -823,35 +834,30 @@ void game_run(void)
     hud_draw();
 
     for (;;) {
-        /* Lock 5 s après passage en gameover : GAME OVER + HoF fixes,
-         * pas de touches acceptées et pas de prompt affiché pour laisser
-         * l'utilisateur lire son score. */
-        static unsigned char gameover_lock = 0;
-        static unsigned char gameover_armed = 0;   /* attente release SPACE/ESC */
-        static unsigned char prompt_drawn = 0;     /* PRESS SPACE + OR ESC */
+        /* Compteur frames depuis la transition gameover=0→1 (init à 0
+         * au moment du décès, incrémenté chaque frame, clampé à 255
+         * pour éviter le wrap). Pilote le séquencement Phase 1/2/3
+         * (cf. constantes DEATH_*) et le wait-release. */
+        static unsigned char gameover_elapsed = 0;
+        static unsigned char gameover_armed   = 0;  /* exiger release SPACE/ESC */
+        static unsigned char prompt_drawn     = 0;
         key_scan();
 
-        /* Note : la transition gameover=0→1 se produit DANS la frame
-         * courante (bloc ship, collisions), pas avant. Donc à cette
-         * ligne, gameover est encore à sa valeur de fin-de-frame N-1.
-         * Le vrai check de transition est plus bas (ligne ~1023), où
-         * on initialise aussi gameover_lock + gameover_armed. */
-
-        /* Désarmer le wait-release uniquement quand le lock est terminé
-         * ET SPACE/ESC sont relâchés. Tant que l'utilisateur maintient
-         * une touche depuis avant la mort, on ignore son appui pour ne
-         * pas redémarrer/quitter instantanément. */
-        if (gameover && !gameover_lock && gameover_armed) {
+        /* Désarmer le wait-release dès qu'on entre en Phase 3 ET que
+         * SPACE/ESC sont relâchés. Tant qu'une touche reste maintenue
+         * depuis avant la mort, on continue d'ignorer. */
+        if (gameover && gameover_elapsed >= DEATH_HOF_FRAME && gameover_armed) {
             if ((key_state & 0x28) == 0) {     /* SPACE (0x08) + ESC (0x20) */
                 gameover_armed = 0;
             }
         }
 
-        if (gameover && (gameover_lock || gameover_armed)) {
-            /* Lock actif ou touches encore maintenues : ignorer SPACE/ESC. */
+        /* Inputs game over : actifs uniquement en Phase 3 + wait-release OK. */
+        if (gameover && (gameover_elapsed < DEATH_HOF_FRAME || gameover_armed)) {
+            /* Phase 1 ou 2, ou touches encore maintenues : ignore. */
         } else if (gameover) {
             if (key_state & 0x08) {
-                /* SPACE → rejouer. */
+                /* SPACE → rejouer. Efface les textes d'écran game over. */
                 if (prompt_drawn) {
                     presspace_erase(140);
                     quit_label_erase(155);
@@ -865,6 +871,8 @@ void game_run(void)
                     hiscores_draw_table();   /* XOR : efface */
                     hiscores_drawn = 0;
                 }
+                gameover_elapsed = 0;
+                gameover_armed   = 0;
                 game_reset();
                 prev_gameover = 0;
                 continue;
@@ -1021,25 +1029,20 @@ void game_run(void)
         }
         sound_tick();
 
-        /* Passage en game over → insertion hi-scores + clean UFO +
-         * armement du lock 5 s et du wait-release. C'est ICI que la
-         * transition est correctement détectée : la collision (qui
-         * set gameover=1) s'est produite plus tôt dans cette même
-         * frame, et prev_gameover est encore à sa valeur N-1 (=0).
-         * Le hiscore_pos enregistre le rang d'insertion (0..5) ou
-         * 0xFF si le score n'entre pas dans le top. */
+        /* Transition gameover=0→1 : la collision (bloc ship) vient de
+         * passer gameover à 1 ; prev_gameover est encore à 0. C'est
+         * ICI qu'on initialise le compteur de séquencement. */
         if (gameover && !prev_gameover) {
             final_score = score;
             new_hiscore_pos = hiscores_insert(final_score);
             ufo_kill();
-            gameover_lock = 150;       /* 6 s à 25 Hz : 2.4s explosion + 3.6s lecture */
-            gameover_armed = 1;        /* exiger relâchement SPACE/ESC */
+            gameover_elapsed = 0;          /* début Phase 1 */
+            gameover_armed   = 1;          /* exiger relâchement SPACE/ESC */
         }
         prev_gameover = gameover;
 
-        /* Décrémenter le timer de lock game over (~2 s sans accepter
-         * SPACE/ESC pour laisser le joueur lire son score + HoF). */
-        if (gameover_lock) gameover_lock--;
+        /* Incrémenter le compteur (clamp à 255 ≈ 10 s pour éviter wrap). */
+        if (gameover && gameover_elapsed < 255) gameover_elapsed++;
 
         /* Wave label — erase puis redraw consécutifs si vague changée */
         if (current_wave != wave_displayed) {
@@ -1050,30 +1053,40 @@ void game_run(void)
 
         hud_draw();
 
-        /* Séquencement écran game over (lock 150 = 6 s à 25 Hz) :
-         *   Phase 1 (lock 150→91, ~60 frames ≈ 2.4 s) : explosion debris
-         *     seule — fragment 0 dure 60 frames (DEBRIS_TTL), durée
-         *     suffisante pour bien percevoir l'animation.
-         *   Phase 2 (lock ≤ 90, ~90 frames ≈ 3.6 s) : + GAME OVER + HoF.
-         *   Phase 3 (lock = 0 ET wait-release OK) : + prompt "PRESS
-         *     SPACE / OR ESC TO STOP".
-         * Évite l'effet "tout s'affiche d'un coup" et donne à l'animation
-         * d'explosion le temps de se développer. */
-        if (gameover && gameover_lock <= 90) {
-            if (hiscores_drawn) hiscores_draw_table();
-            if (gameover_text_drawn) gameover_erase();
-            hiscores_draw_table();
-            hiscores_drawn = 1;
-            gameover_draw();
-            gameover_text_drawn = 1;
-        }
+        /* Affichage écran game over — machine à 3 phases pilotée par
+         * gameover_elapsed (frames depuis la mort). Chaque transition
+         * fait une opération one-shot via flag *_drawn, donc pas de
+         * redessin permanent et pas de surcoût CPU pendant l'attente.
+         *
+         *   Phase 1 [0,        DEATH_EXPLOSION_END[ : debris seul (rien à dessiner ici).
+         *   Phase 2 [60,       DEATH_HOF_FRAME[     : "GAME OVER" seul.
+         *   Phase 3 [185, ∞[                       : "GAME OVER" effacé,
+         *                                            +HIGH SCORES,
+         *                                            +prompt après wait-release.
+         */
         if (gameover) {
-
-            if (gameover_lock == 0 && !gameover_armed) {
-                if (prompt_drawn) {
-                    presspace_erase(140);
-                    quit_label_erase(155);
-                }
+            /* Phase 2 entry : GAME OVER apparaît (les debris ont fini
+             * à frame DEATH_EXPLOSION_END = DEBRIS_TTL, donc plus de
+             * superposition possible). */
+            if (gameover_elapsed >= DEATH_EXPLOSION_END
+                && gameover_elapsed < DEATH_HOF_FRAME
+                && !gameover_text_drawn) {
+                gameover_draw();
+                gameover_text_drawn = 1;
+            }
+            /* Phase 3 entry : GAME OVER s'efface, HIGH SCORES apparaît. */
+            if (gameover_elapsed >= DEATH_HOF_FRAME && gameover_text_drawn) {
+                gameover_erase();
+                gameover_text_drawn = 0;
+            }
+            if (gameover_elapsed >= DEATH_HOF_FRAME && !hiscores_drawn) {
+                hiscores_draw_table();
+                hiscores_drawn = 1;
+            }
+            /* Phase 3 + wait-release OK : prompt apparaît. */
+            if (gameover_elapsed >= DEATH_HOF_FRAME
+                && !gameover_armed
+                && !prompt_drawn) {
                 presspace_draw(140);
                 quit_label_draw(155);
                 prompt_drawn = 1;
