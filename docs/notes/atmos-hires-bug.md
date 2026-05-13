@@ -1,7 +1,12 @@
 # Bug Atmos — rendu HIRES en pattern de points régulier
 
-**État** : dette technique, non bloquant pour Oric‑1. Découvert en testant
-la portabilité Atmos après `JMP ($FFFC)` (commit à venir).
+**État (2026-05-13)** : **faux positif Phosphoric** — le binaire tourne
+correctement sur **Oricutron en mode Atmos** (validé utilisateur). Le
+pattern `$4C` n'apparaît qu'avec Phosphoric `-m atmos -r basic11b.rom`.
+Notre portage est **réellement Atmos-compat** via `JMP ($FFFC)`.
+
+À ne traiter que si le bug est reproduit sur **hardware Atmos réel**.
+Sinon, à signaler à l'équipe Phosphoric comme bug émulateur.
 
 ## Symptôme
 

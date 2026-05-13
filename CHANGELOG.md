@@ -7,6 +7,21 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Validation — Atmos OK sur Oricutron ✅
+
+Le binaire produit avec `JMP ($FFFC)` tourne correctement sur
+**Oricutron en mode Atmos** (validé utilisateur 2026-05-13). Le
+pattern HIRES `$4C` toutes les 8 scanlines observé sur Phosphoric
+`-m atmos -r basic11b.rom` est un **faux positif émulateur**, pas un
+bug de portage. Cf `docs/notes/atmos-hires-bug.md` mis à jour.
+
+**Validation cross-machine** :
+- ✅ Oric-1 BASIC 1.0 / Phosphoric : nominal
+- ✅ Atmos BASIC 1.1 / Oricutron : fonctionnel
+- ⏳ Oric-1 physique : à tester quand hardware dispo
+- ⏳ Atmos physique : à tester quand hardware dispo
+- ❌ Atmos / Phosphoric `-m atmos` : faux positif émulateur (à signaler)
+
 ### Portabilité — `crt0.s` : retour BASIC via vecteur RESET hardware
 
 **Changement** : `crt0.s:39` `JMP $F800` → `JMP ($FFFC)`.
