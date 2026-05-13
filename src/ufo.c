@@ -281,7 +281,11 @@ void ufo_draw(void)
 {
     unsigned char i;
     const signed char (*segs)[4];
-    if (!ufo_active) return;
+    /* Pas de check ufo_active : permet d'effacer (XOR) l'UFO après
+     * ufo_kill() — ufo_x/y/type sont préservés par kill, donc l'erase
+     * trace au bon endroit. Caller responsabilité : ne pas appeler
+     * avant qu'un UFO ait été drawn au moins une fois (= caller utilise
+     * un flag ufo_was_drawn). */
     segs = (ufo_type == UFO_LARGE) ? seg_large : seg_small;
     for (i = 0; i < N_SEGS; i++) {
         line((unsigned char)((signed char)ufo_x + segs[i][0]),

@@ -40,6 +40,45 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Anti-flicker UFO — bloc compact erase → tick → draw ✅
+
+**Symptôme** : l'UFO clignotait beaucoup vs le reste (ship, asteroids).
+
+**Cause** : `ufo_draw()` était appelé **deux fois** par frame —
+au début (erase, ligne 920) et à la fin (draw, ligne 1005). Entre
+les deux, ~85 lignes de code (updates, collisions, bloc asteroids
+complet, bloc ship complet). L'UFO était invisible à l'écran pendant
+~80 % de la durée de frame ⇒ flicker très perceptible.
+
+À comparer avec le **ship** (bloc compact erase→update→draw en ~15
+lignes) et les **asteroids** (`asteroids_render` per-entity).
+
+**Fix** :
+- Bloc UFO compact entre `asteroids_render` et le bloc ship :
+  ```c
+  if (ufo_was_drawn) ufo_draw();   // erase à pos N-1
+  if (!gameover) ufo_tick(...);    // bouge UFO
+  if (ufo_active) {
+      ufo_draw();                  // draw à pos N
+      ufo_was_drawn = 1;
+  } else {
+      ufo_was_drawn = 0;
+  }
+  ```
+- Nouvelle variable BSS `ufo_was_drawn` (init explicite à 0 dans
+  `game_run`, cf. workaround Phase 6).
+- Retrait du check `if (!ufo_active) return;` dans `ufo_draw()` —
+  bloquait l'erase XOR après `ufo_kill()`. Le caller contrôle
+  maintenant via `ufo_was_drawn`.
+- `game_reset()` adapté : `if (ufo_was_drawn) ufo_draw()` au lieu
+  d'un `ufo_draw()` aveugle.
+- `ufo_tick` retiré du bloc updates généraux, déplacé dans le bloc
+  UFO compact.
+
+Conséquence : les collisions bullet↔UFO sont calculées avec ufo_x/y
+de frame N-1 (avant `ufo_tick`) au lieu de frame N. Décalage 1 frame
+imperceptible à 25 Hz.
+
 ### Fix — game_reset : pas d'invincibilité au new game ✅
 
 **Symptôme** : après une défaite, en relançant une partie via SPACE,

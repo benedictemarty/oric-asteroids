@@ -153,6 +153,7 @@ static unsigned char hyper_cd;
 
 static unsigned char ship_invincible;
 static unsigned char ship_was_drawn;
+static unsigned char ufo_was_drawn;
 
 /* Phase 7 — high scores en RAM (persistance .tap reportée Phase 9) */
 static unsigned int  hiscores[HISCORE_COUNT];
@@ -731,7 +732,8 @@ static void game_reset(void)
     if (ship_was_drawn) ship_erase();
     bullets_render();           /* efface les tirs encore actifs */
     asteroids_draw();           /* efface les asteroids actifs */
-    ufo_draw();
+    if (ufo_was_drawn) ufo_draw();   /* efface UFO si dessiné */
+    ufo_was_drawn = 0;
     ufo_bullet_draw();
 
     /* Réinit complète */
@@ -774,6 +776,7 @@ void game_run(void)
      * d'un coup à Phase 3 (bug observé). */
     ship_invincible     = 0;
     ship_was_drawn      = 0;
+    ufo_was_drawn       = 0;
     prev_gameover       = 0;
     final_score         = 0;
     hiscores_drawn      = 0;
@@ -917,8 +920,10 @@ void game_run(void)
         asteroid_debris_render();
         debris_render();
         ufo_bullet_draw();
-        ufo_draw();
         bullets_render();
+        /* Note : ufo_draw n'est plus appelé ici. Bloc UFO compact
+         * placé après asteroids_render (cf. plus bas) pour minimiser
+         * la fenêtre d'absence à l'écran (anti-flicker). */
 
         /* 2. Bullets : input fire (level-trigger = auto-repeat) puis
          *    update. bullet_fire() court-circuite sur fire_cd, donc la
@@ -931,9 +936,9 @@ void game_run(void)
             if (key_state & 0x08) bullet_fire();
         }
 
-        /* 3. Updates physiques NON-asteroids NON-ship */
+        /* 3. Updates physiques NON-asteroids NON-ship NON-ufo
+         *    (ufo_tick déplacé dans le bloc UFO compact ci-dessous) */
         bullets_update();
-        if (!gameover) ufo_tick(ship_x, ship_y, score);
         ufo_bullet_update();
         debris_update();
         asteroid_debris_update();
@@ -948,6 +953,26 @@ void game_run(void)
         collisions_ufobullet_asteroids();
         asteroids_render();
         /* ===== FIN BLOC ASTEROIDS ===== */
+
+        /* 4b. ===== UFO — bloc compact erase → tick → draw =====
+         * Avant : erase début frame + draw fin frame ⇒ fenêtre d'absence
+         * = quasi toute la frame ⇒ flicker très perceptible vs ship et
+         * asteroids (qui ont des blocs compacts).
+         * Maintenant : erase / tick / draw consécutifs, fenêtre minimisée.
+         *
+         * Note : les collisions bullet↔UFO ont déjà eu lieu dans le bloc
+         * asteroids (ligne ~947) avec ufo_x/y de frame N-1 (pas encore
+         * tick). Décalage 1 frame imperceptible à 25 Hz.
+         */
+        if (ufo_was_drawn) ufo_draw();          /* erase à pos N-1 */
+        if (!gameover) ufo_tick(ship_x, ship_y, score);
+        if (ufo_active) {
+            ufo_draw();                          /* draw à pos N */
+            ufo_was_drawn = 1;
+        } else {
+            ufo_was_drawn = 0;
+        }
+        /* ===== FIN BLOC UFO ===== */
 
         /* 5. ===== SHIP — bloc compact erase → input → update → draw =====
          * Fenêtre pendant laquelle le ship est absent de l'écran réduite
@@ -1000,9 +1025,9 @@ void game_run(void)
         }
         /* ===== FIN BLOC SHIP ===== */
 
-        /* 6. Draw entités mobiles restantes à pos N */
+        /* 6. Draw entités mobiles restantes à pos N (UFO déjà fait dans
+         *    son bloc compact ci-dessus). */
         bullets_render();
-        ufo_draw();
         ufo_bullet_draw();
         debris_render();
         asteroid_debris_render();
