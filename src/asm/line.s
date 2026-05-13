@@ -386,11 +386,12 @@ _draw_line_xor:
 @h_no_stepy:
         sta  l_err_lo
 @h_step_x:
-        ; step x toujours (sx=+1) : lsr mask, increment ptr si nouvelle colonne
+        ; step x toujours (sx=+1) : lsr mask. Si pas de nouvelle colonne
+        ; (~80 % des pixels), `bcc @h_loop` économise 1c vs ancien
+        ; `bcs @h_newcol / jmp @h_loop` (revue senior optim #2).
         lsr  l_mask
-        bcs  @h_newcol
-        jmp  @h_loop
-@h_newcol:
+        bcc  @h_loop
+        ; Fallthrough = newcol : reset mask + inc ptr.
         lda  #$20
         sta  l_mask
         inc  l_ptr
@@ -424,11 +425,11 @@ _draw_line_xor:
 @v_sbc_dy:
         sbc  #$00                ; opérande patchée = l_dy
         sta  l_err_lo
-        ; step x : lsr mask, ptr++ si newcol
+        ; step x : lsr mask. Si pas newcol → branch direct vers step_y
+        ; (économie 1c vs ancien bcs+jmp).
         lsr  l_mask
-        bcs  @v_newcol
-        jmp  @v_step_y
-@v_newcol:
+        bcc  @v_step_y
+        ; Fallthrough = newcol.
         lda  #$20
         sta  l_mask
         inc  l_ptr
