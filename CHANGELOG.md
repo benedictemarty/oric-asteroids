@@ -7,20 +7,23 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-### Validation — Atmos OK sur Oricutron ✅
+### Rectification — Atmos ne fonctionne pas avec ROM Atmos
 
-Le binaire produit avec `JMP ($FFFC)` tourne correctement sur
-**Oricutron en mode Atmos** (validé utilisateur 2026-05-13). Le
-pattern HIRES `$4C` toutes les 8 scanlines observé sur Phosphoric
-`-m atmos -r basic11b.rom` est un **faux positif émulateur**, pas un
-bug de portage. Cf `docs/notes/atmos-hires-bug.md` mis à jour.
+Le précédent commit `6631fc7` annonçait "Atmos OK sur Oricutron" mais
+ce test était en réalité Oricutron mode Oric-1 (par défaut), pas avec
+une ROM Atmos. Avec ROM Atmos sur Oricutron, **`asteroids.tap` ne
+fonctionne pas** (signalé utilisateur 2026-05-13).
 
-**Validation cross-machine** :
+Le bug HIRES `$4C` n'est donc **pas** un faux positif Phosphoric :
+c'est un vrai problème de portage Atmos. Cible nominale Oric-1 reste
+inchangée. Compat Atmos = sprint à part si priorité future.
+
+**Validation cross-machine actuelle** :
 - ✅ Oric-1 BASIC 1.0 / Phosphoric : nominal
-- ✅ Atmos BASIC 1.1 / Oricutron : fonctionnel
-- ⏳ Oric-1 physique : à tester quand hardware dispo
-- ⏳ Atmos physique : à tester quand hardware dispo
-- ❌ Atmos / Phosphoric `-m atmos` : faux positif émulateur (à signaler)
+- ✅ Oric-1 BASIC 1.0 / Oricutron : fonctionnel
+- ❌ Atmos BASIC 1.1 / Phosphoric `-m atmos` : pattern HIRES `$4C`
+- ❌ Atmos BASIC 1.1 / Oricutron : non fonctionnel
+- ⏳ Hardware physique Oric-1 / Atmos : à tester
 
 ### Portabilité — `crt0.s` : retour BASIC via vecteur RESET hardware
 

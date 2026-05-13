@@ -1,12 +1,19 @@
 # Bug Atmos — rendu HIRES en pattern de points régulier
 
-**État (2026-05-13)** : **faux positif Phosphoric** — le binaire tourne
-correctement sur **Oricutron en mode Atmos** (validé utilisateur). Le
-pattern `$4C` n'apparaît qu'avec Phosphoric `-m atmos -r basic11b.rom`.
-Notre portage est **réellement Atmos-compat** via `JMP ($FFFC)`.
+**État (2026-05-13, mis à jour)** : **bug réel de portage Atmos**.
+Initialement supposé faux positif Phosphoric, mais validation Oricutron
++ ROM Atmos confirme : `asteroids.tap` **ne fonctionne pas avec une ROM
+Atmos** (signalé utilisateur). La compat Atmos reste à debugger.
 
-À ne traiter que si le bug est reproduit sur **hardware Atmos réel**.
-Sinon, à signaler à l'équipe Phosphoric comme bug émulateur.
+Cible nominale du projet = Oric-1 (cf. CLAUDE.md). Atmos = bonus à
+traiter en sprint dédié si priorité.
+
+**Validation cross-machine actuelle** :
+- ✅ Oric-1 BASIC 1.0 / Phosphoric : nominal
+- ✅ Oric-1 BASIC 1.0 / Oricutron : fonctionnel
+- ❌ Atmos BASIC 1.1 / Phosphoric `-m atmos` : pattern HIRES `$4C`
+- ❌ Atmos BASIC 1.1 / Oricutron : non fonctionnel (signalé utilisateur)
+- ⏳ Hardware physique : à tester
 
 ## Symptôme
 
