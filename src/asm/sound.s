@@ -152,30 +152,23 @@ _sound_play_fx:
         lda  #$FF
         sta  VIA_DDRA
 
-        ; Cas FX_FIRE — port Mine Storm Vectrex SS.BLT (rev C)
+        ; Cas FX_FIRE — arcade authentique (cf. docs/arcade-sounds-analysis.md)
+        ; NOISE 740 Hz, durée 267 ms ≈ 7 frames à 25 Hz. Pas de tone.
+        ; R6 noise period = 3 ⇒ freq = 1 MHz / (16 × 32 × 3) ≈ 651 Hz
+        ; (proche de 740 Hz, ajustement 1 cran plus aigu = R6=2 si trop grave).
         lda  _sfx_id
         cmp  #FX_FIRE
         bne  @not_fire
-        ; SS.BLT : reg 2=$39 (tone B freq lo), reg 3=$00 (tone B hi),
-        ;          reg 6=$1F (noise grave), reg 7=$05+$40 (mixer : tone B on
-        ;          + noise A on + port A input pour scan clavier Oric),
-        ;          reg 9=$0F (volume B max). Durée 6 frames.
-        lda  #$39
-        ldy  #2
-        jsr  _psg_write       ; freq B lo
-        lda  #$00
-        ldy  #3
-        jsr  _psg_write       ; freq B hi
-        lda  #$1F
+        lda  #$03
         ldy  #6
-        jsr  _psg_write       ; noise grave max
+        jsr  _psg_write       ; noise period 3 (≈ 740 Hz)
         lda  #$0F
-        ldy  #9
-        jsr  _psg_write       ; volume B max
-        lda  #$45             ; mixer Vectrex $05 + bit 6 (port A input Oric)
+        ldy  #8
+        jsr  _psg_write       ; volume A max (fixe, pas d'enveloppe)
+        lda  #$47             ; mixer noise A only + port A input
         ldy  #7
         jsr  _psg_write
-        lda  #6
+        lda  #7
         sta  _sfx_timer
         jmp  @done
 @not_fire:

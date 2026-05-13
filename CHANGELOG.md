@@ -40,6 +40,21 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Sons étape 2 — FX_FIRE noise 740 Hz arcade-fidèle ✅
+
+Le tir arcade est un **burst de noise** (~740 Hz, 267 ms), pas un tone
+aigu. Notre version Mine Storm SS.BLT (tone B + noise grave mélangés)
+sonnait "computer game" 80s plus que Asteroids.
+
+**Changements `sound.s` FX_FIRE** :
+- Plus de tone (suppression R2/R3, mixer simplifié).
+- R6 = $03 → noise 1 MHz / (16 × 32 × 3) ≈ 651 Hz (proche 740 Hz arcade).
+- R7 = $47 → mixer **noise A only** + port A input.
+- R8 = $0F → vol A max (fixe, pas d'enveloppe — burst sec).
+- Timer = 7 frames (≈ 280 ms à 25 Hz, proche 267 ms arcade).
+
+Sonore : "psssht" sec caractéristique arcade au lieu du "beep" tonal.
+
 ### Sons étape 1 — Triple explosion S/M/L arcade-fidèle ✅
 
 D'après analyse FFT des `.wav` arcade (cf.
