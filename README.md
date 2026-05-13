@@ -106,15 +106,19 @@ des 9 phases.
 | 16  | Optimisations framerate (`_plot_dot` + `ORA #$40` retiré) | `phase16-done` / `v1.2.6` |
 | 17  | Compteur pixels Bresenham + suppression mises à jour _lx0/_ly0 | `phase17-done` / `v1.2.7` |
 | 18  | Main-axis split Bresenham (refactor algo, gain 2.47%) | `phase18-done` / `v1.2.8` |
+| 18b–h | Anti-flicker, scan clavier HW, 8.8 fixed-point, décimation shapes | `phase18b…h-done` |
+| 19  | Vaisseau arcade-fidèle 5 segments | `phase19-done` / `v1.2.9` |
+| —   | Fix VSync : Timer 1 free-run (CB1 non câblé sur HW réel) | `v1.2.10` |
 
-## Différé Phase 19+
+## Différé Phase 20+
 
 - Persistance high scores en `.tap` ou `.dsk` (driver cassette résident).
 - Image `.dsk` Microdisc avec sauvegarde native.
-- Écran titre vectoriel (lettres "ASTEROIDS" en segments).
-- Effets sonores manquants : thrust continu, UFO oscillant, hyperespace,
-  enveloppe AY (registres 11-13).
+- Enveloppe AY (registres 11-13) pour effets sonores enrichis.
 - Player AY sous IRQ Timer 1 (libération CPU pendant les frames).
+- VSync Option B : vrai bit ULA pour anti-tearing parfait (bloqué côté
+  Phosphoric — modélisation à ajouter).
+- Test sur Oric‑1 physique (revision PAL).
 
 ## Sources
 

@@ -7,6 +7,8 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [1.2.10] - 2026-05-13
+
 ### Fix — frame_wait : Timer 1 free-run au lieu de CB1 (VSync hardware-réel) ✅
 
 **Symptôme** : à partir de Phosphoric 1.16.11+ et Oricutron WIP
@@ -52,6 +54,8 @@ Fix livré dans Phosphoric **v1.16.3-alpha** (header 9-byte ROM-compatible).
 format après recompilation de Phosphoric. Vérifier `xxd build/asteroids.tap |
 head -1` → doit commencer par `16 16 16 24 00 00 80 80 …` (et non
 `16 16 16 24 80 80 …`).
+
+## [1.2.9] - 2026-05-13
 
 ### Investigation HIRES TEXT glitch — comportement hardware Oric attendu
 
