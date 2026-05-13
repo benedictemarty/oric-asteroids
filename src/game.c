@@ -178,11 +178,15 @@ static unsigned char wave_displayed;
  * SÉQUENTIELLE — les fragments disparaissent un par un dans le temps,
  * conformément au comportement arcade rev 4. */
 #define DEBRIS_COUNT      6
-/* Phase 19+ : DEBRIS_TTL augmenté à 60 (2.4 s à 25 Hz) — l'animation
- * à 30 frames passait trop vite, l'utilisateur ne percevait pas le
- * vaisseau exploser. Séquence séquentielle 60/55/50/45/40/35 frames :
- * fragment 0 dure 2.4 s, fragment 5 dure 1.4 s. */
-#define DEBRIS_TTL        60
+/* DEBRIS_TTL = 40 frames (1.6 s à 25 Hz). Séquence séquentielle
+ * 40/35/30/25/20/15 : fragment 0 dure 1.6 s, fragment 5 dure 0.6 s.
+ *
+ * Calibrage : à 30 frames (1.2 s), l'animation passait trop vite —
+ * pas perçue. À 60 frames (2.4 s), elle s'éternisait : certains debris
+ * (vx=0, vy=±4) restent à l'écran pendant ~25 frames avant de sortir,
+ * et l'animation continuait jusqu'à TTL=0 même si visuellement épuisée.
+ * 40 = compromis : animation lisible mais ne traîne pas. */
+#define DEBRIS_TTL        40
 
 /* Séquencement de l'écran game over (compteur frames @ 25 Hz) :
  *   [0,  DEATH_EXPLOSION_END[   = Phase 1 : explosion debris seule.
@@ -191,7 +195,7 @@ static unsigned char wave_displayed;
  *                                 (Le prompt n'apparaît qu'après relâchement
  *                                  des touches SPACE/ESC — wait-release.)
  * Toutes les durées sont en frames à 25 Hz (1 s = 25 frames). */
-#define DEATH_EXPLOSION_END     60    /* fin animation debris = DEBRIS_TTL */
+#define DEATH_EXPLOSION_END     40    /* fin animation debris = DEBRIS_TTL */
 #define DEATH_GAMEOVER_HOLD     125   /* 5 s pile de GAME OVER seul */
 #define DEATH_HOF_FRAME         (DEATH_EXPLOSION_END + DEATH_GAMEOVER_HOLD)
 

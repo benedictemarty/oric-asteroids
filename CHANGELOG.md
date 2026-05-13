@@ -40,6 +40,23 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Tune — DEBRIS_TTL 60 → 40 (explosion plus courte) ✅
+
+**Symptôme** : l'explosion du ship paraissait trop longue, "ne
+s'arrêtait que quand tous les bouts étaient en dehors de l'écran".
+
+**Diagnostic** : avec `DEBRIS_TTL = 60` (2.4 s à 25 Hz) et vélocités
+±3-4 px/frame, certains debris (vx=0, vy=±4) restent à l'écran
+~25 frames avant de sortir. L'animation continuait alors jusqu'à
+TTL=0 même si visuellement épuisée — perception "qui traîne".
+
+**Fix** : `DEBRIS_TTL` 60 → **40** (1.6 s). Séquence séquentielle
+40/35/30/25/20/15 : fragment 0 dure 1.6 s, fragment 5 dure 0.6 s.
+Compromis entre 30 (trop court, pas perçu) et 60 (trop long).
+
+`DEATH_EXPLOSION_END` ajusté à 40 (Phase 1 dure exactement la durée
+de l'animation). Phase 2 démarre dès que les debris ont disparu.
+
 ### Fix BSS-clear — flags séquence game over non initialisés ✅
 
 **Symptôme** (suite au refactor 3 phases) : `GAME OVER` n'apparaissait
