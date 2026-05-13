@@ -40,6 +40,26 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Tune — game over : séquencer explosion → GAME OVER + HoF ✅
+
+**Symptôme** : à la mort du dernier vaisseau, tout s'affichait
+simultanément à l'écran — debris d'explosion en cours d'animation,
+texte "GAME OVER" et tableau "HIGH SCORES". Visuellement surchargé,
+le joueur ne voyait pas distinctement son ship exploser.
+
+**Fix** : séquencement temporel en 3 phases via `gameover_lock`
+(125 frames = 5 s à 25 Hz) :
+
+- **Phase 1** (lock 125 → 96, ~30 frames ≈ 1.2 s) : **explosion debris
+  seule** à l'écran. Le joueur voit son ship voler en éclats sans
+  être distrait par le texte. 30 frames correspond exactement à la
+  durée max du fragment 0 (`DEBRIS_TTL = 30`).
+- **Phase 2** (lock ≤ 95) : ajout de GAME OVER + HIGH SCORES.
+  Les debris ont fini leur animation, place au résumé.
+- **Phase 3** (lock = 0 ET `gameover_armed = 0`) : prompt
+  "PRESS SPACE / OR ESC TO STOP" et acceptation des touches (cf.
+  tune wait-release ci-dessous).
+
 ### Tune — game over : lock 5 s + wait-release sur SPACE/ESC ✅
 
 **Symptômes** :

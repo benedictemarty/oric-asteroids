@@ -1040,15 +1040,24 @@ void game_run(void)
 
         hud_draw();
 
-        /* Game over text : HoF + "GAME OVER" tracés dès le début ;
-         * "PRESS SPACE / OR ESC TO STOP" seulement après le lock 2 s. */
-        if (gameover) {
+        /* Séquencement écran game over :
+         *   Phase 1 (lock 125→96, ~30 frames ≈ 1.2 s) : explosion debris
+         *     seule à l'écran — laisse le joueur voir mourir son ship.
+         *   Phase 2 (lock ≤ 95) : ajout de GAME OVER + HIGH SCORES.
+         *     Les debris ont fini leur animation (TTL max = 30 frames).
+         *   Phase 3 (lock = 0 ET wait-release OK) : prompt "PRESS SPACE
+         *     / OR ESC TO STOP" accepté.
+         * Évite l'effet "tout s'affiche d'un coup" qui était visuellement
+         * surchargé (debris + GAME OVER + HoF en même temps). */
+        if (gameover && gameover_lock <= 95) {
             if (hiscores_drawn) hiscores_draw_table();
             if (gameover_text_drawn) gameover_erase();
             hiscores_draw_table();
             hiscores_drawn = 1;
             gameover_draw();
             gameover_text_drawn = 1;
+        }
+        if (gameover) {
 
             if (gameover_lock == 0 && !gameover_armed) {
                 if (prompt_drawn) {
