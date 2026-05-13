@@ -82,7 +82,9 @@ void tune_stop(void);
 #define WX_SPAN         (WX_MAX - WX_MIN)
 #define WY_SPAN         (WY_MAX - WY_MIN)
 
-#define SHIP_RADIUS         7
+/* Demi-extent L∞ du ship 5 segments : max(|x|)=4 (P1/P2), max(|y|)=5 (P0).
+ * R=5 ⇒ hitbox = silhouette exacte (pas de halo invisible). */
+#define SHIP_RADIUS         5
 /* Ship mort → invisible pendant DEBRIS_TTL frames (animation explosion),
  * puis clignote pendant SHIP_BLINK_FRAMES (invincibilité). */
 #define SHIP_BLINK_FRAMES   20

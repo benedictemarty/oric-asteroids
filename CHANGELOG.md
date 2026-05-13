@@ -50,8 +50,13 @@ thrust lors d'une future Phase polish.
     + replot final des 5 sommets via `_plot_dot` (compense le XOR
     Bresenham qui omet certains endpoints — cf. fix Phase 9g),
   - `_ship_draw`/`_ship_erase` : tail-call sur `draw_five_lines`.
-- `SHIP_RADIUS` dans `game.c` reste à 7 (majorant inchangé : la nouvelle
-  forme tient dans une bbox 8×9, R=7 reste valide pour collision L∞).
+- `SHIP_RADIUS` dans `game.c` : **7 → 5** pour recalibrer la hitbox L∞
+  sur la nouvelle silhouette. Le nouveau ship a un demi-extent réel
+  max(|x|)=4 (P1/P2), max(|y|)=5 (P0) ; R=5 fait coïncider la hitbox
+  avec la silhouette exacte (pas de halo invisible de 2 px qu'aurait
+  laissé R=7 sur le nouveau ship). Cohérent avec l'esprit arcade où
+  la hitbox est ≤ silhouette (pardonne plutôt qu'elle ne pénalise).
+  Affecte 3 collisions : ship vs asteroid, ship vs UFO, ship vs UFO_bullet.
 
 **Coût rendu** : +2 segments à dessiner par frame ship (3 → 5). Avec
 le Bresenham actuel à ~97 c/px et les segments courts (3-6 px chacun),
