@@ -120,14 +120,27 @@ static const unsigned int score_by_size[3] = { 100, 50, 20 };
 #define VIA_IER         (*(volatile unsigned char*)0x030E)
 #define VIA_T1CL        (*(volatile unsigned char*)0x0304)
 #define VIA_T1CH        (*(volatile unsigned char*)0x0305)
-#define FRAME_LO        0x3F
-#define FRAME_HI        0x9C
 
-/* Phase 9 — synchro VSync ULA via CB1.
- * Sur Oric-1, CB1 est connecté au signal VSync de l'ULA (50 Hz PAL).
- * IFR bit 4 = flag CB1, set sur transition. À 25 Hz = 2 VSync par frame. */
-#define VSYNC_FLAG      0x10        /* IFR bit 4 = CB1 */
-#define VSYNCS_PER_FRAME 2          /* 50 Hz / 2 = 25 Hz */
+/* Synchro frame via VIA Timer 1 en mode continu (free-run).
+ *
+ * HISTORIQUE — Phase 9 avait posé une synchro VSync ULA via CB1 (IFR
+ * bit 4). Cela marchait sur Phosphoric ≤ 1.16.10 par convention
+ * d'émulation, mais le hardware Oric réel ne câble PAS CB1 à la VSync
+ * ULA — boucle infinie sur Phosphoric 1.16.11+, Oricutron WIP, et le
+ * vrai Oric-1 (cf. docs/notes/2026-05-13-asteroids-vsync-cb1.md).
+ *
+ * Solution actuelle — VIA T1 free-run @ 20 ms :
+ *   period = 20 000 cycles à 1 MHz = 0x4E1F (T1CH=$4E, T1CL=$1F).
+ *   ACR bits 6-7 = 01 ⇒ T1 free-run, pas de sortie PB7.
+ *   Polling de IFR bit 6 (T1 flag). Clear par lecture de T1CL.
+ *
+ * Dérive : quelques cycles par trame, négligeable à 25 Hz pour Asteroids.
+ * Tearing théorique possible (pas synchro avec balayage écran), non
+ * perçu en pratique sur un jeu vectoriel sparse comme Asteroids. */
+#define T1_FLAG          0x40        /* IFR bit 6 = Timer 1 */
+#define T1_PERIOD_LO     0x1F        /* 20000 = $4E1F */
+#define T1_PERIOD_HI     0x4E
+#define VSYNCS_PER_FRAME 2           /* 50 Hz / 2 = 25 Hz */
 
 /* ------------------------------------------------------------------ */
 /* État local                                                          */
@@ -277,25 +290,40 @@ static unsigned char collide(unsigned char x1, unsigned char y1,
 
 static void timer_init(void)
 {
-    /* Phase 9 : VSync ULA via CB1 (preferé, anti-tearing).
-     * On laisse PCR tel que la ROM le configure (CB1 = falling edge,
-     * géré par la ROM IRQ). Désactivons l'IRQ CB1 pour pouvoir poll
-     * IFR sans rejet. */
-    VIA_ACR = VIA_ACR & 0x3F;       /* Timer 1 one-shot (au cas où fallback) */
-    VIA_IER = 0x40;                  /* Disable T1 IRQ */
-    VIA_IFR = 0x50;                  /* Clear T1 + CB1 flags initialement */
+    /* Programmer Timer 1 du VIA en mode free-run @ 20 ms.
+     *
+     * Sur Oric-1 (1 MHz), 20 ms = 20 000 cycles = $4E1F (T1 décrémente
+     * à chaque cycle, IRQ flag à 0). Le timer se réarme automatiquement
+     * en mode free-run, donc le flag IFR T1 se latche tous les 20 ms.
+     *
+     * ACR bits 6-7 : 01 = T1 continuous mode, pas de sortie PB7.
+     * On désactive T1 IRQ pour pouvoir poller IFR (sans dispatch ROM).
+     *
+     * Charger T1CL puis T1CH dans cet ordre : l'écriture de T1CH
+     * recharge le compteur depuis (T1CL, T1CH) et démarre le décompte.
+     */
+    VIA_ACR = (VIA_ACR & 0x3F) | 0x40;   /* T1 free-run, no PB7 */
+    VIA_T1CL = T1_PERIOD_LO;             /* low latch */
+    VIA_T1CH = T1_PERIOD_HI;             /* high latch + start countdown */
+    VIA_IER = 0x40;                       /* disable T1 IRQ */
+    VIA_IFR = 0x40;                       /* clear flag initial */
 }
 
 static void frame_wait(void)
 {
-    /* Attendre VSYNCS_PER_FRAME transitions CB1 (= 2 VSync = 25 Hz).
-     * Le flag CB1 est partagé avec la ROM IRQ : la ROM le clear dans
-     * son handler. Pour un polling fiable, on clear nous-mêmes après
-     * chaque attente. */
+    /* Attendre VSYNCS_PER_FRAME tics T1 (= 2 × 20 ms = 40 ms = 25 Hz).
+     *
+     * Le flag T1 (IFR bit 6) se latche à chaque expiration du compteur.
+     * Pour le clear, il faut LIRE T1CL (relire le low byte) ou écrire
+     * T1CH (recharge le compteur depuis le latch et clear). On utilise
+     * la lecture de T1CL, plus rapide et conserve le pacing free-run.
+     */
     unsigned char i;
+    volatile unsigned char dummy;
     for (i = 0; i < VSYNCS_PER_FRAME; i++) {
-        while (!(VIA_IFR & VSYNC_FLAG)) { }
-        VIA_IFR = VSYNC_FLAG;        /* clear par écriture du bit */
+        while (!(VIA_IFR & T1_FLAG)) { }
+        dummy = VIA_T1CL;                /* read clears IFR T1 flag */
+        (void)dummy;
     }
 }
 

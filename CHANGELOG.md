@@ -7,6 +7,36 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Fix — frame_wait : Timer 1 free-run au lieu de CB1 (VSync hardware-réel) ✅
+
+**Symptôme** : à partir de Phosphoric 1.16.11+ et Oricutron WIP
+récent, le jeu boucle à l'infini sur l'écran titre. Phosphoric ≤
+1.16.10 « marchait » par convention émulateur non-conforme.
+
+**Cause** (note technique équipe Phosphoric,
+`docs/notes/2026-05-13-asteroids-vsync-cb1.md`) : notre Phase 9
+`frame_wait()` pollait `IFR bit 4` (CB1) en supposant que la broche
+CB1 du VIA est câblée au VSync ULA. **C'est FAUX sur le hardware Oric
+réel** — CB1 n'est pas câblé au signal VSync. L'émulateur Phosphoric
+pulsait CB1 par commodité ≤ 1.16.10, masquant le bug. Aligné sur le
+hardware réel à partir de 1.16.11.
+
+**Fix** : remplacement de la synchro CB1 par **VIA Timer 1 en mode
+free-run @ 20 ms** (Option A de la note Phosphoric). Portable sur
+hardware réel, Phosphoric, Oricutron, MAME.
+
+`src/game.c` :
+- Constantes : `VSYNC_FLAG` (CB1) → `T1_FLAG` ($40, IFR bit 6).
+  `T1_PERIOD_LO/HI` = $1F/$4E (20 000 cycles à 1 MHz = 20 ms).
+- `timer_init()` : programme T1 free-run, charge le latch
+  ($1F, $4E), désactive T1 IRQ, clear flag initial.
+- `frame_wait()` : poll IFR bit 6, clear par lecture de T1CL.
+
+Dérive : quelques cycles par trame, négligeable à 25 Hz. Pas synchro
+balayage écran ⇒ tearing théorique possible (non perçu sur Asteroids).
+
+Note importée dans `docs/notes/2026-05-13-asteroids-vsync-cb1.md`.
+
 ### Portabilité `.tap` — Oricutron / Euphoric / hardware (résolu côté Phosphoric)
 
 `bin2tap` (Phosphoric) produisait un header 7-byte non lu par Oricutron :
