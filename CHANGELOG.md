@@ -40,6 +40,29 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Fix BSS-clear — flags séquence game over non initialisés ✅
+
+**Symptôme** (suite au refactor 3 phases) : `GAME OVER` n'apparaissait
+pas en Phase 2 (5 s d'attente). Il apparaissait directement en même
+temps que le HoF à Phase 3.
+
+**Cause** : workaround Phase 6 documenté (crt0 ne clear pas BSS) — les
+flags `hiscores_drawn` et `gameover_text_drawn` (déjà BSS) et les
+nouveaux `gameover_elapsed`, `gameover_armed`, `prompt_drawn` n'étaient
+pas initialisés explicitement dans `game_run`. Si la RAM hasardeuse
+au boot mettait `gameover_text_drawn = 1` :
+- Phase 2 entry : `!gameover_text_drawn` = false ⇒ **pas de
+  `gameover_draw()`** appelé.
+- Phase 3 entry : `gameover_text_drawn` = true ⇒ `gameover_erase()`
+  toggle des pixels jamais dessinés ⇒ `GAME OVER` **apparaît au
+  moment de l'erase** (XOR), en même temps que `HIGH SCORES`.
+
+**Fix** :
+- Déplacer `prompt_drawn`, `gameover_elapsed`, `gameover_armed` du
+  scope `static for(;;)` au scope fichier (plus contrôlé).
+- Init explicite de TOUS les flags pilotant la séquence game over
+  au début de `game_run`, avec les autres workarounds Phase 6.
+
 ### Refactor senior — séquence game over en 3 phases exactes ✅
 
 **Cible** (spec utilisateur explicite, revue senior) :

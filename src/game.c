@@ -156,8 +156,11 @@ static unsigned char ship_was_drawn;
 
 /* Phase 7 — high scores en RAM (persistance .tap reportée Phase 9) */
 static unsigned int  hiscores[HISCORE_COUNT];
-static unsigned char hiscores_drawn;     /* dernier état affiché du tableau */
-static unsigned char gameover_text_drawn; /* Phase 9d : "GAME OVER" affiché */
+static unsigned char hiscores_drawn;       /* dernier état affiché du tableau */
+static unsigned char gameover_text_drawn;  /* Phase 9d : "GAME OVER" affiché */
+static unsigned char prompt_drawn;         /* "PRESS SPACE / OR ESC" affiché */
+static unsigned char gameover_elapsed;     /* frames depuis transition gameover */
+static unsigned char gameover_armed;       /* exiger relâchement SPACE/ESC */
 
 /* Phase 8 — cadence thump : décrémente sur le timer, déclenche sound_play_fx */
 static unsigned char thump_timer;
@@ -756,11 +759,20 @@ void game_run(void)
     unsigned int  final_score;
     unsigned char new_hiscore_pos = 0xFF;    /* 0..5 = nouveau hi-score, 0xFF = non */
 
-    /* Init explicite — crt0 ne clear pas BSS (workaround Phase 6) */
-    ship_invincible = 0;
-    ship_was_drawn  = 0;
-    prev_gameover   = 0;
-    final_score     = 0;
+    /* Init explicite — crt0 ne clear pas BSS (workaround Phase 6).
+     * Inclut TOUS les flags pilotant la séquence game over : sans ça,
+     * la RAM hasardeuse au boot peut faire croire que GAME OVER ou
+     * HoF étaient déjà dessinés ⇒ Phase 2 sautée et tout apparaît
+     * d'un coup à Phase 3 (bug observé). */
+    ship_invincible     = 0;
+    ship_was_drawn      = 0;
+    prev_gameover       = 0;
+    final_score         = 0;
+    hiscores_drawn      = 0;
+    gameover_text_drawn = 0;
+    prompt_drawn        = 0;
+    gameover_elapsed    = 0;
+    gameover_armed      = 0;
 
     hires_init();
     timer_init();
@@ -834,13 +846,10 @@ void game_run(void)
     hud_draw();
 
     for (;;) {
-        /* Compteur frames depuis la transition gameover=0→1 (init à 0
-         * au moment du décès, incrémenté chaque frame, clampé à 255
-         * pour éviter le wrap). Pilote le séquencement Phase 1/2/3
+        /* gameover_elapsed / gameover_armed / prompt_drawn sont des
+         * statics fichier — déclarés en haut, initialisés explicitement
+         * dans game_run (au-dessus). Pilote le séquencement Phase 1/2/3
          * (cf. constantes DEATH_*) et le wait-release. */
-        static unsigned char gameover_elapsed = 0;
-        static unsigned char gameover_armed   = 0;  /* exiger release SPACE/ESC */
-        static unsigned char prompt_drawn     = 0;
         key_scan();
 
         /* Désarmer le wait-release dès qu'on entre en Phase 3 ET que
