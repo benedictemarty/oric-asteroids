@@ -73,7 +73,6 @@ BENCH_PROF     = tests/out/phase6_bench.prof
 TEST_INPUT     = "0:\n"
 
 .PHONY: all clean run test ref check bench gen_ship host-test
-.DEFAULT_GOAL := all
 
 # ── Tests host (x86) ──────────────────────────────────────────────────
 # Vérifient le déterminisme et les bornes des routines portables
