@@ -124,9 +124,16 @@ psg_write:
 _key_scan:
         sei                   ; pas d'IRQ ROM pendant l'accès PSG
 
-        ; Sauvegarde bits invariants du PCR
+        ; Sauvegarde bits invariants du PCR.
+        ; Bit 0 (CA1) préservé. Bit 4 (CB1) FORCÉ à 0 ⇒ falling edge.
+        ; Avec auto-exec via .tap autorun (Phosphoric v1.16.3+), la ROM
+        ; Oric peut laisser PCR bit 4 = 1 (positive edge), ce qui empêche
+        ; le flag CB1 IFR de se latcher sur le VSync ULA falling.
+        ; frame_wait() reste alors bloqué. AND #$01 (au lieu de #$11)
+        ; garantit bit 4 = 0 dans kb_pcr_save, donc dans toute écriture
+        ; PCR ultérieure de _psg_write.
         lda  VIA_PCR
-        and  #$11             ; bit 0 (CA1) + bit 4 (CB1)
+        and  #$01             ; juste bit 0 (CA1) ; bit 4 forcé à 0
         sta  kb_pcr_save
 
         ; Sauvegarder DDRA et le mettre en output ($FF) pour écriture PSG.
