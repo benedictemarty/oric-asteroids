@@ -5,8 +5,10 @@ gen_ship.py — Générateur de tables précalculées pour le vaisseau Asteroids
 
 Produit src/asm/ship_verts.s contenant :
   - ship_pt0x[32], ship_pt0y[32] : pointe avant (apex) après rotation
-  - ship_pt1x[32], ship_pt1y[32] : arrière gauche
-  - ship_pt2x[32], ship_pt2y[32] : arrière droite
+  - ship_pt1x[32], ship_pt1y[32] : arrière gauche extérieur
+  - ship_pt2x[32], ship_pt2y[32] : arrière droit extérieur
+  - ship_pt3x[32], ship_pt3y[32] : cockpit gauche (sur flanc, mi-hauteur)
+  - ship_pt4x[32], ship_pt4y[32] : cockpit droit (sur flanc, mi-hauteur)
   - ship_thrx[32], ship_thry[32] : vecteur de poussée (delta vélocité)
 
 Convention : angle 0 = pointe vers le HAUT (y vers le bas en HIRES).
@@ -20,15 +22,20 @@ import sys
 N = 32      # nombre d'angles
 TMAG = 6    # amplitude max du thrust (px/frame)
 
-# Sommets du triangle vaisseau dans son repère local.
+# Sommets du vaisseau dans son repère local.
 # (y positif = bas, donc pointe en y négatif = haut)
-# Phase 18f : taille réduite ~50 % (de 16×20 à 8×10) pour matcher
-# proche de l'arcade Atari (~16 px max) sans tomber sous la limite de
-# visibilité à 240 px de large. Phase 19 prévoit 5 segments authentiques.
+# Phase 19 : forme arcade-fidèle 5 segments. Triangle ouvert à l'arrière
+# (engine port) avec une barre cockpit interne. Les segments tracés sont :
+#   P0→P3, P3→P1   (flanc gauche en deux tronçons = "encoche")
+#   P0→P4, P4→P2   (flanc droit en deux tronçons = "encoche")
+#   P3→P4          (barre cockpit horizontale)
+# Pas de segment P1↔P2 → l'arrière reste ouvert (style arcade).
 VERTS = [
-    (0,  -6),    # P0: pointe avant
-    (-4,  4),    # P1: arrière gauche
-    (4,   4),    # P2: arrière droite
+    (0,  -5),    # P0: pointe avant (apex)
+    (-4,  4),    # P1: arrière gauche extérieur
+    (4,   4),    # P2: arrière droit extérieur
+    (-2,  0),    # P3: cockpit gauche (sur flanc, mi-hauteur)
+    (2,   0),    # P4: cockpit droit (sur flanc, mi-hauteur)
 ]
 
 
@@ -68,11 +75,13 @@ def main():
     print("        .export ship_pt0x, ship_pt0y")
     print("        .export ship_pt1x, ship_pt1y")
     print("        .export ship_pt2x, ship_pt2y")
+    print("        .export ship_pt3x, ship_pt3y")
+    print("        .export ship_pt4x, ship_pt4y")
     # Tables exposées au C (cc65 préfixe _) — utilisées par game.c
     print("        .export _ship_thrx, _ship_thry")
     print()
 
-    for vi, ((px, py), name) in enumerate(zip(VERTS, ("pt0", "pt1", "pt2"))):
+    for vi, ((px, py), name) in enumerate(zip(VERTS, ("pt0", "pt1", "pt2", "pt3", "pt4"))):
         xs = [to_byte(rotate(px, py, i)[0]) for i in range(N)]
         ys = [to_byte(rotate(px, py, i)[1]) for i in range(N)]
         emit_table(f"ship_{name}x", xs)

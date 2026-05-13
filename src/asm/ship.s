@@ -25,6 +25,8 @@
         .import   ship_pt0x, ship_pt0y
         .import   ship_pt1x, ship_pt1y
         .import   ship_pt2x, ship_pt2y
+        .import   ship_pt3x, ship_pt3y
+        .import   ship_pt4x, ship_pt4y
 
 ;-----------------------------------------------------------------
 ; Variables ZP
@@ -40,13 +42,17 @@ _ship_vy:     .res 2     ; vitesse Y idem
 _ship_angle:  .res 1     ; orientation 0..31
 _key_state:   .res 1     ; bit0=←  bit1=→  bit2=↑(thrust)  bit3=SPACE  bit4=↓
 
-; Coordonnées calculées des 3 sommets après rotation+translation
+; Coordonnées calculées des 5 sommets après rotation+translation
 sh_tx0:      .res 1
 sh_ty0:      .res 1
 sh_tx1:      .res 1
 sh_ty1:      .res 1
 sh_tx2:      .res 1
 sh_ty2:      .res 1
+sh_tx3:      .res 1
+sh_ty3:      .res 1
+sh_tx4:      .res 1
+sh_ty4:      .res 1
 
 ;-----------------------------------------------------------------
 ; _ship_init — vaisseau au centre, immobile, angle 0
@@ -70,7 +76,7 @@ _ship_init:
         rts
 
 ;-----------------------------------------------------------------
-; compute_verts — calcule les 3 sommets dans sh_tx0..sh_ty2
+; compute_verts — calcule les 5 sommets dans sh_tx0..sh_ty4
 ;
 ; ptN[angle] est en complément à 2 (8 bits signés, plage [-12,+12]).
 ; clc+adc avec _ship_x (unsigned, 0..239) donne la coord pixel ; le
@@ -90,7 +96,7 @@ compute_verts:
         adc  _ship_y
         sta  sh_ty0
 
-        ; Vertex 1 (arrière gauche)
+        ; Vertex 1 (arrière gauche extérieur)
         lda  ship_pt1x,x
         clc
         adc  _ship_x
@@ -100,7 +106,7 @@ compute_verts:
         adc  _ship_y
         sta  sh_ty1
 
-        ; Vertex 2 (arrière droite)
+        ; Vertex 2 (arrière droit extérieur)
         lda  ship_pt2x,x
         clc
         adc  _ship_x
@@ -109,16 +115,52 @@ compute_verts:
         clc
         adc  _ship_y
         sta  sh_ty2
+
+        ; Vertex 3 (cockpit gauche)
+        lda  ship_pt3x,x
+        clc
+        adc  _ship_x
+        sta  sh_tx3
+        lda  ship_pt3y,x
+        clc
+        adc  _ship_y
+        sta  sh_ty3
+
+        ; Vertex 4 (cockpit droit)
+        lda  ship_pt4x,x
+        clc
+        adc  _ship_x
+        sta  sh_tx4
+        lda  ship_pt4y,x
+        clc
+        adc  _ship_y
+        sta  sh_ty4
         rts
 
 ;-----------------------------------------------------------------
-; draw_three_lines — trace les 3 segments du triangle
+; draw_five_lines — trace les 5 segments arcade-fidèles
+;
+; Topologie (apex = P0, base ouverte) :
+;   P0→P3, P3→P1   = flanc gauche en deux tronçons (encoche cockpit)
+;   P0→P4, P4→P2   = flanc droit en deux tronçons (encoche cockpit)
+;   P3→P4          = barre cockpit horizontale
 ;-----------------------------------------------------------------
-draw_three_lines:
-        ; Segment P0 -> P1
+draw_five_lines:
+        ; Segment P0 -> P3 (haut flanc gauche)
         lda  sh_tx0
         sta  _lx0
         lda  sh_ty0
+        sta  _ly0
+        lda  sh_tx3
+        sta  _lx1
+        lda  sh_ty3
+        sta  _ly1
+        jsr  _draw_line_xor
+
+        ; Segment P3 -> P1 (bas flanc gauche)
+        lda  sh_tx3
+        sta  _lx0
+        lda  sh_ty3
         sta  _ly0
         lda  sh_tx1
         sta  _lx1
@@ -126,30 +168,42 @@ draw_three_lines:
         sta  _ly1
         jsr  _draw_line_xor
 
-        ; Segment P1 -> P2
-        lda  sh_tx1
-        sta  _lx0
-        lda  sh_ty1
-        sta  _ly0
-        lda  sh_tx2
-        sta  _lx1
-        lda  sh_ty2
-        sta  _ly1
-        jsr  _draw_line_xor
-
-        ; Segment P0 -> P2
+        ; Segment P0 -> P4 (haut flanc droit)
         lda  sh_tx0
         sta  _lx0
         lda  sh_ty0
         sta  _ly0
+        lda  sh_tx4
+        sta  _lx1
+        lda  sh_ty4
+        sta  _ly1
+        jsr  _draw_line_xor
+
+        ; Segment P4 -> P2 (bas flanc droit)
+        lda  sh_tx4
+        sta  _lx0
+        lda  sh_ty4
+        sta  _ly0
         lda  sh_tx2
         sta  _lx1
         lda  sh_ty2
         sta  _ly1
         jsr  _draw_line_xor
 
-        ; Replot des 3 sommets via _plot_dot rapide (Phase 16) :
-        ; setup réduit (pas de Bresenham), gain ~50 c/plot × 3 = 150 c.
+        ; Segment P3 -> P4 (barre cockpit)
+        lda  sh_tx3
+        sta  _lx0
+        lda  sh_ty3
+        sta  _ly0
+        lda  sh_tx4
+        sta  _lx1
+        lda  sh_ty4
+        sta  _ly1
+        jsr  _draw_line_xor
+
+        ; Replot des 5 sommets via _plot_dot rapide (Phase 16).
+        ; Compense le XOR de Bresenham qui omet parfois l'endpoint
+        ; (sommets partagés entre 2+ segments, cf. Phase 9g).
         lda  sh_tx0
         sta  _lx0
         lda  sh_ty0
@@ -164,7 +218,17 @@ draw_three_lines:
         sta  _lx0
         lda  sh_ty2
         sta  _ly0
-        jmp  _plot_dot         ; plot P2 (tail call)
+        jsr  _plot_dot         ; plot P2
+        lda  sh_tx3
+        sta  _lx0
+        lda  sh_ty3
+        sta  _ly0
+        jsr  _plot_dot         ; plot P3
+        lda  sh_tx4
+        sta  _lx0
+        lda  sh_ty4
+        sta  _ly0
+        jmp  _plot_dot         ; plot P4 (tail call)
 
 ;-----------------------------------------------------------------
 ; _ship_draw / _ship_erase — XOR idempotent : même routine
@@ -172,7 +236,7 @@ draw_three_lines:
 _ship_draw:
 _ship_erase:
         jsr  compute_verts
-        jmp  draw_three_lines
+        jmp  draw_five_lines
 
 ;-----------------------------------------------------------------
 ; _ship_rotate — A = delta (signé : -1 = gauche, +1 = droite)

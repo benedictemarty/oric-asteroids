@@ -7,6 +7,67 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 19 — Vaisseau arcade-fidèle 5 segments (v1.2.9) ✅
+
+Refonte de la géométrie du vaisseau : on passe du triangle simple
+3 segments à une forme arcade-fidèle 5 segments avec barre cockpit
+interne et arrière ouvert ("engine port" style Atari).
+
+**Géométrie locale** (apex pointe vers Y négatif, soit le haut écran) :
+
+```
+        P0  (0, -5)   apex
+       /  \
+      /    \
+     P3----P4         P3 = (-2, 0)   cockpit gauche
+    /        \        P4 = ( 2, 0)   cockpit droit
+   /          \
+  P1          P2      P1 = (-4, 4)   arrière gauche extérieur
+                      P2 = ( 4, 4)   arrière droit extérieur
+```
+
+Segments tracés (XOR) :
+1. P0 → P3   (haut flanc gauche)
+2. P3 → P1   (bas flanc gauche, "encoche")
+3. P0 → P4   (haut flanc droit)
+4. P4 → P2   (bas flanc droit, "encoche")
+5. P3 → P4   (barre cockpit horizontale)
+
+L'arrière n'est volontairement pas fermé (pas de segment P1↔P2) :
+c'est le port moteur style arcade, par lequel sortira la flamme de
+thrust lors d'une future Phase polish.
+
+**Changements de code** :
+
+- `tools/gen_ship.py` : `VERTS` passe de 3 à 5 sommets ; génère 5 paires
+  de tables `ship_ptNx`/`ship_ptNy` (N = 0..4) après rotation 32 angles.
+- `src/asm/ship_verts.s` : régénéré avec les nouvelles tables P3/P4
+  (320 octets RODATA, +128 octets vs 3-sommets).
+- `src/asm/ship.s` :
+  - imports `ship_pt3x/y` et `ship_pt4x/y`,
+  - `compute_verts` étend le calcul à 5 sommets (`sh_tx3/y3`, `sh_tx4/y4`),
+  - `draw_three_lines` renommée en `draw_five_lines`, trace les 5 segments
+    + replot final des 5 sommets via `_plot_dot` (compense le XOR
+    Bresenham qui omet certains endpoints — cf. fix Phase 9g),
+  - `_ship_draw`/`_ship_erase` : tail-call sur `draw_five_lines`.
+- `SHIP_RADIUS` dans `game.c` reste à 7 (majorant inchangé : la nouvelle
+  forme tient dans une bbox 8×9, R=7 reste valide pour collision L∞).
+
+**Coût rendu** : +2 segments à dessiner par frame ship (3 → 5). Avec
+le Bresenham actuel à ~97 c/px et les segments courts (3-6 px chacun),
+le surcoût est ~600-1000 cycles/frame ship = ~3-5 % du budget 25 Hz.
+Acceptable au vu du rendu plus fidèle.
+
+**Validation** :
+
+- Build OK (`make clean && make`).
+- Test régression `make check` PASS — la capture d'écran titre est
+  inchangée (le ship n'apparaît pas en écran titre, seule la démo
+  passive d'astéroïdes y figure).
+- Validation visuelle à angle 0 par extraction PPM zone (115-125, 92-105) :
+  apex à (120, 95), barre cockpit visible à y=100, coins arrière à
+  (116, 103) et (123, 103). Géométrie conforme à la spec.
+
 ### Anti-flicker — réorganisation boucle `game_run` (étapes A + B) ✅
 
 **Symptôme** : à 25 Hz, les astéroïdes (et autres entités mobiles)
