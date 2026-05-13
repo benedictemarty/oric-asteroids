@@ -11,6 +11,78 @@
 
 ---
 
+## Code source arcade — désasm rev 4 (computerarcheology.com)
+
+Le hardware Asteroids n'utilise PAS de PSG. Chaque effet a son
+**propre circuit analogique discret** (oscillateurs 555 + RC fixes),
+et le CPU 6502 ne fait que déclencher/arrêter via des ports I/O.
+
+### Hardware sound (ports d'écriture)
+
+| Addr   | Symbol      | Effet                      |
+|--------|-------------|----------------------------|
+| $3600  | `SNDEXP`    | Explosion (bits 6-7 = size, bits 0-5 = durée frames) |
+| $3A00  | `SNDTHUMP`  | Beat / thump cadencé       |
+| $3C00  | `SNDSAUCR`  | Saucer ambient bip-bip     |
+| $3C01  | `SNDSFIRE`  | Saucer fire                |
+| $3C03  | `SNDTHRUST` | Thrust                     |
+| $3C04  | `SNDFIRE`   | Player fire                |
+| $3C05  | `SNDBONUS`  | Extra ship                 |
+| $3E00  | `SNDRESET`  | Reset global               |
+
+Pas de pitch programmable côté CPU — chaque circuit a son timbre fixe.
+Seules **durée** et **déclenchement** sont contrôlés.
+
+### Compteurs RAM (décrémentés chaque frame, 60 Hz NTSC)
+
+| Addr | Symbol                  | Init connu        |
+|------|-------------------------|-------------------|
+| $66  | `sndTimePlayerFire`     | **$12 = 18 frames = 0.3 s** |
+| $67  | `sndTimeSaucerFire`     | non vu            |
+| $68  | `sndTimeBonusShip`      | non vu            |
+| $69  | `sndTimeExplosion`      | calc dynamique selon size (cf. ci-dessous) |
+| $6C  | `sndThump`              | **$04 = 4 frames = 0.067 s** par thump   |
+| $6E  | `sndTHumpOff`           | $04 (off flag)    |
+
+### Encodage de l'explosion (size → pitch + durée)
+
+Code arcade `$6B47-$6B65` :
+```asm
+LDA  [statusAsteroids],Y    ; bits 0-1 = size (0=SMALL, 1=MEDIUM, 2=LARGE)
+AND  #$03                   ; isole size
+EOR  #$02                   ; mapping LARGE→0, MED→3, SMALL→2
+LSR  A                      ; >> 1 (carry = bit 0 sortant)
+ROR  A                      ; ROR avec carry → bit 7
+ROR  A                      ; ROR encore
+ORA  #$3F                   ; bits 0-5 = $3F (= durée 63 frames)
+STA  [sndTimeExplosion]
+```
+
+**Résultat des 8 bits écrits** (déduction depuis calcul) :
+| Size   | Valeur sndTimeExplosion | Bits 6-7 (pitch ID) | Bits 0-5 (durée 60 Hz) |
+|--------|-------------------------|---------------------|------------------------|
+| LARGE  | `$3F`  | 00 = pitch grave       | $3F = 63 frames = 1.05 s |
+| MEDIUM | `$FF`  | 11 = pitch aigu        | $3F = 63 frames = 1.05 s |
+| SMALL  | `$BF`  | 10 = pitch medium      | $3F = 63 frames = 1.05 s |
+
+Les **bits 6-7** sont probablement décodés par le hardware comme
+sélecteur entre 3-4 timbres d'explosion (filtres RC différents).
+La **durée** est identique à ~1 s pour les 3.
+
+### Conversion vers notre AY-3-8912 (1 effet à la fois)
+
+Ratio frames : arcade 60 Hz → Oric 25 Hz = × 25/60 = **× 0.42**.
+
+| Effet | Arcade frames | Oric frames | Notre valeur actuelle |
+|-------|---------------|-------------|-----------------------|
+| Fire (sndTimePlayerFire) | 18 | 7.5 ≈ 7 | **7** ✓ |
+| Explosion all sizes | 63 | 26 | **25** ✓ |
+| Thump individuel | 4 | 1.7 ≈ 2 | **2** ✓ |
+
+Nos valeurs sont déjà bien calibrées.
+
+---
+
 ## ⚠ Corrections suite à l'analyse MP3 (mise à jour)
 
 L'analyse initiale sur `.wav` 1994 8-bit/11kHz a donné des fréquences
