@@ -240,19 +240,20 @@ static void asteroid_draw_at(unsigned char idx, unsigned char cx, unsigned char 
             draw_line_xor();
         }
     }
-    /* Phase 9g : replot des N sommets (polygone fermé) — clippés pareil.
-     * Phase 16 : utilise plot_dot (40 c/plot vs ~80 c via draw_line_xor). */
-    for (i = 0; i < n; i++) {
-        dx0 = shape_x[base + i];
-        dy0 = shape_y[base + i];
-        x0 = ax + (int)dx0;
-        y0 = ay + (int)dy0;
-        if (IN_BOUNDS(x0, y0)) {
-            lx0 = (unsigned char)x0;
-            ly0 = (unsigned char)y0;
-            plot_dot();
-        }
-    }
+    /* Revue senior 2026-05-13 : suppression du replot des N sommets
+     * (Phase 9g) — pour un polygone fermé, chaque sommet est endpoint
+     * du segment N et startpoint du segment N+1. Avec un Bresenham XOR
+     * inclusif, ces 2 traces s'annulent (2 toggles = invisible). Le
+     * replot rétablissait le sommet via _plot_dot ⇒ 3 toggles = visible.
+     *
+     * Gain : ~6 sommets × _plot_dot (~40 c) × MAX_ASTEROIDS=6 × 2 (erase
+     * + draw) = ~2880 c/frame éliminés ≈ 15 % du budget 25 Hz.
+     *
+     * Compromis : 1 px peut manquer aux sommets selon le comportement
+     * exact du Bresenham. À mesurer visuellement. Si trop gênant, on
+     * peut revenir au replot ciblé (uniquement sommets visiblement
+     * absents, pas tous).
+     */
 }
 
 /* Phase 10l — duplication d'instance : asteroid près d'un bord est
