@@ -37,6 +37,11 @@ balayage écran ⇒ tearing théorique possible (non perçu sur Asteroids).
 
 Note importée dans `docs/notes/2026-05-13-asteroids-vsync-cb1.md`.
 
+**Validation cross-émulateur** :
+- ✅ Phosphoric 1.16.11+ : OK
+- ✅ Oricutron : fonctionnel (validé 2026-05-13)
+- ⏳ Oric‑1 physique : à tester quand hardware disponible
+
 ### Portabilité `.tap` — Oricutron / Euphoric / hardware (résolu côté Phosphoric)
 
 `bin2tap` (Phosphoric) produisait un header 7-byte non lu par Oricutron :

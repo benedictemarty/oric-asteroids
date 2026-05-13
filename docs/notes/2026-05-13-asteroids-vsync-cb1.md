@@ -181,11 +181,11 @@ ROM. Plus fragile, dépend de la ROM exacte (BASIC 1.0 vs 1.1). À éviter.
 
 ## 6. Tests à refaire après correction
 
-1. `asteroids.tap` fast-load Phosphoric 1.16.11+ : doit dépasser l'écran titre
-   et accepter SPACE.
-2. `asteroids.tap` Oricutron WIP : doit dépasser l'écran titre.
-3. `asteroids.dsk` sur vrai Oric‑1 (revision PAL) : doit jouer normalement
-   à ~25 fps.
+1. ✅ `asteroids.tap` fast-load Phosphoric 1.16.11+ : dépasse l'écran titre
+   et accepte SPACE.
+2. ✅ `asteroids.tap` Oricutron : fonctionnel (validé 2026-05-13).
+3. ⏳ `asteroids.dsk` sur vrai Oric‑1 (revision PAL) : à valider quand
+   hardware disponible.
 
 ## 7. Côté Phosphoric — ce qui a changé
 
