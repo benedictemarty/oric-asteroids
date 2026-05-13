@@ -305,10 +305,14 @@ void ufo_bullet_update(void)
     }
     nx = (int)ufo_bullet_x + (int)ufo_bullet_vx;
     ny = (int)ufo_bullet_y + (int)ufo_bullet_vy;
-    if (nx < 1 || nx > 238 || ny < 1 || ny > 198) {
-        ufo_bullet_active = 0;
-        return;
-    }
+    /* Wraparound arcade : dans l'Atari rev, UFO et joueur partagent les
+     * mêmes shot slots ($021F-$0222) ⇒ même traitement aux bords. Bullet
+     * UFO = 1 pixel, donc x ∈ [0..239], y ∈ [0..199]. Vélocité max ±4
+     * ⇒ un seul ajustement par bord suffit. TTL borne la portée totale. */
+    if (nx < 0)        nx += 240;
+    else if (nx > 239) nx -= 240;
+    if (ny < 0)        ny += 200;
+    else if (ny > 199) ny -= 200;
     ufo_bullet_x = (unsigned char)nx;
     ufo_bullet_y = (unsigned char)ny;
     ufo_bullet_ttl--;

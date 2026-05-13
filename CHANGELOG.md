@@ -42,6 +42,27 @@ Affecte uniquement les bullets ship. Les bullets UFO (`ufo.c`) gardent
 leur comportement actuel (TTL 30, mort aux bords) — peut être aligné
 en Phase 20 si jugé utile.
 
+### Bullets UFO — wraparound arcade-fidèle ✅
+
+**Confirmation source arcade** (computerarcheology, désasm Atari rev 4) :
+les bullets UFO partagent les **mêmes shot slots** que les bullets joueur
+($021F-$0222, tracking via `statusShip $1B-$1E`) et reçoivent donc le
+**même traitement de wraparound aux bords**.
+
+**Correctif `ufo.c ufo_bullet_update`** : remplace la mort aux bords
+par un wrap add/sub :
+- `if (nx < 0) nx += 240; else if (nx > 239) nx -= 240;`
+- idem pour Y avec span 200.
+- Bullet UFO = 1 pixel ⇒ x ∈ [0..239] complet (vs [0..238] pour ship
+  bullet à 2 px).
+- Vélocité max ±4 px/frame ⇒ un seul ajustement suffit.
+
+**`UFO_BULLET_TTL` inchangé (30 frames)** : à 4 px/frame × 30 = 120 px
+de portée = 50 % écran. Pas aligné sur le TTL ship (15) car la vélocité
+UFO est 3× plus faible — un TTL identique donnerait une portée de 60 px
+seulement (25 % écran), trop courte pour menacer le joueur. Le 30 actuel
+préserve la pression UFO tout en autorisant 1 wrap occasionnel.
+
 ### Phase 19 — Vaisseau arcade-fidèle 5 segments (v1.2.9) ✅
 
 Refonte de la géométrie du vaisseau : on passe du triangle simple
