@@ -59,12 +59,18 @@ REF_SHOT       = tests/ref/phase9_release.ppm
 BENCH_CYCLES   = $(shell echo $$(($(FASTLOAD_DONE) + 25000000)))
 BENCH_PROF     = tests/out/phase6_bench.prof
 
-# Inputs scriptés Phase 3 :
-#   après 3.5M cycles : CALL 1280 (lance le jeu)
-#   après 4.0M cycles : appui RIGHT ARROW (tourne 0.5 s)
-#   après 4.5M cycles : appui UP ARROW (thrust)
-#   après 5.5M cycles : appui SPACE (tir)
-TEST_INPUT     = "$(FASTLOAD_DONE):CALL $(LOAD_ADDR)\n"
+# Inputs scriptés.
+#
+# Phosphoric v1.16.3+ : le .tap produit par bin2tap a un flag autorun
+# ($C7 byte 7 du header) ⇒ le binaire s'auto-exécute après injection
+# fast-load. PAS BESOIN de taper "CALL 1280" — au contraire, le faire
+# après l'auto-exec provoque ILLEGAL QUANTITY ERROR car $0500 pointe
+# sur du code déjà exécuté.
+#
+# TEST_INPUT vide (la valeur "0:" est un placeholder valide pour
+# --type-keys qui exige le format "cycles:texte"). Si besoin de scripter
+# SPACE/touches pour test gameplay, redéfinir.
+TEST_INPUT     = "0:\n"
 
 .PHONY: all clean run test ref check bench gen_ship host-test
 
