@@ -40,6 +40,27 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Fix — game_reset : pas d'invincibilité au new game ✅
+
+**Symptôme** : après une défaite, en relançant une partie via SPACE,
+le ship apparaissait 1 s, disparaissait 4 s, puis réapparaissait
+clignotant — comme s'il y avait une invincibilité injustifiée.
+
+**Cause** : `game_reset()` mettait `ship_invincible = INVINCIBLE_FRAMES`
+(= `DEBRIS_TTL + SHIP_BLINK_FRAMES` = 60 frames). Cette valeur est
+conçue pour le **respawn mid-game** : ship_invincible > SHIP_BLINK_FRAMES
+fait que le ship reste invisible pendant l'animation des debris
+d'explosion, puis clignote pour signaler l'invincibilité.
+
+Mais au **new game** (après game over + SPACE), il n'y a **pas eu
+d'explosion à animer** — l'animation a déjà eu lieu et est terminée.
+L'invincibilité forçait donc une attente artificielle visible/invisible
+de plusieurs secondes.
+
+**Fix** : `ship_invincible = 0` dans `game_reset()`. Le ship apparaît
+direct au centre, pleinement visible. L'invincibilité reste active
+pour `ship_respawn()` (mid-game), où elle a son sens.
+
 ### Tune — DEBRIS_TTL 60 → 40 (explosion plus courte) ✅
 
 **Symptôme** : l'explosion du ship paraissait trop longue, "ne

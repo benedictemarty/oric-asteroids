@@ -741,8 +741,12 @@ static void game_reset(void)
     asteroids_spawn_wave();
     ufo_init();
     hud_init();
-    ship_was_drawn = 0;
-    ship_invincible = INVINCIBLE_FRAMES;
+    ship_was_drawn  = 0;
+    /* Pas d'invincibilité au new game : INVINCIBLE_FRAMES est prévu
+     * pour le respawn mid-game (= attendre fin animation explosion +
+     * clignote). Au new game (après game over + SPACE), il n'y a pas
+     * eu d'explosion à animer ⇒ le ship doit apparaître direct. */
+    ship_invincible = 0;
 
     /* Première frame visible */
     ship_draw();
