@@ -761,15 +761,15 @@ void game_run(void)
     asteroids_spawn_wave();
     asteroids_draw();
     {
-        unsigned char i;
+        unsigned char i = 0;
         unsigned char prev_space = 0;
         unsigned char ps_visible = 1;     /* PRESS SPACE actuellement affiché */
         /* Option C : aucune musique en écran titre — silence, comme
          * l'arcade Atari Asteroids originale (le thump cadencé commence
-         * uniquement quand le jeu démarre). Le timeout sans appui est
-         * réduit à 32 frames (~2 s à 17 Hz) : pour démarrer rapidement
-         * il suffit d'appuyer sur SPACE, le double-scan le capte. */
-        for (i = 0; i < 32; i++) {
+         * uniquement quand le jeu démarre). Boucle d'attente SPACE
+         * sans timeout : on reste en attract mode tant que le joueur
+         * n'a pas appuyé sur SPACE (edge-trigger), comme l'arcade. */
+        for (;;) {
             key_scan();
             if ((key_state & 0x08) && !prev_space) break;
             prev_space = key_state & 0x08;
@@ -788,6 +788,7 @@ void game_run(void)
                     ps_visible = 1;
                 }
             }
+            i++;
             frame_wait();
         }
         /* Garantir l'état "effacé" en sortie (XOR cohérence) */

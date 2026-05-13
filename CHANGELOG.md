@@ -7,6 +7,25 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Fix — écran titre attend vraiment SPACE (suppression timeout) ✅
+
+**Symptôme** : au lancement du jeu, l'écran titre se fermait
+automatiquement après ~2 secondes et le jeu démarrait **sans appui
+sur SPACE**, alors que "PRESS SPACE" est affiché et clignote.
+
+**Cause** : `game_run()` faisait `for (i = 0; i < 32; i++)` autour de
+la boucle d'attente titre — limite de 32 itérations introduite à un
+moment comme "timeout d'attract mode" (cf. commit `cd50f9c`). Le timeout
+court-circuitait l'attente SPACE.
+
+**Correctif** : remplacement de la boucle bornée par `for (;;)` (boucle
+infinie) — comportement arcade authentique : le mode attract dure
+indéfiniment tant que le joueur ne presse pas SPACE. La détection
+SPACE en edge-trigger (`(key_state & 0x08) && !prev_space`) reste
+inchangée, comme le toggle clignotement "PRESS SPACE" toutes les
+8 frames. Compteur `i` conservé pour piloter le toggle (++ explicite,
+overflow uint8 sans impact car seul `i & 0x07` est utilisé).
+
 ### Bullets joueur — wraparound + portée arcade-fidèle ✅
 
 **Symptôme** : les torpilles tirées par le ship mouraient en touchant
