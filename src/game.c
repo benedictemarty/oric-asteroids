@@ -65,8 +65,21 @@ void tune_stop(void);
 /* ------------------------------------------------------------------ */
 
 #define BULLETS         4
-#define BULLET_TTL      35
+/* TTL bullet : arcade Atari rev = 18 frames @ 60 Hz NTSC (≈ 0.3 s,
+ * shipShotsTimer $0x12). À 25 Hz Oric on conserve la portée temporelle
+ * relative ⇒ 18 × 25/60 ≈ 8 frames ; on prend 15 comme compromis
+ * (≈ 0.6 s, portée ≈ 180 px = 75 % écran à 12 px/frame), ce qui
+ * autorise 1 wraparound occasionnel mais pas 2. */
+#define BULLET_TTL      15
 #define FIRE_COOLDOWN   2     /* ~12 tirs/s à 25 Hz */
+/* Bornes de la fenêtre HIRES pour le wrap bullet. On tient compte du
+ * fait que la torpille fait 2 px (plot blt_x ET blt_x+1) : x ∈ [0..238]. */
+#define BLT_X_MIN       0
+#define BLT_X_MAX       238
+#define BLT_Y_MIN       0
+#define BLT_Y_MAX       199
+#define BLT_X_SPAN      (BLT_X_MAX - BLT_X_MIN + 1)   /* 239 */
+#define BLT_Y_SPAN      (BLT_Y_MAX - BLT_Y_MIN + 1)   /* 200 */
 
 /* 8.8 fixed-point pour ship_vx/vy (16 bits signed).
  *   - V_MAX_FIXED = 2048 = 8.00 px/frame max (à 25 Hz = 200 px/s).
@@ -499,10 +512,14 @@ static void bullets_update(void)
         if (blt_ttl[i] == 0) continue;
         nx = (int)blt_x[i] + (int)blt_vx[i];
         ny = (int)blt_y[i] + (int)blt_vy[i];
-        if (nx < 1 || nx > 238 || ny < 1 || ny > 198) {
-            blt_ttl[i] = 0;
-            continue;
-        }
+        /* Wraparound arcade : position 16-bit côté Atari, ici on rejette
+         * juste les coords hors fenêtre avec un add/sub du span. Vélocité
+         * max ±12 px/frame ⇒ un seul pas suffit pour ramener nx/ny dans
+         * [MIN..MAX]. La portée totale est bornée par BULLET_TTL frames. */
+        if (nx < BLT_X_MIN)      nx += BLT_X_SPAN;
+        else if (nx > BLT_X_MAX) nx -= BLT_X_SPAN;
+        if (ny < BLT_Y_MIN)      ny += BLT_Y_SPAN;
+        else if (ny > BLT_Y_MAX) ny -= BLT_Y_SPAN;
         blt_x[i] = (unsigned char)nx;
         blt_y[i] = (unsigned char)ny;
         blt_ttl[i]--;

@@ -7,6 +7,41 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Bullets joueur — wraparound + portée arcade-fidèle ✅
+
+**Symptôme** : les torpilles tirées par le ship mouraient en touchant
+les bords de l'écran, alors que dans l'arcade Atari elles font le
+wraparound aux 4 bords (positions 16-bit côté arcade).
+
+**Source arcade** (Atari Asteroids, désasm computerarcheology) :
+- `shipShotsTimer` (4 slots à $021F-$0222) initialisé à `$12 = 18 frames`
+  @ 60 Hz NTSC ⇒ portée temporelle ≈ **0.3 s**.
+- Position 16-bit ⇒ wraparound naturel aux bords écran.
+- Max **3 bullets simultanées** (notre port : 4, conservé).
+
+**Correctif game.c `bullets_update`** :
+
+- Plus de mort aux bords : `if (nx < BLT_X_MIN) nx += BLT_X_SPAN` etc.
+  pour les 4 bords (X et Y). Vélocité bullet max ±12 px/frame ⇒ un
+  seul ajustement suffit à ramener dans [MIN..MAX]. Le TTL continue
+  de décrémenter normalement, bornant la portée totale.
+- Constantes `BLT_X_MIN/MAX = 0/238`, `BLT_Y_MIN/MAX = 0/199`.
+  X borné à 238 car la torpille fait 2 px (`plot(blt_x)` + `plot(blt_x+1)`),
+  donc x+1 ≤ 239 toujours valide.
+
+**Correctif `BULLET_TTL` 35 → 15** :
+
+Conversion arcade : `18 frames @ 60 Hz × (25/60) ≈ 8 frames` à 25 Hz Oric.
+On prend 15 (compromis entre fidélité [8] et jouabilité [35] originale) :
+- Portée ≈ 15 × 12 = **180 px** = 75 % largeur écran 240.
+- Autorise **1 wraparound occasionnel** mais pas 2 (un bullet ne peut
+  pas tuer son tireur après avoir fait le tour 2× — comportement
+  cohérent arcade).
+
+Affecte uniquement les bullets ship. Les bullets UFO (`ufo.c`) gardent
+leur comportement actuel (TTL 30, mort aux bords) — peut être aligné
+en Phase 20 si jugé utile.
+
 ### Phase 19 — Vaisseau arcade-fidèle 5 segments (v1.2.9) ✅
 
 Refonte de la géométrie du vaisseau : on passe du triangle simple
