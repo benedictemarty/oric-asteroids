@@ -7,6 +7,26 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 2b — SMC dans Bresenham `_draw_line_xor` ✅
+
+Objectif Phase 2b ROADMAP : passer de ~97 c/px à ~40-50 c/px via
+Self-Modifying Code et déroulage. Première itération — SMC seul.
+
+**Optimisations** :
+1. **SMC step y** : `clc/adc #40/bcc/inc` (sy=+1) patché en
+   `sec/sbc/bcs/dec` (sy=-1) à l'entrée. Élimine le test
+   `lda l_sy; bmi …` à chaque step y. Gain ~5-15 c sur pixels avec step y.
+2. **SMC opérandes dx / dy** : `cmp l_dx` / `adc l_dy` / `sbc l_dx`
+   (3c chacun, ZP) → `cmp #dx` / `adc #dy` / `sbc #dx` (2c chacun,
+   immédiat). Patché à l'entrée. Gain 3 c/px constant.
+
+**Sécurité** : à chaque appel, les 12 octets de SMC sont **ré-écrits
+explicitement** selon sy/dx/dy. Pas de leak d'état entre appels.
+
+**Gain estimé** : ~4 c/px en moyenne (mix pixels). Loin des 50 c/px
+visés (97 → ~93 c/px). Pour atteindre l'objectif, le déroulage boucle
+et la simplification du mask shift restent à faire (Phase 2c).
+
 ### Fix — trace fantôme ship quand UP+DOWN simultanés ✅
 
 **Symptôme reproductible** (signalé par utilisateur) : appuyer UP

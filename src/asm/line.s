@@ -262,6 +262,57 @@ _draw_line_xor:
         lda  x_msk,y
         sta  l_mask
 
+        ; ── Phase 2b — SMC : patcher la direction step y dans la boucle h
+        ; (et plus tard la boucle v). Élimine le test `lda l_sy; bmi ...`
+        ; à chaque step y, économise ~5-6 c/px sur les pixels concernés.
+        ;
+        ; Opcodes par défaut (sy = +1) : clc/adc/bcc/inc
+        ; Opcodes pour sy = -1 :          sec/sbc/bcs/dec
+        lda  l_sy
+        bpl  @smc_sy_pos
+        ; sy = -1 : patcher
+        lda  #$38                ; sec
+        sta  @h_sy_carry
+        sta  @v_sy_carry
+        lda  #$E9                ; sbc
+        sta  @h_sy_op
+        sta  @v_sy_op
+        lda  #$B0                ; bcs
+        sta  @h_sy_branch
+        sta  @v_sy_branch
+        lda  #$C6                ; dec
+        sta  @h_sy_inc
+        sta  @v_sy_inc
+        jmp  @smc_done
+@smc_sy_pos:
+        ; sy = +1 : restaurer opcodes par défaut (au cas où un appel
+        ; précédent a patché à sec/sbc/bcs/dec).
+        lda  #$18                ; clc
+        sta  @h_sy_carry
+        sta  @v_sy_carry
+        lda  #$69                ; adc
+        sta  @h_sy_op
+        sta  @v_sy_op
+        lda  #$90                ; bcc
+        sta  @h_sy_branch
+        sta  @v_sy_branch
+        lda  #$E6                ; inc
+        sta  @h_sy_inc
+        sta  @v_sy_inc
+@smc_done:
+
+        ; ── Phase 2b SMC : patcher les opérandes immédiates dx / dy ──
+        ; `adc l_dy` / `cmp l_dx` / `sbc l_dx` (boucle h) et symétrique
+        ; pour la boucle v. Patch l'octet opérande (+1 après l'opcode).
+        lda  l_dy
+        sta  @h_adc_dy+1
+        sta  @v_cmp_dy+1
+        sta  @v_sbc_dy+1
+        lda  l_dx
+        sta  @h_cmp_dx+1
+        sta  @h_sbc_dx+1
+        sta  @v_adc_dx+1
+
         ;--- Phase 18 : main-axis split ---
         ; err 8-bit non-signé, biais 0. Choix axe principal selon dx vs dy.
         ; Algo : err += axe_secondaire ; si err >= axe_principal → step
@@ -301,31 +352,36 @@ _draw_line_xor:
         bne  @h_body
         jmp  @done
 @h_body:
-        ; err += dy ; if err >= dx : step y, err -= dx (11+6c)
+        ; err += dy ; if err >= dx : step y, err -= dx
+        ; Phase 2b — SMC : `cmp l_dx`, `adc l_dy`, `sbc l_dx` (3c chacun)
+        ; remplacés par `cmp #dx`, `adc #dy`, `sbc #dx` (2c chacun) avec
+        ; opérandes patchées au démarrage. Gain ~3c/px.
         lda  l_err_lo
         clc
-        adc  l_dy
-        cmp  l_dx
+@h_adc_dy:
+        adc  #$00                ; opérande patchée = l_dy
+        ; Note : pas de clc avant cmp car cmp ne dépend pas du carry.
+@h_cmp_dx:
+        cmp  #$00                ; opérande patchée = l_dx
         bcc  @h_no_stepy
-        sbc  l_dx                ; carry set par cmp BCS
+@h_sbc_dx:
+        sbc  #$00                ; opérande patchée = l_dx
         sta  l_err_lo
-        ; step y conditionnel selon sy
-        lda  l_sy
-        bmi  @h_sy_neg
+        ; ── Phase 2b — step y via SMC ────────────────────────────────
+        ; L'instruction `clc` (op $18) ou `sec` ($38), `adc #40` ($69)
+        ; ou `sbc #40` ($E9), `bcc` ($90) ou `bcs` ($B0), `inc` ($E6)
+        ; ou `dec` ($C6) sont patchées au démarrage selon le signe de sy.
+        ; Élimine le test `lda l_sy; bmi ...` à chaque pixel (~5c).
         lda  l_ptr
-        clc
-        adc  #40
+@h_sy_carry:
+        clc                      ; patché $18→$38 si sy<0
+@h_sy_op:
+        adc  #40                 ; patché $69→$E9 si sy<0
         sta  l_ptr
-        bcc  @h_step_x
-        inc  l_ptr+1
-        jmp  @h_step_x
-@h_sy_neg:
-        lda  l_ptr
-        sec
-        sbc  #40
-        sta  l_ptr
-        bcs  @h_step_x
-        dec  l_ptr+1
+@h_sy_branch:
+        bcc  @h_step_x           ; patché $90→$B0 si sy<0
+@h_sy_inc:
+        inc  l_ptr+1             ; patché $E6→$C6 si sy<0
         jmp  @h_step_x
 @h_no_stepy:
         sta  l_err_lo
@@ -357,12 +413,16 @@ _draw_line_xor:
         jmp  @done
 @v_body:
         ; err += dx ; if err >= dy : step x, err -= dy
+        ; Phase 2b — SMC : 3 opérandes ZP → immédiat, gain ~3c/px.
         lda  l_err_lo
         clc
-        adc  l_dx
-        cmp  l_dy
+@v_adc_dx:
+        adc  #$00                ; opérande patchée = l_dx
+@v_cmp_dy:
+        cmp  #$00                ; opérande patchée = l_dy
         bcc  @v_no_stepx
-        sbc  l_dy
+@v_sbc_dy:
+        sbc  #$00                ; opérande patchée = l_dy
         sta  l_err_lo
         ; step x : lsr mask, ptr++ si newcol
         lsr  l_mask
@@ -378,23 +438,17 @@ _draw_line_xor:
 @v_no_stepx:
         sta  l_err_lo
 @v_step_y:
-        ; step y toujours selon sy
-        lda  l_sy
-        bmi  @v_sy_neg
+        ; Phase 2b — step y via SMC : 4 opcodes patchés selon sy.
         lda  l_ptr
-        clc
-        adc  #40
+@v_sy_carry:
+        clc                      ; patché $18→$38 si sy<0
+@v_sy_op:
+        adc  #40                 ; patché $69→$E9 si sy<0
         sta  l_ptr
-        bcc  @v_loop
-        inc  l_ptr+1
-        jmp  @v_loop
-@v_sy_neg:
-        lda  l_ptr
-        sec
-        sbc  #40
-        sta  l_ptr
-        bcs  @v_loop
-        dec  l_ptr+1
+@v_sy_branch:
+        bcc  @v_loop             ; patché $90→$B0 si sy<0
+@v_sy_inc:
+        inc  l_ptr+1             ; patché $E6→$C6 si sy<0
         jmp  @v_loop
 
 @done:
