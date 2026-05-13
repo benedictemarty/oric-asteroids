@@ -40,6 +40,15 @@ Test Phosphoric Oric-1 (basic10.rom, 10M cycles) : écran titre
 complet "ASTEROIDS PRESS SPACE" + 2 astéroïdes rendus. Tests host
 4/4 PASS.
 
+**Validation chiffrée** (Phosphoric v1.16.14-alpha + `--trace-irq` +
+`--dump-ram-at`, cf `docs/notes/phase20-irq-validation.md`) :
+- 493 IRQ-ENTRY + 493 RTI équilibrés sur 10 M cycles
+- Cadence T1 : 19 930-19 970 cycles entre IRQ (cible 20 000 = 50 Hz,
+  variance < 1 %)
+- `IFR=$C0`, `srcmask=$01` → seule source T1, aucune IRQ parasite
+- Tous les `PC_return` dans `$0500-$9A22` (zone code Asteroids)
+- `_frame_cnt` (ZP `$AD`) = `$BF` à 9 M cycles, cohérent
+
 ### Rectification — Atmos ne fonctionne pas avec ROM Atmos
 
 Le précédent commit `6631fc7` annonçait "Atmos OK sur Oricutron" mais
