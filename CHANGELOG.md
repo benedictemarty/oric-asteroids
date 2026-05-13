@@ -7,6 +7,28 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Portabilité `.tap` — Oricutron / Euphoric / hardware (résolu côté Phosphoric)
+
+`bin2tap` (Phosphoric) produisait un header 7-byte non lu par Oricutron :
+plantage à `CLOAD ""` (start=$0061, end=$0500, chargement zero page).
+Fix livré dans Phosphoric **v1.16.3-alpha** (header 9-byte ROM-compatible).
+
+**Action requise** : `make` régénère `build/asteroids.tap` au nouveau
+format après recompilation de Phosphoric. Vérifier `xxd build/asteroids.tap |
+head -1` → doit commencer par `16 16 16 24 00 00 80 80 …` (et non
+`16 16 16 24 80 80 …`).
+
+### Investigation HIRES TEXT glitch — comportement hardware Oric attendu
+
+Le rapport `docs/phosphoric-hires-text-glitch.md` (zone TEXT du bas
+en mode HIRES affiche des glyphes aléatoires) est un **faux positif
+côté Phosphoric**. Cause racine : l'ULA Oric lit le charset HIRES à
+`$9800` (et non `$B400`). Le programme doit copier le charset
+`$B400 → $9800` (2 048 octets) **avant** `STA $BB80,$1C`, sinon
+`$9800-$9BFF` contient de la RAM non initialisée et les caractères
+de la zone TEXT du bas (`$BF68-$BFDF`) sont rendus avec des glyphes
+parasites. Solution à intégrer dans `_hires_init`.
+
 ### Phase 2b — SMC dans Bresenham `_draw_line_xor` ✅
 
 Objectif Phase 2b ROADMAP : passer de ~97 c/px à ~40-50 c/px via
