@@ -7,6 +7,39 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Fix — trace fantôme ship quand UP+DOWN simultanés ✅
+
+**Symptôme reproductible** (signalé par utilisateur) : appuyer UP
+(thrust) + DOWN (hyperespace) **en même temps** crée des fantômes
+ship à des positions précédentes — exactement le même symptôme que
+le bug "moitié haute" précédemment attribué au replot `_plot_dot`.
+
+**Vraie cause** : la logique hyperespace était dans le **bloc bullets**
+(avant le bloc asteroids), donc **avant** `ship_erase()`. Quand
+`ship_hyperspace()` se déclenchait, il téléportait `ship_x/y` à une
+position aléatoire AVANT que l'erase du ship N-1 ait eu lieu. Résultat :
+- `ship_erase` (ligne 932) utilisait les NOUVELLES coords (post-hyper)
+  ⇒ XORait des pixels au mauvais endroit, sans effacer le ship à sa
+  position d'origine.
+- Le ship à pos N-1 restait **complet** à l'écran (trace fantôme).
+
+**Fix** : déplacer la logique hyperespace **dans le bloc ship**,
+entre `ship_erase()` et `ship_update()`. L'ordre devient :
+1. erase à pos N-1 (= pos affichée)
+2. rotate / thrust (modifie angle / vélocité, pas la position)
+3. hyperespace si DOWN edge-trigger (modifie position)
+4. ship_update (applique vélocité)
+5. draw à pos N
+
+L'erase et le draw entourent maintenant correctement toute modification
+de position (téléportation + intégration vélocité), garantissant
+l'idempotence XOR.
+
+Note : le retrait du replot `_plot_dot` au commit `0325e15` reste
+utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
+mais la cause racine du bug "moitié A" était bien l'hyperespace
+mal placé.
+
 ### Tune — game over : lock 5 s + wait-release sur SPACE/ESC ✅
 
 **Symptômes** :

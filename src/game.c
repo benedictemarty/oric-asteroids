@@ -893,17 +893,12 @@ void game_run(void)
         /* 2. Bullets : input fire (level-trigger = auto-repeat) puis
          *    update. bullet_fire() court-circuite sur fire_cd, donc la
          *    cadence reste bornée à FIRE_COOLDOWN frames + 4 bullets max.
-         *    Hyperespace reste en edge-trigger DOWN (un appui = un saut). */
+         *    Hyperespace est déplacé dans le bloc ship (entre erase et
+         *    update) pour ne pas téléporter ship_x/y AVANT que l'erase
+         *    ait effacé le ship à sa position d'origine — sinon trace
+         *    fantôme à l'ancienne pos quand UP+DOWN sont pressés ensemble. */
         if (!gameover) {
             if (key_state & 0x08) bullet_fire();
-
-            hyper_now = key_state & 0x10;
-            if (hyper_now && !prev_hyper && hyper_cd == 0) {
-                ship_hyperspace();
-                hyper_cd = HYPER_COOLDOWN;
-            }
-            prev_hyper = hyper_now;
-            if (hyper_cd) hyper_cd--;
         }
 
         /* 3. Updates physiques NON-asteroids NON-ship */
@@ -941,6 +936,17 @@ void game_run(void)
                 ship_apply_thrust();
                 if (sfx_id == FX_NONE) sound_play_fx(FX_THRUST);
             }
+            /* Hyperespace : edge-trigger sur DOWN, déplacé ici pour que
+             * la téléportation se fasse APRÈS l'erase à pos N-1 (sinon
+             * trace fantôme à l'ancienne pos si UP+DOWN simultanés). */
+            hyper_now = key_state & 0x10;
+            if (hyper_now && !prev_hyper && hyper_cd == 0) {
+                ship_hyperspace();
+                hyper_cd = HYPER_COOLDOWN;
+            }
+            prev_hyper = hyper_now;
+            if (hyper_cd) hyper_cd--;
+
             ship_update();
             collisions_ship_asteroids();
         }
