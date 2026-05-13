@@ -163,7 +163,13 @@ $(BIN): $(OBJS) $(CFG)
 $(TAP): $(BIN)
 	$(BIN2TAP) $(BIN) --start $(LOAD_ADDR) --exec $(EXEC_ADDR) \
 	           --name "$(PROJECT)" -o $@
-	@echo ">>> $(TAP) prêt"
+	@# Désactive le flag autorun (byte 7 = $C7 → $00) sur le .tap
+	@# produit par bin2tap Phosphoric v1.16.3+. L'auto-exec déclenche le
+	@# code AVANT que la ROM Oric ait fini ses inits VSync/PCR ⇒ glitch
+	@# graphique et frame_wait bloqué. Avec autorun off, le user tape
+	@# CALL 1280 manuellement → la ROM est dans son état stable.
+	@python3 -c "import sys; d=open('$@','r+b'); d.seek(7); d.write(b'\x00'); d.close()"
+	@echo ">>> $(TAP) prêt (autorun désactivé — taper CALL 1280)"
 
 run: $(TAP)
 	$(EMU) -m oric1 -r $(ROM) -t $(TAP) -f \
