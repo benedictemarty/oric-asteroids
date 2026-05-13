@@ -7,6 +7,36 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Fix — auto-repeat tir (SPACE maintenu = rafale) ✅
+
+**Symptôme** : maintenir la barre d'espace ne déclenchait qu'**un seul
+tir** au lieu d'une rafale (auto-repeat absent).
+
+**Cause** : edge-trigger en place dans `game.c game_run()` :
+```c
+fire_now = key_state & 0x08;
+if (fire_now && !prev_fire) bullet_fire();
+prev_fire = fire_now;
+```
+Le tir n'était déclenché que sur la transition 0→1 de SPACE.
+Maintenir la touche laissait `prev_fire == 1` et bloquait les tirs
+suivants.
+
+**Fix** : passage en **level-trigger** :
+```c
+if (key_state & 0x08) bullet_fire();
+```
+`bullet_fire()` vérifie déjà `if (fire_cd) return;` ⇒ la cadence
+reste bornée par `FIRE_COOLDOWN = 2 frames` (~8 tirs/s à 25 Hz) et
+par `BULLETS = 4` (max bullets actives simultanément).
+
+Variables retirées : `static unsigned char prev_fire` et la locale
+`fire_now` (devenues inutiles). Hyperespace reste en edge-trigger
+(un appui = un saut).
+
+Conforme arcade : Atari Asteroids original a un auto-repeat sur le
+tir borné par le cooldown + le quota max de bullets actives.
+
 ### Fix HIRES — copie charset $B400→$9800 + nettoyage TEXT bas ✅
 
 **Symptôme** : au passage en mode HIRES, les 3 lignes texte du bas

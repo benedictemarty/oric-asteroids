@@ -147,7 +147,6 @@ static signed char   blt_vx[BULLETS];
 static signed char   blt_vy[BULLETS];
 static unsigned char blt_ttl[BULLETS];
 
-static unsigned char prev_fire;
 static unsigned char fire_cd;
 static unsigned char prev_hyper;
 static unsigned char hyper_cd;
@@ -477,7 +476,6 @@ static void bullets_init(void)
 {
     unsigned char i;
     for (i = 0; i < BULLETS; i++) blt_ttl[i] = 0;
-    prev_fire = 0;
     fire_cd = 0;
     prev_hyper = 0;
     hyper_cd = 0;
@@ -734,7 +732,7 @@ static void game_reset(void)
 
 void game_run(void)
 {
-    unsigned char fire_now, hyper_now;
+    unsigned char hyper_now;
     unsigned char ship_visible;
     unsigned char prev_gameover;
     unsigned int  final_score;
@@ -877,12 +875,12 @@ void game_run(void)
         ufo_draw();
         bullets_render();
 
-        /* 2. Bullets : input fire (edge-trigger) puis update.
-         *    Hyperespace edge-trigger DOWN. */
+        /* 2. Bullets : input fire (level-trigger = auto-repeat) puis
+         *    update. bullet_fire() court-circuite sur fire_cd, donc la
+         *    cadence reste bornée à FIRE_COOLDOWN frames + 4 bullets max.
+         *    Hyperespace reste en edge-trigger DOWN (un appui = un saut). */
         if (!gameover) {
-            fire_now = key_state & 0x08;
-            if (fire_now && !prev_fire) bullet_fire();
-            prev_fire = fire_now;
+            if (key_state & 0x08) bullet_fire();
 
             hyper_now = key_state & 0x10;
             if (hyper_now && !prev_hyper && hyper_cd == 0) {
