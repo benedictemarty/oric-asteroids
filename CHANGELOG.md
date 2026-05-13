@@ -7,6 +7,32 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Tune — game over : lock 5 s + wait-release sur SPACE/ESC ✅
+
+**Symptômes** :
+1. Le lock post-game-over de 2 s était trop court pour lire le score
+   et la HoF avant que le prompt s'affiche.
+2. Si l'utilisateur maintenait SPACE (auto-repeat fire) ou ESC au
+   moment de mourir, le jeu redémarrait/quittait instantanément à
+   la fin du lock, sans laisser le temps de voir le résumé.
+
+**Fix `game.c game_run()`** :
+
+- `gameover_lock` 50 → **125 frames** (= **5 s à 25 Hz**).
+- Nouveau flag `gameover_armed` : à 1 au passage en gameover, exige
+  un **relâchement** de SPACE ET ESC avant d'accepter un nouvel
+  appui (anti-stale-input).
+- `gameover_armed` se désarme uniquement quand `gameover_lock == 0`
+  ET `(key_state & 0x28) == 0` (les deux touches relâchées).
+- Tant que `gameover_armed`, les touches sont ignorées ET le prompt
+  "PRESS SPACE / OR ESC" reste **caché** (cohérence visuelle :
+  pas de prompt affiché quand l'input ne marche pas).
+
+Effet utilisateur : après la mort, le jeu affiche immédiatement
+GAME OVER + HoF mais bloque tous les inputs pendant 5 s minimum.
+Une fois écoulé, le prompt n'apparaît que quand le joueur a relâché
+toutes ses touches — empêche le redémarrage involontaire.
+
 ### Tune — explosion asteroid : flash plus bref (TTL 5 → 2) ✅
 
 **Symptôme** : la marque d'explosion (8 dots étoile au point d'impact)

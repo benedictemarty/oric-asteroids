@@ -819,19 +819,31 @@ void game_run(void)
     hud_draw();
 
     for (;;) {
-        /* Lock 2 s après passage en gameover : GAME OVER + HoF fixes,
+        /* Lock 5 s après passage en gameover : GAME OVER + HoF fixes,
          * pas de touches acceptées et pas de prompt affiché pour laisser
          * l'utilisateur lire son score. */
         static unsigned char gameover_lock = 0;
-        static unsigned char prompt_drawn = 0;   /* PRESS SPACE + OR ESC */
+        static unsigned char gameover_armed = 0;   /* attente release SPACE/ESC */
+        static unsigned char prompt_drawn = 0;     /* PRESS SPACE + OR ESC */
         key_scan();
 
         if (gameover && !prev_gameover) {
-            gameover_lock = 50;        /* 2 s à 25 Hz */
+            gameover_lock = 125;       /* 5 s à 25 Hz */
+            gameover_armed = 1;        /* exiger relâchement avant prochain appui */
         }
 
-        if (gameover && gameover_lock) {
-            /* Lock actif : ignorer SPACE/ESC. */
+        /* Désarmer le wait-release uniquement quand le lock est terminé
+         * ET SPACE/ESC sont relâchés. Tant que l'utilisateur maintient
+         * une touche depuis avant la mort, on ignore son appui pour ne
+         * pas redémarrer/quitter instantanément. */
+        if (gameover && !gameover_lock && gameover_armed) {
+            if ((key_state & 0x28) == 0) {     /* SPACE (0x08) + ESC (0x20) */
+                gameover_armed = 0;
+            }
+        }
+
+        if (gameover && (gameover_lock || gameover_armed)) {
+            /* Lock actif ou touches encore maintenues : ignorer SPACE/ESC. */
         } else if (gameover) {
             if (key_state & 0x08) {
                 /* SPACE → rejouer. */
@@ -1032,7 +1044,7 @@ void game_run(void)
             gameover_draw();
             gameover_text_drawn = 1;
 
-            if (gameover_lock == 0) {
+            if (gameover_lock == 0 && !gameover_armed) {
                 if (prompt_drawn) {
                     presspace_erase(140);
                     quit_label_erase(155);
