@@ -7,28 +7,45 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
-### Documentation — glitch zone TEXT du bas en HIRES (à reporter à Phosphoric)
+### Fix HIRES — copie charset $B400→$9800 + nettoyage TEXT bas ✅
 
 **Symptôme** : au passage en mode HIRES, les 3 lignes texte du bas
-(scanlines 200-223) affichent un pattern de "lignes verticales"
-glitché sur fond blanc, au lieu d'être noires ou de conserver le
-texte BASIC initial.
+(scanlines 200-223) affichaient un pattern de "lignes verticales"
+glitché sur fond blanc.
 
-**Investigation** : tentative d'effacement à `$BF68-$BFDF` (candidat
-naturel = 3 dernières lignes du screen TEXT) — n'a affecté que la
-première cellule de chaque ligne. La zone TEXT du bas semble lue
-ailleurs (probablement `$BB80-$BBF7`, dans la zone HIRES qui contient
-des `$40` = caractère `'@'`).
+**Cause racine (confirmée par l'équipe Phosphoric)** : l'ULA Oric
+utilise **deux zones charset distinctes** selon le mode vidéo —
+`$B400` en TEXT, `$9800` en HIRES. Le BASIC ROM Oric copie
+automatiquement `$B400 → $9800` quand on utilise sa commande HIRES.
+Notre binaire bypassait le BASIC en écrivant directement `$1C` à
+`$BB80` ⇒ la RAM `$9800-$9FFF` (charset HIRES) restait non
+initialisée et l'ULA y lisait des glyphs aléatoires pour rendre la
+zone TEXT du bas. C'est **conforme hardware Oric‑1 réel**, pas un
+bug Phosphoric.
 
-**Pas de fix appliqué côté projet** : un effacement de `$BB80-$BBF7`
-polluerait 3 scanlines HIRES (176-178) avec des pixels parasites
-dans la zone de jeu (1 px / cellule de 6 px sur la largeur). On
-préfère préserver la zone HIRES propre.
+**Fix `src/asm/line.s _hires_init`** :
 
-**Action** : rapport rédigé pour l'équipe Phosphoric
-(`docs/phosphoric-hires-text-glitch.md`) avec reproduction minimale,
-hypothèses et demandes. Commentaire détaillé dans `src/asm/line.s`
-au niveau de `_hires_init`.
+1. **Copie charset `$B400 → $9800`** (2 Ko, 8 pages) AVANT
+   `STA $BB80,$1C` — obligatoire car après bascule en HIRES, le
+   mappage TEXT/HIRES change et on perd l'accès au charset source.
+2. Bascule HIRES (inchangé).
+3. Remplissage `$A000-$BF3F` avec `$40` (inchangé).
+4. Nettoyage zone TEXT du bas `$BF68-$BFDF` (lignes texte 25-27 du
+   screen TEXT) avec `$20` (espace) — efface les codes du prompt
+   BASIC (`Ready`, `CALL 1280`, etc.) hérités du boot.
+
+Ajout d'une variable ZP `cs_src` (2 octets) ; réutilise `l_ptr`
+comme pointeur destination pendant la copie.
+
+**Vérification** : capture PPM zone TEXT du bas (24 scanlines ×
+240 px) → **0 % blanc, 100 % noir**. Plus de glitch.
+
+**Coût** : 2 048 octets RAM (`$9800-$9FFF` réservés au charset
+HIRES) + ~30 octets de code dans `_hires_init`. Capture régression
+mise à jour (`make ref`).
+
+Rapport `docs/phosphoric-hires-text-glitch.md` mis à jour avec la
+résolution complète. Statut CLOS.
 
 ### Fix — écran titre attend vraiment SPACE (suppression timeout) ✅
 

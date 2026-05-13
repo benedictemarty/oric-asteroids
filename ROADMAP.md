@@ -312,8 +312,8 @@ Checklist obligatoire à exécuter **avant de marquer le projet "Done"** :
 - [ ] **Test Oric‑1 physique** (si disponible) : charger le `.tap` sur
       un Oric‑1 réel via interface cassette ou disque dur, vérifier
       gameplay 5 min minimum.
-- [ ] **Glitch zone TEXT du bas en HIRES** : voir
-      `docs/phosphoric-hires-text-glitch.md`. Soit retour positif de
-      l'équipe Phosphoric (fix émulateur), soit workaround acté côté
-      projet (pollution HIRES tolérée ou autre).
-- [ ] Tag git `v1.x.0-release` après validation des 3 points.
+- [x] ~~**Glitch zone TEXT du bas en HIRES**~~ — **résolu 2026-05-13**.
+      Pas un bug Phosphoric : charset HIRES `$9800` non initialisé
+      côté binaire. Fix : copie `$B400 → $9800` dans `_hires_init`.
+      Cf. `docs/phosphoric-hires-text-glitch.md`.
+- [ ] Tag git `v1.x.0-release` après validation des 2 points restants.

@@ -35,6 +35,7 @@ l_e2lo:     .res 1          ; e2 temporaire bas  (2 * err)
 l_e2hi:     .res 1          ; e2 temporaire haut
 l_mask:     .res 1          ; masque de bit du pixel courant
 l_pix:      .res 1          ; Phase 17 — compteur pixels = max(dx,dy)+1
+cs_src:     .res 2          ; ptr source pour la copie charset $B400 -> $9800
 
 ;-----------------------------------------------------------------
 ; Tables precalculees (RODATA, 200+200+240+240 = 880 octets)
@@ -71,12 +72,56 @@ x_msk:
         .segment "CODE"
 
 _hires_init:
-        ; Declencher HIRES : ecrire attribut vid_mode=4 ($1C) a $BB80
+        ; ----------------------------------------------------------------
+        ; 1. Copie du charset $B400 → $9800 (8 pages = 2048 octets)
+        ;
+        ; OBLIGATOIRE avant STA $BB80,$1C : l'ULA Oric utilise deux zones
+        ; charset distinctes selon le mode vidéo :
+        ;   - Mode TEXT  : charset à $B400 (mappé spécial / RAM système)
+        ;   - Mode HIRES : charset à $9800 (RAM utilisateur)
+        ; Le BASIC ROM copie $B400 → $9800 quand on utilise sa commande
+        ; HIRES ; comme on bypasse le BASIC en écrivant directement
+        ; l'attribut $1C, on doit faire la copie nous-mêmes — sinon
+        ; les 3 lignes texte du bas affichent des glyphs aléatoires
+        ; (RAM $9800-$9FFF non initialisée au boot).
+        ;
+        ; Note (Phosphoric src/video/video.c:61-65) :
+        ;   base = vid->hires_mode ? 0x9800 : 0xB400;
+        ;   return mem[base + char_idx * 8 + row];
+        ; ----------------------------------------------------------------
+        lda  #$00
+        sta  cs_src
+        sta  l_ptr               ; dst lo
+        lda  #$B4
+        sta  cs_src+1            ; src hi = $B4 → $B400
+        lda  #$98
+        sta  l_ptr+1             ; dst hi = $98 → $9800
+        ldx  #8                  ; 8 pages à copier
+@cs_pg:
+        ldy  #0
+@cs_by:
+        lda  (cs_src),y
+        sta  (l_ptr),y
+        iny
+        bne  @cs_by
+        inc  cs_src+1
+        inc  l_ptr+1
+        dex
+        bne  @cs_pg
+
+        ; ----------------------------------------------------------------
+        ; 2. Bascule en mode HIRES : écrire attribut vid_mode=4 ($1C)
+        ;    à $BB80 (l'ULA lit ce premier octet à chaque scanline 0).
+        ; ----------------------------------------------------------------
         lda  #$1C
         sta  $BB80
 
-        ; Remplir $A000-$BF3F avec 0x40 (octet pixel vierge, noir)
-        ; IMPORTANT : recharger A=$40 a chaque tour — 'lda l_ptr+1' ecrase A.
+        ; ----------------------------------------------------------------
+        ; 3. Remplir $A000-$BF3F avec $40 (octet "pixel vierge" HIRES) :
+        ;    bit 6=1 → sécurité non-attribut, bits 5-0=0 → aucun pixel.
+        ;    IMPORTANT : recharger A=$40 à chaque tour — 'lda l_ptr+1'
+        ;    écrase A.
+        ; ----------------------------------------------------------------
         lda  #0
         sta  l_ptr
         lda  #$A0
@@ -102,30 +147,20 @@ _hires_init:
         iny
         cpy  #64
         bne  @clr_tail
-        rts
 
         ; ----------------------------------------------------------------
-        ; NOTE — Zone TEXT du bas en mode HIRES Oric :
-        ;
-        ; Les 24 scanlines du bas (200-223) affichent 3 lignes texte de
-        ; caractères. Sur Phosphoric, ces lignes apparaissent altérées
-        ; (pattern de lignes verticales / "glitch") après notre passage
-        ; en HIRES, indépendamment du contenu mémoire qu'on écrit à
-        ; $BF68-$BFDF (lignes texte 25-27 du screen TEXT, candidat
-        ; naturel).
-        ;
-        ; Investigation empirique (cf. docs/phosphoric-hires-text-glitch.md) :
-        ; écrire $20 (espace) dans $BF68-$BFDF n'efface que la 1re cellule
-        ; visible — la suite garde le pattern du remplissage HIRES ($40).
-        ; Hypothèse : l'ULA Oric (ou l'émulation Phosphoric) lit la zone
-        ; TEXT du bas depuis une adresse qui chevauche la zone HIRES
-        ; ($BB80-$BBF7), créant un conflit RAM. $40 en TEXT = '@', d'où
-        ; le pattern visible.
-        ;
-        ; Bug reporté à l'équipe Phosphoric — pas de fix possible côté
-        ; ROM Oric standard sans polluer la zone HIRES par 1 px/cellule
-        ; sur les lignes 176-178. Comportement laissé en l'état.
+        ; 4. Nettoyer la zone TEXT du bas $BF68-$BFDF (lignes texte 25-27
+        ;    du screen TEXT) avec $20 (espace). Sans cette étape, on
+        ;    hérite des codes laissés par le BASIC (CALL, prompt…) et la
+        ;    zone TEXT du bas affiche du texte parasite.
         ; ----------------------------------------------------------------
+        ldx  #119                ; 120 octets (3 × 40)
+        lda  #$20
+@txt_clr:
+        sta  $BF68,x
+        dex
+        bpl  @txt_clr
+        rts
 
 ;-----------------------------------------------------------------
 ; _draw_line_xor — Bresenham XOR entre (_lx0,_ly0) et (_lx1,_ly1)

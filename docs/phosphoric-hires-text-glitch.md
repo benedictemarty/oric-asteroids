@@ -1,10 +1,118 @@
-# Rapport de bug Phosphoric — glitch zone TEXT du bas en mode HIRES
+# Glitch zone TEXT du bas en mode HIRES — RÉSOLU
 
 **Date** : 2026-05-13
 **Projet** : Oric Asteroids (portage clone arcade)
 **Émulateur** : Phosphoric (`/home/bmarty/Oric1/oric1-emu`)
 **Machine cible** : Oric‑1 48 K, ROM BASIC 1.0
 **Mode** : HIRES (240×200 monochrome + 3 lignes texte en bas)
+**Statut** : **CLOS** — pas un bug Phosphoric, manque d'init côté binaire.
+
+---
+
+## Conclusion (par l'équipe Phosphoric, 2026-05-13)
+
+Verdict : **comportement matériel Oric attendu, fidèlement émulé par
+Phosphoric**. Aucun correctif émulateur nécessaire.
+
+### Cause racine
+
+L'ULA Oric utilise **deux zones charset distinctes** selon le mode vidéo :
+
+| Mode  | Adresse charset |
+|-------|-----------------|
+| TEXT  | `$B400` (RAM système / mappage spécial)  |
+| HIRES | `$9800` (RAM utilisateur)                |
+
+Source Phosphoric `src/video/video.c:61-65` :
+```c
+static uint8_t get_charset_byte(video_t* vid, const uint8_t* mem,
+                                int char_idx, int row) {
+    if (vid->charset) return vid->charset[char_idx * 8 + row];
+    uint16_t base = vid->hires_mode ? 0x9800 : 0xB400;
+    return mem[base + char_idx * 8 + row];
+}
+```
+
+Quand le BASIC ROM Oric exécute sa commande HIRES, il **copie le
+charset `$B400` → `$9800`** automatiquement. Notre binaire bypassait
+le BASIC en écrivant directement `$1C` à `$BB80` — la copie n'avait
+pas lieu et l'ULA lisait des **glyphs aléatoires depuis la RAM
+`$9800-$9FFF` non initialisée** (restes du boot). Le pattern régulier
+observé `#####.#.#.#.…` était la traduction de chaque cellule TEXT
+`$BF68+col` (contenant `$40` du remplissage HIRES = code char `'@'`)
+indexée dans une zone `$9800` chaotique mais constante (d'où le
+rendu identique frame après frame).
+
+### Adresse confirmée de la zone TEXT du bas
+
+`$BF68-$BFDF` (lignes texte 25-27 du screen TEXT, soit
+`$BB80 + 25*40` à `$BB80 + 27*40 + 39`). C'est l'hypothèse 1 de
+notre rapport initial qui était la bonne.
+
+### Pourquoi notre test « écrire `$20` à `$BF68-$BFDF` » ne changeait que 5 colonnes
+
+`$20 & 0x60 = 0x20 ≠ 0` ⇒ interprété comme **caractère**, pas attribut.
+Le rendu appelait `render_text_char(byte=$20)` qui lit
+`mem[$9800 + $20*8 + row]` — toujours dans la RAM `$9800` non
+initialisée. Le contenu mémoire était bien remplacé, mais le rendu
+restait glitché parce que **le bug était en amont, dans le charset
+HIRES vide**.
+
+---
+
+## Fix appliqué (commit `feat(hires-init): copie charset $B400→$9800`)
+
+`src/asm/line.s _hires_init` :
+
+1. **Copier le charset `$B400 → $9800` (2 048 octets, 8 pages)**
+   AVANT `STA $BB80,$1C` — sinon le mappage TEXT/HIRES change et on
+   perd l'accès au charset source.
+2. Bascule en HIRES (`STA $BB80, $1C`).
+3. Remplir zone HIRES `$A000-$BF3F` avec `$40` (pixel vierge).
+4. Nettoyer zone TEXT du bas `$BF68-$BFDF` avec `$20` (espace).
+
+Code :
+```asm
+        ; 1. Copie charset $B400 → $9800 (8 pages = 2048 octets)
+        lda  #$00
+        sta  cs_src
+        sta  l_ptr               ; dst lo
+        lda  #$B4
+        sta  cs_src+1
+        lda  #$98
+        sta  l_ptr+1             ; dst hi
+        ldx  #8
+@cs_pg: ldy  #0
+@cs_by: lda  (cs_src),y
+        sta  (l_ptr),y
+        iny
+        bne  @cs_by
+        inc  cs_src+1
+        inc  l_ptr+1
+        dex
+        bne  @cs_pg
+        ; 2. Bascule HIRES
+        lda  #$1C
+        sta  $BB80
+        ; 3. Remplit zone HIRES $A000-$BF3F avec $40 (inchangé)
+        ; …
+        ; 4. Nettoie zone TEXT du bas
+        ldx  #119
+        lda  #$20
+@txt:   sta  $BF68,x
+        dex
+        bpl  @txt
+        rts
+```
+
+### Vérification
+
+Capture PPM après fix, zone TEXT du bas (24 scanlines × 240 px) :
+**0 % blanc, 100 % noir**. Plus de glitch, plus de lignes verticales,
+plus de fond blanc.
+
+Coût mémoire : 2 048 octets RAM en `$9800-$9FFF` (charset HIRES) +
++30 octets de code dans `_hires_init`. Acceptable sur 48 Ko.
 
 ---
 
