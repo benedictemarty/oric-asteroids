@@ -56,6 +56,22 @@
 _sfx_id:    .res 1
 _sfx_timer: .res 1
 sound_tmp:  .res 1
+life_idx:   .res 1     ; index sweep FX_LIFE (0=init, 1..3=ticks)
+
+;-----------------------------------------------------------------
+; Tables RODATA — sweep FX_LIFE
+;
+; Period AY = 1 MHz / (16 × freq_Hz). 4 valeurs descendantes :
+;   index 0 : 2786 Hz → period $0016 (init dans play_fx)
+;   index 1 : 1393 Hz → period $002D
+;   index 2 :  696 Hz → period $005A
+;   index 3 :  348 Hz → period $00B3
+;-----------------------------------------------------------------
+        .segment "RODATA"
+life_per_lo:
+        .byte $16, $2D, $5A, $B3
+life_per_hi:
+        .byte $00, $00, $00, $00
 
 ;-----------------------------------------------------------------
 ; _psg_write — A = valeur, Y = numéro de registre
@@ -293,21 +309,26 @@ _sound_play_fx:
 
         cmp  #FX_LIFE
         bne  @not_life
-        ; Extra ship : chime tone aigu canal A, durée 20 frames
-        lda  #$30
+        ; Extra ship — arcade : SWEEP descendant 2786 Hz → ~350 Hz, 136 ms.
+        ; Implémentation : table 4 periods, écrites par sound_tick dans
+        ; R0/R1 au fil des ticks. life_idx 0 = init (cet handler), 1..3 =
+        ; ticks suivants.
+        lda  life_per_lo
         ldy  #0
-        jsr  _psg_write
-        lda  #$00
+        jsr  _psg_write       ; period init (R0 lo)
+        lda  life_per_hi
         ldy  #1
-        jsr  _psg_write
+        jsr  _psg_write       ; period init (R1 hi)
         lda  #$0C
         ldy  #8
-        jsr  _psg_write
-        lda  #$7E              ; mixer : tone A on
+        jsr  _psg_write       ; vol A
+        lda  #$7E              ; mixer : tone A on, port A input
         ldy  #7
         jsr  _psg_write
-        lda  #20
-        sta  _sfx_timer
+        lda  #1
+        sta  life_idx          ; prochain tick utilisera life_per[1]
+        lda  #3
+        sta  _sfx_timer        ; 3 ticks restants après l'init (4 frames total)
         jmp  @done
 @not_life:
 
@@ -348,6 +369,33 @@ _sound_play_fx:
 _sound_tick:
         lda  _sfx_id
         beq  @no_sfx
+
+        ; Hook sweep FX_LIFE : si actif et life_idx < 4, écrit la prochaine
+        ; period dans R0/R1 puis avance l'index. Doit être fait AVANT le
+        ; décrément du timer (pour que les 3 ticks utiles touchent les 3
+        ; entrées restantes de la table).
+        cmp  #FX_LIFE
+        bne  @no_life_sweep
+        ldx  life_idx
+        cpx  #4
+        bcs  @no_life_sweep
+        sei
+        lda  VIA_DDRA
+        pha
+        lda  #$FF
+        sta  VIA_DDRA
+        lda  life_per_lo,x
+        ldy  #0
+        jsr  _psg_write
+        lda  life_per_hi,x
+        ldy  #1
+        jsr  _psg_write
+        pla
+        sta  VIA_DDRA
+        cli
+        inc  life_idx
+@no_life_sweep:
+
         lda  _sfx_timer
         beq  @stop
         dec  _sfx_timer

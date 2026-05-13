@@ -40,6 +40,25 @@ utile (sommets P3/P4 ne ré-allument plus un pixel fantôme isolé),
 mais la cause racine du bug "moitié A" était bien l'hyperespace
 mal placé.
 
+### Sons étape 3 — FX_LIFE sweep descendant 2786→348 Hz ✅
+
+L'arcade Asteroids fait un **whoosh descendant** (extraShip = SWEEP
+2786 → 0 Hz, 136 ms, FFT cv=0.13). Notre version Phase 9f était un
+tone aigu statique 20 frames — pas du tout le caractère arcade.
+
+**Implémentation** :
+- Nouvelle variable ZP `life_idx` (0..4) pilotant le sweep.
+- Table RODATA `life_per_lo` / `life_per_hi` : 4 périodes AY
+  descendantes (2786 / 1393 / 696 / 348 Hz).
+- `sound.s _sound_play_fx` FX_LIFE : écrit `life_per[0]` dans R0/R1,
+  set `life_idx = 1`, timer = 3 (4 frames total).
+- `sound.s _sound_tick` : hook AVANT le décrément timer — si
+  `sfx_id == FX_LIFE` et `life_idx < 4`, écrit `life_per[life_idx]`
+  dans R0/R1 puis incrémente `life_idx`.
+- Conséquence : sur 4 frames (~160 ms à 25 Hz, proche 136 ms arcade),
+  le pitch descend par paliers exponentiels (×2 period par tick =
+  freq /2), donnant l'effet "whoosh" caractéristique.
+
 ### Sons étape 2 — FX_FIRE noise 740 Hz arcade-fidèle ✅
 
 Le tir arcade est un **burst de noise** (~740 Hz, 267 ms), pas un tone
