@@ -8,13 +8,7 @@
  * "ASTEROIDS" = 9 lettres × 4-5 segments = ~40 segments XOR.
  */
 
-extern unsigned char lx0, ly0, lx1, ly1;
-#pragma zpsym ("lx0")
-#pragma zpsym ("ly0")
-#pragma zpsym ("lx1")
-#pragma zpsym ("ly1")
-
-void draw_line_xor(void);
+#include "line.h"
 
 /* Format : liste de couples (x0, y0, x1, y1) terminée par 0xFF.
  * Coords relatives au coin haut-gauche de la lettre (largeur 8, hauteur 10). */

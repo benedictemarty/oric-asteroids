@@ -11,15 +11,7 @@
  */
 
 #include "asteroids.h"
-
-extern unsigned char lx0, ly0, lx1, ly1;
-#pragma zpsym ("lx0")
-#pragma zpsym ("ly0")
-#pragma zpsym ("lx1")
-#pragma zpsym ("ly1")
-
-void draw_line_xor(void);
-void plot_dot(void);    /* Phase 16 — XOR 1 pixel rapide */
+#include "line.h"
 
 /* Tables de sommets générées par tools/gen_shapes.py — Phase 10b N variable.
  *   shape_off[size*4+shape]  : offset (uint8) dans shape_x/y

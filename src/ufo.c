@@ -26,14 +26,7 @@
 
 #include "ufo.h"
 #include "asteroids.h"      /* rng8, scr_speedup, asteroids_count */
-
-extern unsigned char lx0, ly0, lx1, ly1;
-#pragma zpsym ("lx0")
-#pragma zpsym ("ly0")
-#pragma zpsym ("lx1")
-#pragma zpsym ("ly1")
-
-void draw_line_xor(void);
+#include "line.h"
 
 /* ------------------------------------------------------------------ */
 /* État UFO (BSS)                                                      */

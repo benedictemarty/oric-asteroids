@@ -36,20 +36,12 @@ extern unsigned char key_state;
 #pragma zpsym ("ship_angle")
 #pragma zpsym ("key_state")
 
-extern unsigned char lx0, ly0, lx1, ly1;
-#pragma zpsym ("lx0")
-#pragma zpsym ("ly0")
-#pragma zpsym ("lx1")
-#pragma zpsym ("ly1")
+#include "line.h"
 
 extern const signed char ship_thrx[32];
 extern const signed char ship_thry[32];
 
 extern const unsigned char shape_radii[3];
-
-void hires_init(void);
-void draw_line_xor(void);
-void plot_dot(void);    /* Phase 16 — XOR 1 pixel rapide */
 void ship_init(void);
 void ship_draw(void);
 void ship_erase(void);

@@ -8,14 +8,7 @@
  */
 
 #include "hud.h"
-
-extern unsigned char lx0, ly0, lx1, ly1;
-#pragma zpsym ("lx0")
-#pragma zpsym ("ly0")
-#pragma zpsym ("lx1")
-#pragma zpsym ("ly1")
-
-void draw_line_xor(void);
+#include "line.h"
 
 unsigned int  score;
 unsigned int  score_extra;
