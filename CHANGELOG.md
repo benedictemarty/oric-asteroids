@@ -7,6 +7,34 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Fix — trace résiduelle "A" au mouvement du ship 5 segments ✅
+
+**Symptôme** : en déplaçant le vaisseau, des fantômes "A" (la moitié
+haute du ship : apex + flancs supérieurs + barre cockpit) restaient
+à des positions précédentes — aléatoirement, pas systématiquement.
+
+**Cause** : le replot des sommets via `_plot_dot` à la fin de
+`draw_five_lines` (héritage Phase 9g, conçu pour le triangle 3
+segments). Pour le ship 5 segments :
+- P3 et P4 sont partagés par **3 segments** chacun (vs 2 pour le
+  triangle), donc touchés 3× par les Bresenham incidents.
+- Le `_plot_dot` final ajoute +1 toggle ⇒ 4 toggles sur P3/P4
+  (pair = pixel éteint).
+- En théorie XOR symétrique entre erase et draw, mais le timing
+  IRQ VSync ULA pouvait introduire un déséquilibre, laissant 3 des
+  5 segments visibles à la position précédente (les 3 qui partagent
+  P3 ou P4 comme endpoint).
+
+**Fix** : retirer le replot `_plot_dot` final dans `draw_five_lines`.
+Les sommets restent visibles grâce aux multiples Bresenham qui
+passent par eux ; le cas P4 (touché par 3 segments, parité paire
+sans plot_dot ⇒ potentiellement absent) reste cosmétiquement
+acceptable (1 px max au pire). Trace fantôme éliminée.
+
+Documentation : commentaire détaillé dans `src/asm/ship.s`
+expliquant le compromis et la stratégie alternative possible si
+un sommet manquant devient gênant.
+
 ### Fix — auto-repeat tir (SPACE maintenu = rafale) ✅
 
 **Symptôme** : maintenir la barre d'espace ne déclenchait qu'**un seul

@@ -201,34 +201,25 @@ draw_five_lines:
         sta  _ly1
         jsr  _draw_line_xor
 
-        ; Replot des 5 sommets via _plot_dot rapide (Phase 16).
-        ; Compense le XOR de Bresenham qui omet parfois l'endpoint
-        ; (sommets partagés entre 2+ segments, cf. Phase 9g).
-        lda  sh_tx0
-        sta  _lx0
-        lda  sh_ty0
-        sta  _ly0
-        jsr  _plot_dot         ; plot P0
-        lda  sh_tx1
-        sta  _lx0
-        lda  sh_ty1
-        sta  _ly0
-        jsr  _plot_dot         ; plot P1
-        lda  sh_tx2
-        sta  _lx0
-        lda  sh_ty2
-        sta  _ly0
-        jsr  _plot_dot         ; plot P2
-        lda  sh_tx3
-        sta  _lx0
-        lda  sh_ty3
-        sta  _ly0
-        jsr  _plot_dot         ; plot P3
-        lda  sh_tx4
-        sta  _lx0
-        lda  sh_ty4
-        sta  _ly0
-        jmp  _plot_dot         ; plot P4 (tail call)
+        ; Pas de replot _plot_dot des sommets (Phase 19).
+        ;
+        ; Le replot de Phase 9g (compensation des endpoints Bresenham
+        ; omis) marche pour les triangles 3 segments où chaque sommet
+        ; est partagé par exactement 2 segments — un toggle de plus
+        ; donne 3 (impair = pixel visible).
+        ;
+        ; Avec le ship 5 segments, P3 et P4 sont partagés par 3 segments
+        ; chacun. Le +1 plot_dot donnait 4 toggles = pair = pixel éteint,
+        ; et créait des traces résiduelles "A" (moitié haute) au
+        ; mouvement du ship (XOR asymétrique entre erase et draw quand
+        ; le timing IRQ VSync ULA était capricieux).
+        ;
+        ; Compromis acté : pixels-sommets éventuellement absents (1 px
+        ; max sur des coins de 1×1), mais pas de trace fantôme. Si un
+        ; sommet manquant devient gênant visuellement, une stratégie de
+        ; compensation par sommet (selon nombre de segments incidents)
+        ; serait à concevoir.
+        rts
 
 ;-----------------------------------------------------------------
 ; _ship_draw / _ship_erase — XOR idempotent : même routine
