@@ -1,37 +1,41 @@
 /*
- * sound.h — API effets sonores Phase 8 (driver AY-3-8912)
+ * sound.h — API effets sonores (driver AY-3-8912)
  *
- * Politique : 1 effet à la fois (override), pas de mix multi-canaux.
- * Phase 8b raffinera : enveloppe progressive, thrust continu, UFO oscillant.
+ * Phase 22 — architecture 3 canaux indépendants :
+ *   Canal A = effets primaires (fire, explode S/M/L, hyper, thrust, life)
+ *   Canal B = thump dédié (Beat1/Beat2) — jamais interrompu par A
+ *   Canal C = UFO dédié (large/small) — auto-restart via ufo_snd_act
+ *
+ * R7 est recalculé dynamiquement par update_mixer à chaque changement.
  */
 
 #ifndef SOUND_H
 #define SOUND_H
 
 #define FX_NONE         0
-#define FX_FIRE         1   /* tir vaisseau         (~6 frames, tone aigu)   */
-#define FX_EXPLODE      2   /* explosion LARGE      (~25 fr, noise R6=12 ≈167 Hz arcade) */
-#define FX_THUMP        3   /* thump cadencé        (~8 frames, tone grave)  */
-#define FX_HYPER        4   /* hyperespace whoosh   (~14 frames, tone+noise) */
-#define FX_THRUST       5   /* thrust noise         (~3 frames, re-déclenché) */
-#define FX_LIFE         6   /* chime extra ship     (~20 frames, tone aigu)  */
-#define FX_UFO          7   /* UFO bip-bip          (~4 frames, re-déclenché) */
-#define FX_BANG_MEDIUM  8   /* explosion MEDIUM     (~25 fr, noise R6=8  ≈246 Hz arcade) */
-#define FX_BANG_SMALL   9   /* explosion SMALL      (~22 fr, noise R6=6  ≈306 Hz arcade) */
-#define FX_THUMP_2     10   /* thump cadencé Beat2  (sym. Beat1, sweep 129→77 Hz) */
-#define FX_UFO_SMALL   11   /* UFO small bip       (sweep MONTANT 983→1354 Hz)   */
-/* FX_THUMP (3) = Beat1 (sweep 134→81 Hz) ; FX_UFO (7) = large UFO (sweep 1259→879 Hz) */
+#define FX_FIRE         1   /* tir vaisseau    noise 740 Hz + env decay  [A] */
+#define FX_EXPLODE      2   /* explosion LARGE noise R6=12 ≈167 Hz       [A] */
+#define FX_THUMP        3   /* beat1 sweep 134→81 Hz                     [B] */
+#define FX_HYPER        4   /* hyperespace tone+noise ~558 ms             [A] */
+#define FX_THRUST       5   /* rumble grave 82 Hz (re-déclenché)          [A] */
+#define FX_LIFE         6   /* chime extra ship 2956 Hz + env decay       [A] */
+#define FX_UFO          7   /* large UFO oscillation 1000/800 Hz          [C] */
+#define FX_BANG_MEDIUM  8   /* explosion MEDIUM noise R6=8  ≈246 Hz      [A] */
+#define FX_BANG_SMALL   9   /* explosion SMALL  noise R6=6  ≈306 Hz      [A] */
+#define FX_THUMP_2     10   /* beat2 sweep 129→77 Hz (sym. Beat1)        [B] */
+#define FX_UFO_SMALL   11   /* small UFO sweep montant 700→1300 Hz       [C] */
 
-extern unsigned char sfx_id;
-extern unsigned char sfx_timer;
-extern unsigned char frame_cnt;       /* incrémenté par IRQ T1 (50 Hz) */
+extern unsigned char sfx_id;    /* canal A id (FX_NONE = libre)         */
+extern unsigned char sfx_timer; /* canal A timer                         */
+extern unsigned char frame_cnt; /* incrémenté à 50 Hz par IRQ T1        */
 #pragma zpsym ("sfx_id")
 #pragma zpsym ("sfx_timer")
 #pragma zpsym ("frame_cnt")
 
 void sound_init(void);
-void sound_tick(void);                /* appelé par _irq_handler à 50 Hz */
+void sound_tick(void);               /* appelé par _irq_handler à 50 Hz */
 void sound_play_fx(unsigned char fx_id);
-void irq_install(void);               /* installe handler IRQ T1 — appeler après timer_init */
+void sound_stop_ufo(void);           /* arrête canal C + désactive auto-restart */
+void irq_install(void);
 
 #endif /* SOUND_H */

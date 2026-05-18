@@ -106,8 +106,7 @@ void tune_stop(void);
 #define THUMP_PERIOD_BASE   30
 #define THUMP_PERIOD_MIN    6
 
-/* Phase 10n — cadence UFO bip-bip */
-#define UFO_SOUND_PERIOD    16
+/* Phase 22 — UFO sound géré dans ufo.c (canal C auto-restart) */
 
 /* Score asteroid + UFO arcade */
 static const unsigned int score_by_size[3] = { 100, 50, 20 };
@@ -170,8 +169,6 @@ static unsigned char gameover_armed;       /* exiger relâchement SPACE/ESC */
 
 /* Phase 8 — cadence thump : décrémente sur le timer, déclenche sound_play_fx */
 static unsigned char thump_timer;
-/* Phase 10n — cadence UFO sound */
-static unsigned char ufo_sound_timer;
 /* Phase 9f — détecter extra life (lives++) pour déclencher FX_LIFE */
 static unsigned char lives_prev;
 /* Phase 10d — affichage "WAVE n" en haut-centre */
@@ -872,7 +869,6 @@ void game_run(void)
     hiscores_init();
     debris_init();
     thump_timer = THUMP_PERIOD_BASE;
-    ufo_sound_timer = 0;
     lives_prev = lives;
     wave_displayed = 0;
 
@@ -1072,28 +1068,19 @@ void game_run(void)
         }
         lives_prev = lives;
 
-        /* Sound thump / UFO bip-bip cadencé */
-        if (!gameover && sfx_id == FX_NONE) {
-            if (ufo_active) {
-                if (ufo_sound_timer == 0) {
-                    /* Étape sons 5 : différencier S/L UFO selon ufo_type
-                     * (large = sweep descendant menaçant, small = sweep
-                     * montant nerveux). */
-                    sound_play_fx(ufo_type == UFO_LARGE ? FX_UFO : FX_UFO_SMALL);
-                    ufo_sound_timer = UFO_SOUND_PERIOD;
-                } else {
-                    ufo_sound_timer--;
-                }
-            } else if (thump_timer == 0) {
-                static unsigned char thump_toggle = 0;   /* alterne Beat1/Beat2 */
+        /* Sound thump — canal B dédié, indépendant du canal A.
+         * Phase 22 : plus besoin de sfx_id == FX_NONE — le thump tourne
+         * sur son propre canal et ne coupe plus les explosions/tirs.
+         * L'UFO bip-bip est géré dans ufo.c (canal C auto-restart). */
+        if (!gameover) {
+            if (thump_timer == 0) {
+                static unsigned char thump_toggle = 0;
                 unsigned char n = asteroids_count();
                 unsigned char period;
                 if (n >= 8)      period = THUMP_PERIOD_BASE;
                 else if (n >= 4) period = THUMP_PERIOD_BASE - 8;
                 else if (n >= 2) period = THUMP_PERIOD_BASE - 16;
                 else             period = THUMP_PERIOD_MIN;
-                /* Étape sons 4 : alternance Beat1/Beat2 arcade-fidèle
-                 * (THUMP-thump-THUMP-thump). */
                 sound_play_fx(thump_toggle ? FX_THUMP_2 : FX_THUMP);
                 thump_toggle = !thump_toggle;
                 thump_timer = period;

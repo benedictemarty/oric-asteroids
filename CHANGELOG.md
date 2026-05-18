@@ -7,6 +7,37 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 22 — Architecture son 3 canaux AY-3-8912 indépendants ✅
+
+**Problème** : politique mono-effet → thump, UFO et explosions se coupaient
+mutuellement. Dans l'arcade Atari, chaque circuit analogique est indépendant.
+
+**Solution** : 3 slots ZP indépendants par canal AY :
+- **Canal A** = effets primaires (fire, explode S/M/L, hyper, thrust, life)
+- **Canal B** = thump dédié (Beat1/Beat2) — jamais interrompu par une explosion
+- **Canal C** = UFO dédié (large/small) — auto-restart dans `sound_tick` via `ufo_snd_act`
+
+`update_mixer` recalcule R7 dynamiquement depuis l'état des 3 canaux → superposition
+naturelle sans conflit.
+
+**Correction FX_FIRE** : R6=$01 (trop proche de l'EXPLODE) → R6=$03 (~740 Hz arcade).
+Plus de sweep inutile ; enveloppe AY decay seule. Son "tack" plus distinct.
+
+**Correction FX_EXPLODE/BANG_*** : enveloppe sur R8 (canal A) au lieu de R10
+(canal C). Mixer $77 (noise A only) au lieu de $47 (noise tous canaux) — évite
+de piloter le volume C depuis canal A.
+
+**UFO bip-bip** : géré dans `ufo.c` — `ufo_spawn()` démarre le canal C,
+`ufo_kill()` et sortie d'écran l'arrêtent via `sound_stop_ufo()`. Auto-restart
+dans `sound_tick` tant que `ufo_snd_act=1`. Suppression du `ufo_sound_timer`
+manuel qui bloquait le thump.
+
+**Fichiers modifiés** : `src/asm/sound.s` (+8 bytes ZP, `sound_tmp` déplacé
+en BSS), `src/sound.h` (+`sound_stop_ufo`), `src/game.c` (thump simplifié,
+gate `sfx_id==FX_NONE` retirée), `src/ufo.c` (start/stop canal C).
+
+
+
 ### Phase 21b — Fix régression Phase 20 : `sound_tick` 25 Hz effectif ✅
 
 **Symptôme** (signalé utilisateur) : pas de son d'explosion quand le

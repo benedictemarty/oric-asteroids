@@ -27,6 +27,7 @@
 #include "ufo.h"
 #include "asteroids.h"      /* rng8, scr_speedup, asteroids_count */
 #include "line.h"
+#include "sound.h"          /* Phase 22 : canal C UFO géré ici */
 
 /* ------------------------------------------------------------------ */
 /* État UFO (BSS)                                                      */
@@ -112,6 +113,7 @@ void ufo_kill(void)
 {
     ufo_active = 0;
     ufo_bullet_active = 0;
+    sound_stop_ufo();   /* Phase 22 : arrêter canal C immédiatement */
 }
 
 /* Spawn : choix taille (RNG biaisé), bord et direction */
@@ -141,6 +143,8 @@ static void ufo_spawn(unsigned int score_in)
     ufo_active = 1;
     ufo_fire_timer = UFO_FIRE_PERIOD;
     ufo_drift_timer = UFO_DRIFT_PERIOD;
+    /* Phase 22 : démarrer canal C UFO (auto-restart dans sound_tick) */
+    sound_play_fx(ufo_type == UFO_LARGE ? FX_UFO : FX_UFO_SMALL);
 }
 
 /* Tir UFO : grande = direction aléatoire ; petite = vers le ship + bruit */
@@ -243,6 +247,7 @@ void ufo_tick(unsigned char ship_x_in, unsigned char ship_y_in,
     if (nx < 4 || nx > 235) {
         /* Sortie d'écran : disparaît, attend prochain spawn */
         ufo_active = 0;
+        sound_stop_ufo();   /* Phase 22 : stopper canal C */
         return;
     }
     ufo_x = (unsigned char)nx;
