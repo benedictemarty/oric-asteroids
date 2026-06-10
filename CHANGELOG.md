@@ -7,6 +7,53 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 26 — Sprites pré-rendus XOR (P3) + shapes arcade complètes restaurées ✅
+
+Le plus gros gain du plan perf : les asteroids ne tournent jamais, donc
+leurs 12 silhouettes (4 shapes × 3 tailles) sont **rasterisées à la
+compilation** (`tools/gen_shapes.py` : Bresenham identique à line.s,
+pixels en OR → sommets toujours visibles) et émises en bitmaps HIRES
+pré-décalés dans leurs **6 phases intra-octet** (3 402 octets RODATA).
+Le rendu par frame devient un **XOR-blit octet par octet** (`_spr_blit`,
+line.s : ~23 c/octet non nul, ~13 c/octet nul — les contours sont creux)
+au lieu de 11-13 segments Bresenham + setup par segment.
+
+**Géométrie** : px_gauche = cx + ox ; en écrivant cx = 6c + p, le bitmap
+de phase p est pré-décalé de (p+ox) mod 6 bits et le runtime ajoute
+cold = (p+ox) div 6 à la colonne. **240 étant divisible par 6, l'instance
+fantôme du wraparound (±240 px) garde la même phase** : ±40 colonnes,
+un seul jeu de bitmaps. Clipping rectangle (rangées [0,199], colonnes
+[0,39]) dans le wrapper C `asteroid_blit_at`.
+
+**Shapes arcade authentiques restaurées** : le coût de rendu ne dépendant
+plus du nombre de sommets, la décimation Phase 18h (11-13 → 6-7 sommets)
+est supprimée — les « creux » fins des 4 shapes rev 4 sont de retour.
+Rayons de collision inchangés ([4, 8, 13] : max|v|=5 présent dans les
+deux jeux de sommets). Les tables de sommets _shape_x/y/off/len
+disparaissent du binaire (sprites à la place).
+
+**ZP** : zéro octet supplémentaire — les 7 paramètres du blit aliasent
+les scratch du traceur de ligne (jamais actifs simultanément).
+
+**Validation** :
+- Idle frame_wait au bench titre : 24,3 % → **39,8 %** (+15,5 points ;
+  cumul Phases 24-26 : 17,9 % → 39,8 %, soit un coût de rendu de la
+  scène divisé par ~1,6 au total).
+- Zéro résidu XOR après 20 s de démo (733 px = nominal) ; wrap des
+  bords correct (fantômes horizontaux ET verticaux, coins) ; partie
+  réelle vérifiée via bench-game (HUD, ship, UFO, asteroids).
+- `make check` PASS déterministe (référence régénérée : shapes
+  complètes = rendu intentionnellement différent) ; host-test 4/4.
+- Binaire : 16,4 → 20,5 Ko (.tap) — +3,4 Ko de bitmaps, large marge
+  sous $9800.
+
+**Fichiers** : `tools/gen_shapes.py` (réécrit : rasterizer + émission
+sprites), `src/asm/shapes.s` (régénéré), `src/asm/line.s` (+`_spr_blit`,
+alias ZP, export `_x_col`), `src/line.h` (+API blit), `src/asteroids.c`
+(`asteroid_blit_at` remplace `asteroid_draw_at`).
+
+
+
 ### Phase 25 — Perf line.s : batch par octet (axe h) + verticale pure dédiée ✅
 
 Axe P2 du plan d'amélioration. Deux chemins rapides dans `_draw_line_xor`

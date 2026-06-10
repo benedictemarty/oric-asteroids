@@ -7,15 +7,32 @@ Source des shapes : 6502disassembly.com/va-asteroids/Asteroids.html
 - AstPtrnPtrTbl à $51DE pointe vers 4 shapes : $51E6, $51FE, $521A, $5234.
 - Format DVG SVEC (Short VECTOR) : déplacements relatifs cumulés.
 
-Phase 10b : **N sommets variables** par shape (11-13 sommets) — plus de
-décimation à 8.
+Phase 26 (P3) : **sprites pré-rendus XOR**. Les asteroids ne tournent
+jamais → chaque silhouette (4 shapes × 3 tailles) est rasterisée ICI
+(Bresenham identique à line.s) puis émise en bitmap HIRES dans ses
+6 phases de décalage intra-octet (6 px/octet). Le runtime blitte
+l'octet entier en un seul EOR/STA (cf. _spr_blit dans line.s), au
+lieu de retracer 11-13 segments par frame.
 
-Format de sortie :
-  _shape_off[12]   : offset (uint8) dans _shape_x/y, par (size*4 + shape)
-  _shape_len[12]   : nombre de sommets (uint8)
-  _shape_x[~144]   : sommets X cumulés
-  _shape_y[~144]   : sommets Y cumulés
-  _shape_radii[3]  : rayon collision par taille
+Conséquence : le coût de rendu ne dépend plus du nombre de sommets →
+la décimation Phase 18h (11-13 → 6-7 sommets) est SUPPRIMÉE, les
+shapes arcade authentiques sont de retour.
+
+Tables émises :
+  _spr_w[12]     : largeur en octets (stride), index = size*4+shape
+  _spr_h[12]     : hauteur en rangées
+  _spr_oy[12]    : offset y signé du coin haut du sprite vs centre
+  _spr_cold[72]  : delta colonne signé, index = id*6 + (cx mod 6)
+  _spr_lo/hi[72] : pointeurs vers le bitmap de la phase (cx mod 6)
+  _x_phase[240]  : table cx → cx mod 6
+  _shape_radii[3]: rayon collision par taille (inchangé : max|v| = 5
+                   présent dans les shapes décimées ET complètes)
+
+Géométrie : px_gauche = cx + ox (ox = min x rasterisé). En écrivant
+cx = 6c + p : px = 6(c + (p+ox) div 6) + ((p+ox) mod 6). Le bitmap de
+phase p est pré-décalé de q = (p+ox) mod 6 bits, et le runtime ajoute
+cold = (p+ox) div 6 (∈ [-3..0]) à la colonne c. L'instance fantôme du
+wraparound (±240 px) garde la MÊME phase (240 = 40×6) : ±40 colonnes.
 """
 
 import math
@@ -51,21 +68,9 @@ ATARI_SHAPE_3 = [
     (1, -3), (2, -4), (3, -3), (0, -1),
 ]
 
-# Phase 18h : décimation step=2 pour réduire le coût de tracé d'environ
-# 50% (11-13 sommets → 6-7). Visuellement on perd les "creux" fins de
-# l'arcade authentique mais on gagne en framerate effectif (passage de
-# ~2 Hz à ~5 Hz quand chargé, suffisant pour rotation/jeu fluides).
-DECIMATE_STEP = 2
-
-def _decimate(shape, step):
-    return shape[::step]
-
-ATARI_SHAPES = [
-    _decimate(ATARI_SHAPE_0, DECIMATE_STEP),
-    _decimate(ATARI_SHAPE_1, DECIMATE_STEP),
-    _decimate(ATARI_SHAPE_2, DECIMATE_STEP),
-    _decimate(ATARI_SHAPE_3, DECIMATE_STEP),
-]
+# Phase 26 : plus de décimation — le blit rend le coût indépendant du
+# nombre de sommets. Shapes arcade rev 4 authentiques (11-13 sommets).
+ATARI_SHAPES = [ATARI_SHAPE_0, ATARI_SHAPE_1, ATARI_SHAPE_2, ATARI_SHAPE_3]
 
 SCALES = [0.9, 1.6, 2.6]   # petit, moyen, grand → rayons cibles 5/9/14
 N_SHAPES = 4
@@ -91,42 +96,117 @@ def compute_radii():
     return radii
 
 
+def raster_line(pixels, x0, y0, x1, y1):
+    """Bresenham main-axis split, sémantique identique à line.s :
+    err = 0 ; par pixel : err += axe_mineur ; si err >= axe_majeur →
+    step mineur, err -= majeur ; step majeur. Pixels en OR (un sommet
+    partagé reste allumé — pas de double-XOR dans un bitmap figé)."""
+    if x0 > x1:
+        x0, y0, x1, y1 = x1, y1, x0, y0
+    dx = x1 - x0
+    dy = abs(y1 - y0)
+    sy = 1 if y1 >= y0 else -1
+    x, y = x0, y0
+    err = 0
+    if dx >= dy:
+        for _ in range(dx + 1):
+            pixels.add((x, y))
+            err += dy
+            if err >= dx and dx > 0:
+                err -= dx
+                y += sy
+            x += 1
+    else:
+        for _ in range(dy + 1):
+            pixels.add((x, y))
+            err += dx
+            if err >= dy:
+                err -= dy
+                x += 1
+            y += sy
+
+
+def rasterize_shape(shape, scale):
+    """Polygone fermé → set de pixels (coords centrées sur (0,0))."""
+    verts = [(int(round(x * scale)), int(round(y * scale))) for (x, y) in shape]
+    pixels = set()
+    n = len(verts)
+    for i in range(n):
+        x0, y0 = verts[i]
+        x1, y1 = verts[(i + 1) % n]
+        raster_line(pixels, x0, y0, x1, y1)
+    return pixels
+
+
+def build_sprite(pixels):
+    """Pixels centrés → (ox, oy, W, H, grille bool [H][W])."""
+    xs = [p[0] for p in pixels]
+    ys = [p[1] for p in pixels]
+    ox, oy = min(xs), min(ys)
+    W = max(xs) - ox + 1
+    H = max(ys) - oy + 1
+    grid = [[False] * W for _ in range(H)]
+    for (x, y) in pixels:
+        grid[y - oy][x - ox] = True
+    return ox, oy, W, H, grid
+
+
+def shift_bitmap(grid, W, H, q, wb):
+    """Bitmap HIRES décalé de q bits (0..5), wb octets/rangée.
+    Bit 5 = pixel de gauche dans l'octet ; bits 6/7 jamais utilisés
+    (invariant non-attribut préservé par l'EOR du blit)."""
+    rows = []
+    for r in range(H):
+        row = [0] * wb
+        for c in range(W):
+            if grid[r][c]:
+                bit = q + c
+                row[bit // 6] |= 0x20 >> (bit % 6)
+        rows.extend(row)
+    return rows
+
+
 def main():
     radii = compute_radii()
 
-    # Calcul offsets et lengths
-    offsets = []
-    lengths = []
-    xs = []
-    ys = []
-    cur_off = 0
+    sprites = []          # par id (size*4+shape) : dict
     for size_id in range(N_SIZES):
         scale = SCALES[size_id]
-        for shape in ATARI_SHAPES:
-            offsets.append(cur_off)
-            lengths.append(len(shape))
-            for (x, y) in shape:
-                xs.append(to_byte(int(round(x * scale))))
-                ys.append(to_byte(int(round(y * scale))))
-            cur_off += len(shape)
+        for shape_id in range(N_SHAPES):
+            pixels = rasterize_shape(ATARI_SHAPES[shape_id], scale)
+            ox, oy, W, H, grid = build_sprite(pixels)
+            wb = (5 + W + 5) // 6          # ceil((5+W)/6) : pire phase q=5
+            phases = []
+            for p in range(6):
+                q = (p + ox) % 6
+                cold = (p + ox) // 6       # floor div python : [-3..0]
+                phases.append({
+                    'q': q, 'cold': cold,
+                    'data': shift_bitmap(grid, W, H, q, wb),
+                })
+            sprites.append({
+                'ox': ox, 'oy': oy, 'w': wb, 'h': H, 'phases': phases,
+                'size': size_id, 'shape': shape_id, 'W': W,
+            })
 
-    total = cur_off
-    if total > 255:
-        raise SystemExit("Total sommets > 255 — offset 8-bit insuffisant")
+    total_bytes = sum(len(ph['data']) for s in sprites for ph in s['phases'])
 
     print("; ===============================================================")
-    print("; shapes.s — auto-généré par tools/gen_shapes.py (Phase 10b)")
-    print("; PORTAGE ATARI ARCADE rev 4 — N sommets variables (11-13)")
+    print("; shapes.s — auto-généré par tools/gen_shapes.py (Phase 26 / P3)")
+    print("; PORTAGE ATARI ARCADE rev 4 — sprites pré-rendus XOR")
     print("; Source : 6502disassembly.com/va-asteroids/Asteroids.html")
+    print("; NE PAS ÉDITER MANUELLEMENT — régénérer avec : make gen_shapes")
     print("; ===============================================================")
-    print(f"; 4 shapes Atari × 3 tailles, longueurs : {[len(s) for s in ATARI_SHAPES]}")
-    print(f"; Total sommets : {total} (par taille : {sum(len(s) for s in ATARI_SHAPES)})")
+    print(f"; 4 shapes × 3 tailles, sommets COMPLETS : "
+          f"{[len(s) for s in ATARI_SHAPES]} (décimation supprimée)")
     print(f"; Échelles : {SCALES}  Rayons collision : {radii}")
+    print(f"; Bitmaps : 12 sprites × 6 phases = {total_bytes} octets")
     print()
     print('        .segment "RODATA"')
     print()
-    print("        .export _shape_x, _shape_y, _shape_radii")
-    print("        .export _shape_off, _shape_len")
+    print("        .export _spr_w, _spr_h, _spr_oy, _spr_cold")
+    print("        .export _spr_lo, _spr_hi, _x_phase")
+    print("        .export _shape_radii")
     print()
 
     def emit_bytes(name, vals, comment=None):
@@ -137,13 +217,50 @@ def main():
             print("        .byte " + ", ".join(f"${v:02X}" for v in vals[i:i+12]))
         print()
 
-    emit_bytes("_shape_off", offsets, "offset (uint8) dans _shape_x/y, index = size*4+shape")
-    emit_bytes("_shape_len", lengths, "nombre de sommets, index = size*4+shape")
-    emit_bytes("_shape_x", xs, "X des sommets, indexé via _shape_off + vertex")
-    emit_bytes("_shape_y", ys, "Y des sommets, indexé via _shape_off + vertex")
+    emit_bytes("_spr_w", [s['w'] for s in sprites],
+               "largeur en octets (stride), index = size*4+shape")
+    emit_bytes("_spr_h", [s['h'] for s in sprites],
+               "hauteur en rangées")
+    emit_bytes("_spr_oy", [to_byte(s['oy']) for s in sprites],
+               "offset y signé (coin haut vs centre)")
+    emit_bytes("_spr_cold",
+               [to_byte(ph['cold']) for s in sprites for ph in s['phases']],
+               "delta colonne signé, index = id*6 + (cx mod 6)")
+
+    print("_spr_lo:")
+    print("        ; pointeur bitmap (octet bas), index = id*6 + (cx mod 6)")
+    for i, s in enumerate(sprites):
+        print("        .byte " + ", ".join(
+            f"<spr_{i:02d}_p{p}" for p in range(6)))
+    print()
+    print("_spr_hi:")
+    for i, s in enumerate(sprites):
+        print("        .byte " + ", ".join(
+            f">spr_{i:02d}_p{p}" for p in range(6)))
+    print()
+
+    print("_x_phase:")
+    print("        ; x mod 6 — phase intra-octet d'une coordonnée pixel")
+    print("        .repeat 240, I")
+    print("            .byte I .MOD 6")
+    print("        .endrepeat")
+    print()
 
     print("_shape_radii:  ; rayon collision par taille (Phase 5)")
     print("        .byte " + ", ".join(str(r) for r in radii))
+    print()
+
+    for i, s in enumerate(sprites):
+        print(f"; ── sprite {i:02d} : size {s['size']} shape {s['shape']} "
+              f"— {s['W']}x{s['h']} px, {s['w']} o/rangée, "
+              f"ox={s['ox']} oy={s['oy']} ──")
+        for p, ph in enumerate(s['phases']):
+            print(f"spr_{i:02d}_p{p}:   ; q={ph['q']} cold={ph['cold']}")
+            data = ph['data']
+            for j in range(0, len(data), 12):
+                print("        .byte " + ", ".join(
+                    f"${v:02X}" for v in data[j:j+12]))
+        print()
 
 
 if __name__ == "__main__":

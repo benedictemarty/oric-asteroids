@@ -62,6 +62,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 23 | Fix mute R7 par key_scan (mixer_shadow) + cli IRQ + collisions toriques | — | 1 j |
 | ✅ | 24 | Perf anti-mul8x16 (−7 % CPU) + Bresenham semi-ouvert (sommets parfaits) + bench-game | — | 1 j |
 | ✅ | 25 | Perf line.s : batch par octet (axe h) + verticale pure (idle 17,9 → 24,3 % vs P23) | — | 1 j |
+| ✅ | 26 | Sprites pré-rendus XOR (P3) + shapes arcade 11-13 sommets restaurées (idle → 39,8 %) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.

@@ -48,4 +48,30 @@ void draw_line_xor_open(void);
  * et les fragments. */
 void plot_dot(void);
 
+/* ── Phase 26 (P3) — blit sprite XOR ─────────────────────────────── */
+
+/* Paramètres ZP du blit (alias des scratch du traceur — ne jamais
+ * appeler draw_line entre leur écriture et spr_blit()). Le rectangle
+ * passé doit être entièrement visible : le clipping rangées/colonnes
+ * incombe à l'appelant (cf. asteroid_blit_at, asteroids.c). */
+extern unsigned char *blt_sptr;       /* bitmap source (RODATA) */
+extern unsigned char blt_row;         /* première rangée écran 0..199 */
+extern unsigned char blt_col;         /* première colonne octet 0..39 */
+extern unsigned char blt_stride;      /* octets/rangée du bitmap */
+extern unsigned char blt_cnt;         /* octets visibles/rangée (>= 1) */
+extern unsigned char blt_nrows;       /* rangées visibles (>= 1) */
+#pragma zpsym ("blt_sptr")
+#pragma zpsym ("blt_row")
+#pragma zpsym ("blt_col")
+#pragma zpsym ("blt_stride")
+#pragma zpsym ("blt_cnt")
+#pragma zpsym ("blt_nrows")
+
+/* XOR-blit le rectangle décrit par les params ci-dessus. Idempotent
+ * (2 blits identiques = effacement), bit 6 écran préservé. */
+void spr_blit(void);
+
+/* Colonne octet (x/6) d'une coordonnée pixel — table RODATA line.s. */
+extern const unsigned char x_col[240];
+
 #endif /* LINE_H */

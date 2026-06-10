@@ -12,7 +12,10 @@
 ;=================================================================
 
         .export  _hires_init, _draw_line_xor, _draw_line_xor_open, _plot_dot
+        .export  _spr_blit, _x_col
         .exportzp _lx0, _ly0, _lx1, _ly1
+        .exportzp _blt_sptr, _blt_row, _blt_col
+        .exportzp _blt_stride, _blt_cnt, _blt_nrows
         .macpack longbranch
 
 ;-----------------------------------------------------------------
@@ -40,6 +43,16 @@ cs_src:     .res 2          ; ptr source pour la copie charset $B400 -> $9800
 ; Phase 24 : l_sx / l_err_hi / l_e2lo / l_e2hi supprimés (reliquats
 ; pré-Phase 18, jamais référencés) → place ZP pour l_open / l_swap,
 ; puis Phase 25 pour l_batch / l_start. ZP de nouveau pleine.
+
+; Phase 26 (P3) — paramètres du blit sprite : ALIAS des scratch du
+; traceur (la ZP est pleine ; blit et tracé de ligne ne sont jamais
+; actifs simultanément — mono-thread, pas de dessin sous IRQ).
+_blt_sptr   = cs_src        ; ptr bitmap sprite (16 bits)
+_blt_row    = l_dx          ; première rangée écran (0..199)
+_blt_col    = l_dy          ; première colonne octet (0..39)
+_blt_stride = l_err_lo      ; octets par rangée du bitmap (avance ptr)
+_blt_cnt    = l_mask        ; octets visibles par rangée (après clip)
+_blt_nrows  = l_pix         ; rangées visibles (après clip)
 
 ;-----------------------------------------------------------------
 ; Tables precalculees (RODATA, 200+200+240+240 = 880 octets)
@@ -69,6 +82,10 @@ x_msk:
         .repeat 240, I
             .byte $20 .SHR (I .MOD 6)
         .endrepeat
+
+; Phase 26 — alias C de x_col (colonne octet d'un pixel) pour le
+; wrapper de blit sprite (asteroids.c).
+_x_col = x_col
 
 ;-----------------------------------------------------------------
 ; _hires_init — declenche le mode HIRES et efface l'ecran
@@ -754,4 +771,54 @@ dlx_common:
         rts
 
 @done:
+        rts
+
+;-----------------------------------------------------------------
+; _spr_blit — Phase 26 (P3) : XOR-blit d'un bitmap sprite sur HIRES
+;
+; Params ZP (alias, cf. en-tête) : _blt_sptr, _blt_row, _blt_col,
+; _blt_stride, _blt_cnt (>= 1), _blt_nrows (>= 1). Le clipping
+; rangées/colonnes est fait par l'appelant C (asteroid_blit_at) :
+; ici on blitte un rectangle entièrement visible.
+;
+; ~23 c/octet non nul, ~13 c/octet nul (les bitmaps contour sont
+; creux : le test beq saute l'EOR/STA inutile), ~30 c/rangée de
+; setup. Un grand asteroid (4 o × ~20 rangées) ≈ 1 400 c, contre
+; ~4 000-6 000 c en 11-13 segments Bresenham + setup par segment.
+;
+; Invariant non-attribut : les octets sprite n'ont jamais les bits
+; 6/7 (générateur) → l'EOR ne touche pas le bit 6 de l'écran.
+;-----------------------------------------------------------------
+_spr_blit:
+@sb_row:
+        ldx  _blt_row        ; adresse écran = hires[row] + col
+        lda  hires_lo,x
+        clc
+        adc  _blt_col
+        sta  l_ptr
+        lda  hires_hi,x
+        adc  #0
+        sta  l_ptr+1
+
+        ldy  _blt_cnt        ; octets de la rangée, de cnt-1 à 0
+        dey
+@sb_byte:
+        lda  (_blt_sptr),y
+        beq  @sb_skip        ; octet vide → pas de RMW écran
+        eor  (l_ptr),y
+        sta  (l_ptr),y
+@sb_skip:
+        dey
+        bpl  @sb_byte
+
+        lda  _blt_sptr       ; bitmap : rangée suivante (+stride)
+        clc
+        adc  _blt_stride
+        sta  _blt_sptr
+        bcc  @sb_nc
+        inc  _blt_sptr+1
+@sb_nc:
+        inc  _blt_row        ; écran : rangée suivante
+        dec  _blt_nrows
+        bne  @sb_row
         rts

@@ -1,11 +1,13 @@
 /*
- * asteroids.c — Astéroïdes Phase 4
+ * asteroids.c — Astéroïdes
  *
  * Tableau d'astéroïdes en BSS. Chacun = (x, y, vx, vy, shape, size, active).
- * Rendu : 8 segments par astéroïde via _draw_line_xor.
- * Mouvement : intégration entière + wraparound zone safe (pas encore de
- * duplication d'instance — Phase 4b).
- * Fragmentation : grand → 2 moyens, moyen → 2 petits, petit → disparu.
+ * Rendu (Phase 26 / P3) : sprites pré-rendus XOR blittés octet par octet
+ * (_spr_blit, line.s) — les asteroids ne tournent jamais, donc 12
+ * silhouettes × 6 phases intra-octet générées par tools/gen_shapes.py.
+ * Shapes arcade rev 4 complètes (11-13 sommets, décimation supprimée).
+ * Mouvement : intégration 8.8 + wraparound par duplication d'instance.
+ * Fragmentation : 1 parent réduit + 2 enfants = 3 fragments par hit.
  *
  * Le tableau est exposé à game.c via les fonctions ci-dessous.
  */
@@ -13,15 +15,18 @@
 #include "asteroids.h"
 #include "line.h"
 
-/* Tables de sommets générées par tools/gen_shapes.py — Phase 10b N variable.
- *   shape_off[size*4+shape]  : offset (uint8) dans shape_x/y
- *   shape_len[size*4+shape]  : N sommets pour cette shape
- *   shape_x/y[total]         : 147 sommets (4 shapes × 3 tailles, N variable)
- */
-extern const signed char shape_x[];
-extern const signed char shape_y[];
-extern const unsigned char shape_off[12];
-extern const unsigned char shape_len[12];
+/* Phase 26 (P3) — sprites pré-rendus par tools/gen_shapes.py.
+ * Les asteroids ne tournent jamais : chaque silhouette (size*4+shape)
+ * est un bitmap HIRES pré-décalé dans ses 6 phases intra-octet,
+ * XOR-blitté par _spr_blit (line.s). Le coût de rendu ne dépend plus
+ * du nombre de sommets → shapes arcade 11-13 sommets restaurées. */
+extern const unsigned char spr_w[12];     /* stride octets */
+extern const unsigned char spr_h[12];     /* rangées */
+extern const signed char  spr_oy[12];     /* coin haut vs centre */
+extern const signed char  spr_cold[72];   /* delta colonne, id*6+phase */
+extern const unsigned char spr_lo[72];    /* ptr bitmap (bas) */
+extern const unsigned char spr_hi[72];    /* ptr bitmap (haut) */
+extern const unsigned char x_phase[240];  /* cx mod 6 */
 extern const unsigned char shape_radii[3];
 
 /* État des astéroïdes (BSS, zéro à l'init via bullets_init logique) */
@@ -196,85 +201,91 @@ void asteroids_update(void)
     }
 }
 
-/* Phase 10l — vérifie qu'une coord (x, y) en int signé est dans
- * la zone HIRES valide [0, 239] × [0, 199]. Permet le clipping
- * segment par segment lors de la duplication d'instance. */
-#define IN_BOUNDS(x, y)  ((x) >= 0 && (x) <= 239 && (y) >= 0 && (y) <= 199)
+/* id*6 précalculé — évite l'appel mulax6 cc65 dans le chemin chaud */
+static const unsigned char id_x6[12] = { 0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66 };
 
-/* Tracé d'un astéroïde à un centre (cx, cy) avec offset (ox, oy).
- * Le centre est passé en paramètre (au lieu de lire p->x/y) pour
- * permettre erase à prev_x/prev_y et draw à x/y dans la même frame
- * (pattern erase+draw consécutif anti-flicker).
- * Permet la duplication d'instance : (0, 0) pour l'instance principale,
- * (±240, 0) ou (0, ±200) pour les instances fantômes près des bords.
- * Clipping segment-par-segment : skip si une extrémité hors HIRES.
+/* Phase 26 (P3) — blit d'un sprite asteroid à un centre (cx, cy).
  *
- * Phase 24 — draw_line_xor_open (semi-ouvert) : le polygone fermé
- * parcouru en cycle v[i]→v[i+1] donne à chaque sommet in-degree 1 →
- * chaque sommet est XOR-é exactement une fois (visible). Clôt le
- * compromis « sommets éteints » de la revue 2026-05-13, à coût nul
- * (1 px de moins tracé par segment compense le test d'entrée).
- * Cas clip : si un segment est sauté, le sommet d'arrivée n'est pas
- * peint — artefact d'1 px limité aux bords d'écran, accepté. */
-static void asteroid_draw_at(const Asteroid *p, unsigned char cx, unsigned char cy,
-                             int ox, int oy)
+ * colofs/rowofs : 0 pour l'instance principale, ±40 colonnes / ±200
+ * rangées pour l'instance fantôme du wraparound (±240 px = ±40 octets ;
+ * 240 étant divisible par 6, la phase intra-octet est la MÊME pour
+ * l'instance fantôme — un seul jeu de bitmaps suffit).
+ *
+ * Clipping rectangle : rangées hors [0,199] sautées (rskip/nr),
+ * colonnes hors [0,39] tronquées (lead/cnt) — le bitmap étant
+ * contigu par rangée, le clip horizontal se réduit à avancer le
+ * pointeur de `lead` octets et blitter `cnt` octets par rangée. */
+static void asteroid_blit_at(unsigned char id, unsigned char cx, unsigned char cy,
+                             signed char colofs, int rowofs)
 {
-    unsigned char i, base, n, next;
-    unsigned char shape_idx;
-    int ax, ay;
-    int x0, y0, x1, y1;
-    signed char dx0, dy0, dx1, dy1;
+    unsigned char sidx;
+    signed char col0;
+    int row0;
+    unsigned char w, lead, cnt, rskip, nr;
 
-    ax = (int)(unsigned int)cx + ox;
-    ay = (int)(unsigned int)cy + oy;
-    shape_idx = (p->size << 2) + p->shape;
-    base = shape_off[shape_idx];
-    n    = shape_len[shape_idx];
+    sidx = id_x6[id] + x_phase[cx];
+    col0 = (signed char)((signed char)x_col[cx] + spr_cold[sidx] + colofs);
+    w    = spr_w[id];
 
-    for (i = 0; i < n; i++) {
-        next = (i + 1 == n) ? 0 : (i + 1);
-        dx0 = shape_x[base + i];
-        dy0 = shape_y[base + i];
-        dx1 = shape_x[base + next];
-        dy1 = shape_y[base + next];
-        x0 = ax + (int)dx0;
-        y0 = ay + (int)dy0;
-        x1 = ax + (int)dx1;
-        y1 = ay + (int)dy1;
-        if (IN_BOUNDS(x0, y0) && IN_BOUNDS(x1, y1)) {
-            lx0 = (unsigned char)x0;
-            ly0 = (unsigned char)y0;
-            lx1 = (unsigned char)x1;
-            ly1 = (unsigned char)y1;
-            draw_line_xor_open();
-        }
+    /* Clip horizontal en colonnes-octets [0..39] */
+    lead = 0;
+    cnt  = w;
+    if (col0 < 0) {
+        lead = (unsigned char)-col0;
+        if (lead >= cnt) return;
+        cnt -= lead;
+        col0 = 0;
     }
+    if ((unsigned char)col0 >= 40) return;
+    if ((unsigned char)col0 + cnt > 40) cnt = 40 - (unsigned char)col0;
+
+    /* Clip vertical en rangées [0..199] */
+    row0 = (int)cy + spr_oy[id] + rowofs;
+    if (row0 >= 200) return;
+    rskip = 0;
+    nr = spr_h[id];
+    if (row0 < 0) {
+        if (row0 + nr <= 0) return;
+        rskip = (unsigned char)-row0;
+        nr -= rskip;
+        row0 = 0;
+    }
+    if (row0 + nr > 200) nr = (unsigned char)(200 - row0);
+
+    blt_sptr = (unsigned char *)(spr_lo[sidx] | ((unsigned int)spr_hi[sidx] << 8));
+    if (rskip) blt_sptr += (unsigned int)rskip * w;
+    blt_sptr  += lead;
+    blt_row    = (unsigned char)row0;
+    blt_col    = (unsigned char)col0;
+    blt_stride = w;
+    blt_cnt    = cnt;
+    blt_nrows  = nr;
+    spr_blit();
 }
 
 /* Phase 10l — duplication d'instance : asteroid près d'un bord est
- * dessiné aussi à son emplacement "fantôme" de l'autre côté de l'écran.
- * Bords (rayon ~14 px) :
- *   - x ≤ 14 : copie à x + 240
- *   - x ≥ 226 : copie à x - 240
- *   - idem Y avec 200
- *   - coins : 4× (1 + dx + dy + dx_dy)
- * Le centre (cx, cy) est passé en paramètre pour permettre le pattern
- * erase à prev_pos puis draw à curr_pos sans modifier la struct. */
+ * dessiné aussi à son emplacement "fantôme" de l'autre côté de l'écran
+ * (coins : jusqu'à 4 instances). Le centre (cx, cy) est passé en
+ * paramètre pour permettre le pattern erase à prev_pos puis draw à
+ * curr_pos sans modifier la struct. Une instance fantôme entièrement
+ * hors écran est rejetée à coût quasi nul par le clip du blit. */
 static void asteroid_draw_one(const Asteroid *p, unsigned char cx, unsigned char cy)
 {
     /* Rayon max conservateur : 14 (= rayon grand asteroid) */
-    int dup_x = 0, dup_y = 0;
+    unsigned char id = (unsigned char)((p->size << 2) + p->shape);
+    signed char dup_c = 0;
+    int dup_r = 0;
 
-    asteroid_draw_at(p, cx, cy, 0, 0);
+    asteroid_blit_at(id, cx, cy, 0, 0);
 
-    if (cx <= 14)        dup_x = +240;
-    else if (cx >= 226)  dup_x = -240;
-    if (cy <= 14)        dup_y = +200;
-    else if (cy >= 186)  dup_y = -200;
+    if (cx <= 14)        dup_c = +40;
+    else if (cx >= 226)  dup_c = -40;
+    if (cy <= 14)        dup_r = +200;
+    else if (cy >= 186)  dup_r = -200;
 
-    if (dup_x) asteroid_draw_at(p, cx, cy, dup_x, 0);
-    if (dup_y) asteroid_draw_at(p, cx, cy, 0, dup_y);
-    if (dup_x && dup_y) asteroid_draw_at(p, cx, cy, dup_x, dup_y);
+    if (dup_c) asteroid_blit_at(id, cx, cy, dup_c, 0);
+    if (dup_r) asteroid_blit_at(id, cx, cy, 0, dup_r);
+    if (dup_c && dup_r) asteroid_blit_at(id, cx, cy, dup_c, dup_r);
 }
 
 /* Trace XOR à pos courante (x, y) pour chaque actif.
