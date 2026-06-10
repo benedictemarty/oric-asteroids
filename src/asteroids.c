@@ -55,15 +55,20 @@ unsigned char rng8(void)
 
 void asteroids_init(unsigned char seed)
 {
+    register Asteroid *p;
     unsigned char i;
     rng_state = seed ? seed : 0x42;
     current_wave = 0;
     ast_per_wave = 0;
     scr_speedup = 5;            /* arcade : init à 5 */
     ast_break_timer = 0;        /* arcade : aucun hit en attente */
-    for (i = 0; i < MAX_ASTEROIDS; i++) {
-        asteroids[i].active = 0;
-        asteroids[i].drawn  = 0;
+    /* Phase 24 — itération par pointeur : l'indexation asteroids[i]
+     * (sizeof = 13, pas une puissance de 2) force cc65 à appeler
+     * mul8x16 à CHAQUE accès champ (~8-9 % du CPU au profil bench).
+     * Le pointeur courant la remplace par un adc #sizeof par tour. */
+    for (i = 0, p = asteroids; i < MAX_ASTEROIDS; i++, p++) {
+        p->active = 0;
+        p->drawn  = 0;
     }
 }
 
@@ -92,39 +97,42 @@ void asteroids_spawn_wave(void)
     n = ast_per_wave;
     if (n > MAX_ASTEROIDS) n = MAX_ASTEROIDS;
 
-    for (i = 0; i < n; i++) {
-        asteroids[i].active = 1;
-        asteroids[i].drawn  = 0;            /* pas encore tracé : skip erase au 1er render */
-        asteroids[i].size   = SIZE_LARGE;
+    {
+    register Asteroid *p = asteroids;      /* Phase 24 — anti-mul8x16 */
+    for (i = 0; i < n; i++, p++) {
+        p->active = 1;
+        p->drawn  = 0;            /* pas encore tracé : skip erase au 1er render */
+        p->size   = SIZE_LARGE;
         /* Shape aléatoire 0-3 (cf. arcade : AND #$18 puis ORA #$04 → status) */
-        asteroids[i].shape  = (rng8() >> 3) & 3;
+        p->shape  = (rng8() >> 3) & 3;
 
         /* Position : RNG bit 0 décide top/bottom ou left/right */
         r = rng8();
         if (r & 1) {
             /* Apparaît sur bord gauche/droit, Y aléatoire */
-            asteroids[i].x = (r & 2) ? 12 : 220;
-            asteroids[i].y = 24 + (rng8() % 144);     /* zone safe Y */
+            p->x = (r & 2) ? 12 : 220;
+            p->y = 24 + (rng8() % 144);     /* zone safe Y */
         } else {
             /* Apparaît sur bord haut/bas, X aléatoire */
-            asteroids[i].x = 20 + (rng8() % 192);     /* zone safe X */
-            asteroids[i].y = (r & 2) ? 20 : 180;
+            p->x = 20 + (rng8() % 192);     /* zone safe X */
+            p->y = (r & 2) ? 20 : 180;
         }
-        asteroids[i].prev_x = asteroids[i].x;
-        asteroids[i].prev_y = asteroids[i].y;
-        asteroids[i].x_frac = 0;
-        asteroids[i].y_frac = 0;
+        p->prev_x = p->x;
+        p->prev_y = p->y;
+        p->x_frac = 0;
+        p->y_frac = 0;
 
         /* Vélocité 8.8 (scale ×128) : base RNG (1 ou 2 px) × 128
          * → 128 ou 256 = 0.5 ou 1.0 px/frame initial. */
         r = rng8();
-        asteroids[i].vx = ((r & 1) ? 1 : -1) * ((r & 2) ? 256 : 128);
-        asteroids[i].vy = ((r & 4) ? 1 : -1) * ((r & 8) ? 256 : 128);
+        p->vx = ((r & 1) ? 1 : -1) * ((r & 2) ? 256 : 128);
+        p->vy = ((r & 4) ? 1 : -1) * ((r & 8) ? 256 : 128);
     }
     /* Marquer les autres comme libres */
-    for (; i < MAX_ASTEROIDS; i++) {
-        asteroids[i].active = 0;
-        asteroids[i].drawn  = 0;
+    for (; i < MAX_ASTEROIDS; i++, p++) {
+        p->active = 0;
+        p->drawn  = 0;
+    }
     }
 }
 
@@ -154,36 +162,37 @@ void asteroids_spawn_wave(void)
 
 void asteroids_update(void)
 {
+    register Asteroid *p;                  /* Phase 24 — anti-mul8x16 */
     unsigned char i;
     unsigned int pos16;
-    for (i = 0; i < MAX_ASTEROIDS; i++) {
-        if (!asteroids[i].active) continue;
+    for (i = 0, p = asteroids; i < MAX_ASTEROIDS; i++, p++) {
+        if (!p->active) continue;
         /* Sauver pos courante comme prev (= pos où l'astéroïde est tracé en
          * sortie de frame précédente) avant de calculer la nouvelle pos. */
-        asteroids[i].prev_x = asteroids[i].x;
-        asteroids[i].prev_y = asteroids[i].y;
+        p->prev_x = p->x;
+        p->prev_y = p->y;
 
         /* X : 8.8 add + wrap modulo SPAN*256 (≠ modulo 65536). */
-        pos16 = ((unsigned int)asteroids[i].x << 8) | asteroids[i].x_frac;
-        pos16 += (unsigned int)asteroids[i].vx;
-        if (asteroids[i].vx >= 0) {
+        pos16 = ((unsigned int)p->x << 8) | p->x_frac;
+        pos16 += (unsigned int)p->vx;
+        if (p->vx >= 0) {
             if (pos16 >= X_SPAN_FIX) pos16 -= X_SPAN_FIX;
         } else {
             if (pos16 >= X_SPAN_FIX) pos16 += X_SPAN_FIX;
         }
-        asteroids[i].x      = (unsigned char)(pos16 >> 8);
-        asteroids[i].x_frac = (unsigned char)(pos16 & 0xFF);
+        p->x      = (unsigned char)(pos16 >> 8);
+        p->x_frac = (unsigned char)(pos16 & 0xFF);
 
         /* Y : idem. */
-        pos16 = ((unsigned int)asteroids[i].y << 8) | asteroids[i].y_frac;
-        pos16 += (unsigned int)asteroids[i].vy;
-        if (asteroids[i].vy >= 0) {
+        pos16 = ((unsigned int)p->y << 8) | p->y_frac;
+        pos16 += (unsigned int)p->vy;
+        if (p->vy >= 0) {
             if (pos16 >= Y_SPAN_FIX) pos16 -= Y_SPAN_FIX;
         } else {
             if (pos16 >= Y_SPAN_FIX) pos16 += Y_SPAN_FIX;
         }
-        asteroids[i].y      = (unsigned char)(pos16 >> 8);
-        asteroids[i].y_frac = (unsigned char)(pos16 & 0xFF);
+        p->y      = (unsigned char)(pos16 >> 8);
+        p->y_frac = (unsigned char)(pos16 & 0xFF);
     }
 }
 
@@ -193,13 +202,21 @@ void asteroids_update(void)
 #define IN_BOUNDS(x, y)  ((x) >= 0 && (x) <= 239 && (y) >= 0 && (y) <= 199)
 
 /* Tracé d'un astéroïde à un centre (cx, cy) avec offset (ox, oy).
- * Le centre est passé en paramètre (au lieu de lire asteroids[idx].x/y)
- * pour permettre erase à prev_x/prev_y et draw à x/y dans la même frame
+ * Le centre est passé en paramètre (au lieu de lire p->x/y) pour
+ * permettre erase à prev_x/prev_y et draw à x/y dans la même frame
  * (pattern erase+draw consécutif anti-flicker).
  * Permet la duplication d'instance : (0, 0) pour l'instance principale,
  * (±240, 0) ou (0, ±200) pour les instances fantômes près des bords.
- * Clipping segment-par-segment : skip si une extrémité hors HIRES. */
-static void asteroid_draw_at(unsigned char idx, unsigned char cx, unsigned char cy,
+ * Clipping segment-par-segment : skip si une extrémité hors HIRES.
+ *
+ * Phase 24 — draw_line_xor_open (semi-ouvert) : le polygone fermé
+ * parcouru en cycle v[i]→v[i+1] donne à chaque sommet in-degree 1 →
+ * chaque sommet est XOR-é exactement une fois (visible). Clôt le
+ * compromis « sommets éteints » de la revue 2026-05-13, à coût nul
+ * (1 px de moins tracé par segment compense le test d'entrée).
+ * Cas clip : si un segment est sauté, le sommet d'arrivée n'est pas
+ * peint — artefact d'1 px limité aux bords d'écran, accepté. */
+static void asteroid_draw_at(const Asteroid *p, unsigned char cx, unsigned char cy,
                              int ox, int oy)
 {
     unsigned char i, base, n, next;
@@ -210,7 +227,7 @@ static void asteroid_draw_at(unsigned char idx, unsigned char cx, unsigned char 
 
     ax = (int)(unsigned int)cx + ox;
     ay = (int)(unsigned int)cy + oy;
-    shape_idx = (asteroids[idx].size << 2) + asteroids[idx].shape;
+    shape_idx = (p->size << 2) + p->shape;
     base = shape_off[shape_idx];
     n    = shape_len[shape_idx];
 
@@ -229,23 +246,9 @@ static void asteroid_draw_at(unsigned char idx, unsigned char cx, unsigned char 
             ly0 = (unsigned char)y0;
             lx1 = (unsigned char)x1;
             ly1 = (unsigned char)y1;
-            draw_line_xor();
+            draw_line_xor_open();
         }
     }
-    /* Revue senior 2026-05-13 : suppression du replot des N sommets
-     * (Phase 9g) — pour un polygone fermé, chaque sommet est endpoint
-     * du segment N et startpoint du segment N+1. Avec un Bresenham XOR
-     * inclusif, ces 2 traces s'annulent (2 toggles = invisible). Le
-     * replot rétablissait le sommet via _plot_dot ⇒ 3 toggles = visible.
-     *
-     * Gain : ~6 sommets × _plot_dot (~40 c) × MAX_ASTEROIDS=6 × 2 (erase
-     * + draw) = ~2880 c/frame éliminés ≈ 15 % du budget 25 Hz.
-     *
-     * Compromis : 1 px peut manquer aux sommets selon le comportement
-     * exact du Bresenham. À mesurer visuellement. Si trop gênant, on
-     * peut revenir au replot ciblé (uniquement sommets visiblement
-     * absents, pas tous).
-     */
 }
 
 /* Phase 10l — duplication d'instance : asteroid près d'un bord est
@@ -257,21 +260,21 @@ static void asteroid_draw_at(unsigned char idx, unsigned char cx, unsigned char 
  *   - coins : 4× (1 + dx + dy + dx_dy)
  * Le centre (cx, cy) est passé en paramètre pour permettre le pattern
  * erase à prev_pos puis draw à curr_pos sans modifier la struct. */
-static void asteroid_draw_one(unsigned char idx, unsigned char cx, unsigned char cy)
+static void asteroid_draw_one(const Asteroid *p, unsigned char cx, unsigned char cy)
 {
     /* Rayon max conservateur : 14 (= rayon grand asteroid) */
     int dup_x = 0, dup_y = 0;
 
-    asteroid_draw_at(idx, cx, cy, 0, 0);
+    asteroid_draw_at(p, cx, cy, 0, 0);
 
     if (cx <= 14)        dup_x = +240;
     else if (cx >= 226)  dup_x = -240;
     if (cy <= 14)        dup_y = +200;
     else if (cy >= 186)  dup_y = -200;
 
-    if (dup_x) asteroid_draw_at(idx, cx, cy, dup_x, 0);
-    if (dup_y) asteroid_draw_at(idx, cx, cy, 0, dup_y);
-    if (dup_x && dup_y) asteroid_draw_at(idx, cx, cy, dup_x, dup_y);
+    if (dup_x) asteroid_draw_at(p, cx, cy, dup_x, 0);
+    if (dup_y) asteroid_draw_at(p, cx, cy, 0, dup_y);
+    if (dup_x && dup_y) asteroid_draw_at(p, cx, cy, dup_x, dup_y);
 }
 
 /* Trace XOR à pos courante (x, y) pour chaque actif.
@@ -280,13 +283,14 @@ static void asteroid_draw_one(unsigned char idx, unsigned char cx, unsigned char
  * / nettoyage : appel en paire (draw puis re-draw) = annule l'XOR. */
 void asteroids_draw(void)
 {
+    register Asteroid *p;                  /* Phase 24 — anti-mul8x16 */
     unsigned char i;
-    for (i = 0; i < MAX_ASTEROIDS; i++) {
-        if (asteroids[i].active) {
-            asteroid_draw_one(i, asteroids[i].x, asteroids[i].y);
-            asteroids[i].prev_x = asteroids[i].x;
-            asteroids[i].prev_y = asteroids[i].y;
-            asteroids[i].drawn  = !asteroids[i].drawn;  /* toggle XOR */
+    for (i = 0, p = asteroids; i < MAX_ASTEROIDS; i++, p++) {
+        if (p->active) {
+            asteroid_draw_one(p, p->x, p->y);
+            p->prev_x = p->x;
+            p->prev_y = p->y;
+            p->drawn  = !p->drawn;  /* toggle XOR */
         }
     }
 }
@@ -305,17 +309,18 @@ void asteroids_draw(void)
  *     drawn = 0. */
 void asteroids_render(void)
 {
+    register Asteroid *p;                  /* Phase 24 — anti-mul8x16 */
     unsigned char i;
-    for (i = 0; i < MAX_ASTEROIDS; i++) {
-        if (asteroids[i].drawn) {
-            asteroid_draw_one(i, asteroids[i].prev_x, asteroids[i].prev_y);
-            asteroids[i].drawn = 0;
+    for (i = 0, p = asteroids; i < MAX_ASTEROIDS; i++, p++) {
+        if (p->drawn) {
+            asteroid_draw_one(p, p->prev_x, p->prev_y);
+            p->drawn = 0;
         }
-        if (asteroids[i].active) {
-            asteroid_draw_one(i, asteroids[i].x, asteroids[i].y);
-            asteroids[i].prev_x = asteroids[i].x;
-            asteroids[i].prev_y = asteroids[i].y;
-            asteroids[i].drawn  = 1;
+        if (p->active) {
+            asteroid_draw_one(p, p->x, p->y);
+            p->prev_x = p->x;
+            p->prev_y = p->y;
+            p->drawn  = 1;
         }
     }
 }
@@ -370,12 +375,14 @@ static int clamp_vel(int v)
  * Total : 1 parent réduit + 2 nouveaux = **3 fragments** par hit (vs 2 avant). */
 void asteroids_fragment(unsigned char idx)
 {
+    register Asteroid *p = &asteroids[idx];   /* Phase 24 — 1 seul mul à l'entrée */
+    register Asteroid *q;
     unsigned char child_size;
     unsigned char i, found, sh;
     int vx_p, vy_p;                  /* 8.8 fixed-point : int 16-bit */
     unsigned char ax, ay;
 
-    if (!asteroids[idx].active) return;
+    if (!p->active) return;
 
     /* Phase 10k : reload AstBreakTimer = 80 (arcade $75EE).  Tout hit
      * d'asteroid retarde le prochain spawn saucer de 80 frames. */
@@ -384,8 +391,8 @@ void asteroids_fragment(unsigned char idx)
     /* Petit détruit complètement (cf. arcade : size devient 0, asteroid disparu).
      * Le tracé existant à prev_x/prev_y sera effacé par asteroids_render
      * (drawn=1, active=0 → erase puis drawn=0). */
-    if (asteroids[idx].size == SIZE_SMALL) {
-        asteroids[idx].active = 0;
+    if (p->size == SIZE_SMALL) {
+        p->active = 0;
         return;
     }
 
@@ -395,41 +402,41 @@ void asteroids_fragment(unsigned char idx)
      * Pour préserver l'invariant, on efface immédiatement le tracé OLD
      * avant de modifier les attrs. drawn=0 → render skip erase, draw à
      * x/y avec NEW attrs. */
-    if (asteroids[idx].drawn) {
-        asteroid_draw_one(idx, asteroids[idx].prev_x, asteroids[idx].prev_y);
-        asteroids[idx].drawn = 0;
+    if (p->drawn) {
+        asteroid_draw_one(p, p->prev_x, p->prev_y);
+        p->drawn = 0;
     }
 
     /* Conserver les attributs du parent avant modification */
-    ax   = asteroids[idx].x;
-    ay   = asteroids[idx].y;
-    vx_p = asteroids[idx].vx;
-    vy_p = asteroids[idx].vy;
-    sh   = asteroids[idx].shape;
-    child_size = asteroids[idx].size - 1;
+    ax   = p->x;
+    ay   = p->y;
+    vx_p = p->vx;
+    vy_p = p->vy;
+    sh   = p->shape;
+    child_size = p->size - 1;
 
     /* 1. Parent : taille réduite, slot conservé, vélocité perturbée */
-    asteroids[idx].size  = child_size;
-    asteroids[idx].shape = (sh + 1) & 3;
-    asteroids[idx].vx    = clamp_vel(vx_p + rand_offset());
-    asteroids[idx].vy    = clamp_vel(vy_p + rand_offset());
+    p->size  = child_size;
+    p->shape = (sh + 1) & 3;
+    p->vx    = clamp_vel(vx_p + rand_offset());
+    p->vy    = clamp_vel(vy_p + rand_offset());
 
     /* 2. Créer 2 NOUVEAUX asteroids dans des slots libres */
     found = 0;
-    for (i = 0; i < MAX_ASTEROIDS && found < 2; i++) {
-        if (i == idx || asteroids[i].active) continue;
-        asteroids[i].active = 1;
-        asteroids[i].drawn  = 0;            /* jamais tracés : skip erase au render */
-        asteroids[i].size   = child_size;
-        asteroids[i].shape  = (sh + 2 + found) & 3;
-        asteroids[i].x      = ax;
-        asteroids[i].y      = ay;
-        asteroids[i].prev_x = ax;
-        asteroids[i].prev_y = ay;
-        asteroids[i].x_frac = 0;
-        asteroids[i].y_frac = 0;
-        asteroids[i].vx     = clamp_vel(vx_p + rand_offset());
-        asteroids[i].vy     = clamp_vel(vy_p + rand_offset());
+    for (i = 0, q = asteroids; i < MAX_ASTEROIDS && found < 2; i++, q++) {
+        if (q == p || q->active) continue;
+        q->active = 1;
+        q->drawn  = 0;            /* jamais tracés : skip erase au render */
+        q->size   = child_size;
+        q->shape  = (sh + 2 + found) & 3;
+        q->x      = ax;
+        q->y      = ay;
+        q->prev_x = ax;
+        q->prev_y = ay;
+        q->x_frac = 0;
+        q->y_frac = 0;
+        q->vx     = clamp_vel(vx_p + rand_offset());
+        q->vy     = clamp_vel(vy_p + rand_offset());
         found++;
     }
     /* Si pas assez de slots libres : pool plein, on accepte la perte
@@ -438,7 +445,8 @@ void asteroids_fragment(unsigned char idx)
 
 unsigned char asteroids_count(void)
 {
+    register const Asteroid *p;            /* Phase 24 — anti-mul8x16 */
     unsigned char i, n = 0;
-    for (i = 0; i < MAX_ASTEROIDS; i++) if (asteroids[i].active) n++;
+    for (i = 0, p = asteroids; i < MAX_ASTEROIDS; i++, p++) if (p->active) n++;
     return n;
 }

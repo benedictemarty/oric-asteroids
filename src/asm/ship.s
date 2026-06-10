@@ -20,8 +20,7 @@
         .exportzp _ship_angle, _key_state
 
         .importzp _lx0, _ly0, _lx1, _ly1
-        .import   _draw_line_xor
-        .import   _plot_dot                ; Phase 16 — replot rapide 1 pixel
+        .import   _draw_line_xor_open      ; Phase 24 — segments semi-ouverts
         .import   ship_pt0x, ship_pt0y
         .import   ship_pt1x, ship_pt1y
         .import   ship_pt2x, ship_pt2y
@@ -140,24 +139,34 @@ compute_verts:
 ;-----------------------------------------------------------------
 ; draw_five_lines — trace les 5 segments arcade-fidèles
 ;
-; Topologie (apex = P0, base ouverte) :
-;   P0→P3, P3→P1   = flanc gauche en deux tronçons (encoche cockpit)
-;   P0→P4, P4→P2   = flanc droit en deux tronçons (encoche cockpit)
-;   P3→P4          = barre cockpit horizontale
+; Phase 24 — segments SEMI-OUVERTS (_draw_line_xor_open : exclut le
+; pixel de départ original). Les directions sont choisies pour que
+; chaque sommet soit l'ARRIVÉE d'exactement un segment (in-degree 1) :
+;
+;   P3→P0   peint P0 (apex)
+;   P3→P1   peint P1 (arrière gauche)
+;   P0→P4   peint P4 (cockpit droit)
+;   P4→P2   peint P2 (arrière droit)
+;   P4→P3   peint P3 (cockpit gauche, barre inversée)
+;
+; Chaque sommet est donc XOR-é exactement UNE fois (impair = visible),
+; y compris P3/P4 partagés par 3 segments — ce qui clôt le compromis
+; Phase 19 (sommets éteints) sans replot compensatoire ni trace
+; fantôme (erase/draw passent par le même chemin, XOR symétrique).
 ;-----------------------------------------------------------------
 draw_five_lines:
-        ; Segment P0 -> P3 (haut flanc gauche)
-        lda  sh_tx0
-        sta  _lx0
-        lda  sh_ty0
-        sta  _ly0
+        ; Segment P3 -> P0 (haut flanc gauche, peint P0)
         lda  sh_tx3
-        sta  _lx1
+        sta  _lx0
         lda  sh_ty3
+        sta  _ly0
+        lda  sh_tx0
+        sta  _lx1
+        lda  sh_ty0
         sta  _ly1
-        jsr  _draw_line_xor
+        jsr  _draw_line_xor_open
 
-        ; Segment P3 -> P1 (bas flanc gauche)
+        ; Segment P3 -> P1 (bas flanc gauche, peint P1)
         lda  sh_tx3
         sta  _lx0
         lda  sh_ty3
@@ -166,9 +175,9 @@ draw_five_lines:
         sta  _lx1
         lda  sh_ty1
         sta  _ly1
-        jsr  _draw_line_xor
+        jsr  _draw_line_xor_open
 
-        ; Segment P0 -> P4 (haut flanc droit)
+        ; Segment P0 -> P4 (haut flanc droit, peint P4)
         lda  sh_tx0
         sta  _lx0
         lda  sh_ty0
@@ -177,9 +186,9 @@ draw_five_lines:
         sta  _lx1
         lda  sh_ty4
         sta  _ly1
-        jsr  _draw_line_xor
+        jsr  _draw_line_xor_open
 
-        ; Segment P4 -> P2 (bas flanc droit)
+        ; Segment P4 -> P2 (bas flanc droit, peint P2)
         lda  sh_tx4
         sta  _lx0
         lda  sh_ty4
@@ -188,37 +197,18 @@ draw_five_lines:
         sta  _lx1
         lda  sh_ty2
         sta  _ly1
-        jsr  _draw_line_xor
+        jsr  _draw_line_xor_open
 
-        ; Segment P3 -> P4 (barre cockpit)
-        lda  sh_tx3
-        sta  _lx0
-        lda  sh_ty3
-        sta  _ly0
+        ; Segment P4 -> P3 (barre cockpit, peint P3)
         lda  sh_tx4
-        sta  _lx1
+        sta  _lx0
         lda  sh_ty4
+        sta  _ly0
+        lda  sh_tx3
+        sta  _lx1
+        lda  sh_ty3
         sta  _ly1
-        jsr  _draw_line_xor
-
-        ; Pas de replot _plot_dot des sommets (Phase 19).
-        ;
-        ; Le replot de Phase 9g (compensation des endpoints Bresenham
-        ; omis) marche pour les triangles 3 segments où chaque sommet
-        ; est partagé par exactement 2 segments — un toggle de plus
-        ; donne 3 (impair = pixel visible).
-        ;
-        ; Avec le ship 5 segments, P3 et P4 sont partagés par 3 segments
-        ; chacun. Le +1 plot_dot donnait 4 toggles = pair = pixel éteint,
-        ; et créait des traces résiduelles "A" (moitié haute) au
-        ; mouvement du ship (XOR asymétrique entre erase et draw quand
-        ; le timing IRQ VSync ULA était capricieux).
-        ;
-        ; Compromis acté : pixels-sommets éventuellement absents (1 px
-        ; max sur des coins de 1×1), mais pas de trace fantôme. Si un
-        ; sommet manquant devient gênant visuellement, une stratégie de
-        ; compensation par sommet (selon nombre de segments incidents)
-        ; serait à concevoir.
+        jsr  _draw_line_xor_open
         rts
 
 ;-----------------------------------------------------------------

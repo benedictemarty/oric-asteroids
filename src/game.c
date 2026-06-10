@@ -587,6 +587,7 @@ static void bullets_render(void)
 
 static void collisions_bullets_asteroids(void)
 {
+    register Asteroid *p;       /* Phase 24 — anti-mul8x16 (cf. asteroids.c) */
     unsigned char b, a, r;
     for (b = 0; b < BULLETS; b++) {
         if (blt_ttl[b] == 0) continue;
@@ -603,16 +604,16 @@ static void collisions_bullets_asteroids(void)
                 continue;
             }
         }
-        for (a = 0; a < MAX_ASTEROIDS; a++) {
+        for (a = 0, p = asteroids; a < MAX_ASTEROIDS; a++, p++) {
             unsigned char sz;
-            if (!asteroids[a].active) continue;
-            r = shape_radii[asteroids[a].size] + 1;
-            if (collide(blt_x[b], blt_y[b], asteroids[a].x, asteroids[a].y, r)) {
+            if (!p->active) continue;
+            r = shape_radii[p->size] + 1;
+            if (collide(blt_x[b], blt_y[b], p->x, p->y, r)) {
                 /* Capturer size AVANT fragment (qui peut le modifier). */
-                sz = asteroids[a].size;
+                sz = p->size;
                 hud_add_score(score_by_size[sz]);
                 /* Phase 14 : flash explosion à la position du hit */
-                asteroid_debris_spawn(asteroids[a].x, asteroids[a].y);
+                asteroid_debris_spawn(p->x, p->y);
                 asteroids_fragment(a);
                 /* Étape sons 1 : explosion arcade-fidèle selon taille
                  * (SIZE_LARGE=2 → grave, SIZE_SMALL=0 → aigu). */
@@ -628,15 +629,16 @@ static void collisions_bullets_asteroids(void)
 
 static unsigned char collisions_ship_asteroids(void)
 {
+    register Asteroid *p;       /* Phase 24 — anti-mul8x16 */
     unsigned char a, r;
     if (ship_invincible) return 0;
-    for (a = 0; a < MAX_ASTEROIDS; a++) {
-        if (!asteroids[a].active) continue;
-        r = shape_radii[asteroids[a].size] + SHIP_RADIUS;
-        if (collide(ship_x, ship_y, asteroids[a].x, asteroids[a].y, r)) {
+    for (a = 0, p = asteroids; a < MAX_ASTEROIDS; a++, p++) {
+        if (!p->active) continue;
+        r = shape_radii[p->size] + SHIP_RADIUS;
+        if (collide(ship_x, ship_y, p->x, p->y, r)) {
             hud_lose_life();
             debris_spawn(ship_x, ship_y);
-            asteroid_debris_spawn(asteroids[a].x, asteroids[a].y);
+            asteroid_debris_spawn(p->x, p->y);
             ship_respawn();
             sound_play_fx(FX_EXPLODE);
             return 1;
@@ -670,15 +672,16 @@ static unsigned char collisions_ship_asteroids(void)
 
 static void collisions_ufobullet_asteroids(void)
 {
+    register Asteroid *p;       /* Phase 24 — anti-mul8x16 */
     unsigned char a, r;
     if (!ufo_bullet_active) return;
-    for (a = 0; a < MAX_ASTEROIDS; a++) {
+    for (a = 0, p = asteroids; a < MAX_ASTEROIDS; a++, p++) {
         unsigned char sz;
-        if (!asteroids[a].active) continue;
-        r = shape_radii[asteroids[a].size] + 1;
+        if (!p->active) continue;
+        r = shape_radii[p->size] + 1;
         if (collide(ufo_bullet_x, ufo_bullet_y,
-                    asteroids[a].x, asteroids[a].y, r)) {
-            sz = asteroids[a].size;
+                    p->x, p->y, r)) {
+            sz = p->size;
             asteroids_fragment(a);
             /* Étape sons 1 : son aussi quand l'UFO casse un asteroid
              * (oubli précédent — pas de feedback audio sur ces hits). */

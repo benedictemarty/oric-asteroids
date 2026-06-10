@@ -36,6 +36,13 @@ void hires_init(void);
  * Idempotent : appel pair = état initial (efface ce qui a été dessiné). */
 void draw_line_xor(void);
 
+/* Phase 24 — variante SEMI-OUVERTE : trace ](lx0,ly0), (lx1,ly1)], i.e.
+ * tous les pixels SAUF le point de départ. Un segment dégénéré (P0 == P1)
+ * ne trace rien. Pour les polygones fermés / chaînes orientées en
+ * in-degree 1 : chaque sommet est XOR-é exactement une fois (visible),
+ * sans replot compensatoire. Utilisé par ship.s et asteroids.c. */
+void draw_line_xor_open(void);
+
 /* XOR un seul pixel à (lx0, ly0). Plus rapide que draw_line_xor pour
  * un point isolé (~40c vs ~80c). Utilisé pour les replots de sommets
  * et les fragments. */

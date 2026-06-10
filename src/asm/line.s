@@ -11,7 +11,7 @@
 ;   Init vierge = 0x40  (bit6=1, aucun pixel, non-attribut)
 ;=================================================================
 
-        .export  _hires_init, _draw_line_xor, _plot_dot
+        .export  _hires_init, _draw_line_xor, _draw_line_xor_open, _plot_dot
         .exportzp _lx0, _ly0, _lx1, _ly1
         .macpack longbranch
 
@@ -26,16 +26,17 @@ _lx1:       .res 1
 _ly1:       .res 1
 l_dx:       .res 1
 l_dy:       .res 1
-l_sx:       .res 1          ; pas x (non utilise dans boucle, conserve pour compat.)
 l_sy:       .res 1          ; pas y : 1 ou $FF
-l_err_lo:   .res 1          ; erreur Bresenham 16-bit signe (octet bas)
-l_err_hi:   .res 1          ; erreur (octet haut, extension de signe)
+l_err_lo:   .res 1          ; erreur Bresenham 8-bit (Phase 18 main-axis split)
 l_ptr:      .res 2          ; pointeur ZP vers l'octet HIRES courant
-l_e2lo:     .res 1          ; e2 temporaire bas  (2 * err)
-l_e2hi:     .res 1          ; e2 temporaire haut
 l_mask:     .res 1          ; masque de bit du pixel courant
 l_pix:      .res 1          ; Phase 17 — compteur pixels = max(dx,dy)+1
+l_open:     .res 1          ; Phase 24 — 1 = segment semi-ouvert (exclut le
+                            ; pixel de départ ORIGINAL, avant swap)
+l_swap:     .res 1          ; Phase 24 — 1 = extrémités échangées (sx norm.)
 cs_src:     .res 2          ; ptr source pour la copie charset $B400 -> $9800
+; Phase 24 : l_sx / l_err_hi / l_e2lo / l_e2hi supprimés (reliquats
+; pré-Phase 18, jamais référencés) → place ZP pour l_open / l_swap.
 
 ;-----------------------------------------------------------------
 ; Tables precalculees (RODATA, 200+200+240+240 = 880 octets)
@@ -205,12 +206,36 @@ _plot_dot:
         sta  (l_ptr),y
         rts
 
+;-----------------------------------------------------------------
+; _draw_line_xor_open — Phase 24 : variante SEMI-OUVERTE.
+;
+; Trace ]P0, P1] : tous les pixels du segment SAUF le pixel de départ
+; ORIGINAL (lx0, ly0) tel que passé par l'appelant (indépendant du
+; swap de normalisation). Un segment dégénéré (P0 == P1) ne trace rien.
+;
+; Usage : polygones fermés / graphes orientés en in-degree 1. Chaque
+; sommet étant le départ d'exactement un segment et l'arrivée d'un
+; autre, il est XOR-é exactement UNE fois → plus de sommets éteints
+; (2 toggles) ni besoin de replots compensatoires (3 toggles).
+; Remplace le compromis Phase 19 pour ship et asteroids.
+;-----------------------------------------------------------------
+_draw_line_xor_open:
+        lda  #1
+        sta  l_open
+        jmp  dlx_common
+
 _draw_line_xor:
+        lda  #0
+        sta  l_open
+dlx_common:
+        lda  #0
+        sta  l_swap
         ;--- Normalisation sx=+1 : si lx0 > lx1, echanger les extremites ---
         lda  _lx0
         cmp  _lx1
         bcc  @no_swap
         beq  @no_swap
+        inc  l_swap          ; Phase 24 — mémoriser le swap (ne touche pas A)
         ldy  _lx1
         sta  _lx1
         sty  _lx0
@@ -324,18 +349,45 @@ _draw_line_xor:
         lda  l_dx
         cmp  l_dy
         bcs  @h_init             ; dx >= dy → axe horizontal
-        ; dy > dx → axe vertical
+        ; dy > dx → axe vertical (dy >= 1 garanti : pas de dégénéré ici)
+        ldx  l_open
+        beq  @v_incl
+        ; Phase 24 — semi-ouvert : N = dy pixels (au lieu de dy+1).
+        ;   swap   → le départ original est l'extrémité FINALE post-swap :
+        ;            boucle normale, le compteur réduit l'exclut.
+        ;   direct → le départ original est le 1er pixel post-swap :
+        ;            entrer à @v_body (1er step sans XOR ni dec).
+        lda  l_dy
+        sta  l_pix
+        ldx  l_swap
+        bne  @v_go
+        jmp  @v_body
+@v_incl:
         lda  l_dy
         clc
         adc  #1
         sta  l_pix
+@v_go:
         jmp  @v_loop
 
 @h_init:
+        ldx  l_open
+        beq  @h_incl
+        ; Phase 24 — semi-ouvert : N = dx pixels ; dégénéré (dx=dy=0,
+        ; segment-point) → ne rien tracer (les appelants qui veulent un
+        ; point utilisent plot_dot ou draw_line_xor inclusif).
+        lda  l_dx
+        jeq  @done
+        sta  l_pix
+        ldx  l_swap
+        bne  @h_go
+        jmp  @h_body
+@h_incl:
         lda  l_dx
         clc
         adc  #1
         sta  l_pix
+@h_go:
         ; tomber sur @h_loop
 
 ;==================================================================

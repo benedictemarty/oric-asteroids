@@ -7,6 +7,57 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 24 — Perf : anti-mul8x16 + sommets parfaits (Bresenham semi-ouvert) + bench gameplay ✅
+
+Trio P6+P1+G1 du plan d'amélioration performances/graphique (2026-06-11).
+
+**P1 — Élimination de mul8x16 (~7 % du CPU)** : `sizeof(Asteroid) = 13`
+n'étant pas une puissance de 2, chaque accès `asteroids[i].champ` forçait
+cc65 à appeler la multiplication logicielle `mul8x16` (mesuré au bench :
+$4249-$4252 ≈ 2,02 M cycles = 7,1 % du total). Toutes les boucles chaudes
+(asteroids.c : init/spawn/update/draw/render/fragment/count ; game.c :
+3 fonctions de collisions) itèrent désormais par pointeur
+(`register Asteroid *p`), et `asteroid_draw_at`/`asteroid_draw_one`
+prennent un `const Asteroid *` au lieu d'un index.
+
+**G1 — Bresenham semi-ouvert (`_draw_line_xor_open`)** : nouvelle variante
+qui trace `]P0, P1]` — tous les pixels SAUF le départ ORIGINAL (avant le
+swap de normalisation ; flag `l_swap`). Sur un polygone fermé parcouru en
+cycle (asteroids) ou un graphe orienté en in-degree 1 (ship : P3→P0,
+P3→P1, P0→P4, P4→P2, P4→P3), chaque sommet est XOR-é exactement une
+fois → **sommets visibles**, sans replot compensatoire ni trace fantôme.
+Clôt le compromis Phase 19 (« pixels-sommets éventuellement absents »).
+Coût net ≈ nul : 1 px de moins par segment compense le test d'entrée.
+Implémentation : selon le swap, soit compteur réduit (départ original =
+extrémité finale post-swap), soit entrée directe à `@h_body`/`@v_body`
+(skip du 1er XOR). Segment dégénéré (point) → ne trace rien (les
+appelants points utilisent plot_dot / draw_line_xor inclusif).
+Lettres/HUD/UFO/debris restent sur le tracé inclusif + replots (inchangés).
+ZP : reliquats `l_sx`/`l_err_hi`/`l_e2lo`/`l_e2hi` (jamais référencés
+depuis Phase 18) supprimés → place pour `l_open`/`l_swap` (net −2).
+
+**P6 — Cible `make bench-game`** : le bench historique profile l'écran
+titre (~18 % d'idle). La nouvelle cible type SPACE à 5,5 M cycles (après
+l'auto-exec à 5 M) puis profile ~20 s de jeu réel + screenshot de
+contrôle (HUD + ship + WAVE 1 vérifiés visuellement).
+
+**Validation chiffrée (bench titre, 28,5 M cycles)** :
+- mul8x16 ($4249-$4252) : 2,02 M cycles (7,1 %) → **disparu du top 20**.
+- Idle frame_wait : 17,9 % → 23,4 % (**+5,5 points de marge CPU**).
+- Aucun résidu XOR après 20 s de démo (719 px allumés = nominal) ;
+  sommets visibles sur les 3 asteroids, wrap fantôme correct au bord.
+- `make host-test` 4/4 PASS ; `make check` PASS déterministe (référence
+  régénérée : rendu intentionnellement changé — sommets — et phase
+  d'animation décalée car les frames sont plus rapides).
+
+**Fichiers** : `src/asm/line.s` (+`_draw_line_xor_open`, ZP nettoyée),
+`src/asm/ship.s` (5 segments réorientés in-degree 1, semi-ouverts),
+`src/line.h` (+prototype), `src/asteroids.c` (pointeurs + semi-ouvert),
+`src/game.c` (collisions par pointeur), `Makefile` (+`bench-game`),
+`tests/ref/phase9_release.ppm` (régénérée).
+
+
+
 ### Phase 23 — Fix mute audio key_scan + durcissement IRQ + collisions toriques ✅
 
 Correctifs issus d'une revue de code complète (2026-06-10).

@@ -73,7 +73,7 @@ BENCH_PROF     = tests/out/phase6_bench.prof
 # redéfinir au cas par cas.
 TEST_INPUT     = "0:\n"
 
-.PHONY: all clean run test ref check bench gen_ship host-test
+.PHONY: all clean run test ref check bench bench-game gen_ship host-test
 
 # ── Tests host (x86) ──────────────────────────────────────────────────
 # Vérifient le déterminisme et les bornes des routines portables
@@ -205,6 +205,26 @@ bench: $(TAP)
 	       --profile $(BENCH_PROF)
 	@echo "=== Rapport profiler ==="
 	@cat $(BENCH_PROF)
+
+# ── Bench gameplay (Phase 24) ─────────────────────────────────────────
+# `bench` profile l'écran titre (~14 % d'idle dans frame_wait : scène
+# légère). bench-game démarre une vraie partie : SPACE typé à 5.5M
+# cycles (l'auto-exec .tap a lieu à 5M), puis ~20 s de jeu émulé
+# (vague 1, ship, HUD, premier spawn UFO vers 12-18 s). Le screenshot
+# final permet de vérifier que la partie a bien démarré (HUD + ship).
+BENCHG_PROF    = tests/out/bench_game.prof
+BENCHG_SHOT    = tests/out/bench_game.ppm
+BENCHG_INPUT   = "5500000: "
+
+bench-game: $(TAP)
+	@mkdir -p tests/out
+	$(EMU) --headless -m oric1 -r $(ROM) -t $(TAP) -f \
+	       --type-keys $(BENCHG_INPUT) \
+	       --cycles $(BENCH_CYCLES) \
+	       --screenshot $(BENCHG_SHOT) \
+	       --profile $(BENCHG_PROF)
+	@echo "=== Rapport profiler (gameplay) ==="
+	@sed -n '1,30p' $(BENCHG_PROF)
 
 clean:
 	rm -rf $(BUILD) tests/out
