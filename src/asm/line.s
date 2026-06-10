@@ -34,9 +34,12 @@ l_pix:      .res 1          ; Phase 17 — compteur pixels = max(dx,dy)+1
 l_open:     .res 1          ; Phase 24 — 1 = segment semi-ouvert (exclut le
                             ; pixel de départ ORIGINAL, avant swap)
 l_swap:     .res 1          ; Phase 24 — 1 = extrémités échangées (sx norm.)
+l_batch:    .res 1          ; Phase 25 — 1 = boucle h batchée (dx >= 4*dy)
+l_start:    .res 1          ; Phase 25 — masque du 1er pixel du run courant
 cs_src:     .res 2          ; ptr source pour la copie charset $B400 -> $9800
 ; Phase 24 : l_sx / l_err_hi / l_e2lo / l_e2hi supprimés (reliquats
-; pré-Phase 18, jamais référencés) → place ZP pour l_open / l_swap.
+; pré-Phase 18, jamais référencés) → place ZP pour l_open / l_swap,
+; puis Phase 25 pour l_batch / l_start. ZP de nouveau pleine.
 
 ;-----------------------------------------------------------------
 ; Tables precalculees (RODATA, 200+200+240+240 = 880 octets)
@@ -350,6 +353,11 @@ dlx_common:
         cmp  l_dy
         bcs  @h_init             ; dx >= dy → axe horizontal
         ; dy > dx → axe vertical (dy >= 1 garanti : pas de dégénéré ici)
+        ; ── Phase 25 : verticale PURE (dx = 0) → boucle dédiée sans err
+        ; ni rechargement de masque (~34 c/px vs ~47). Montants de
+        ; lettres, verticales 7-seg, bords verticaux de shapes. ──
+        ldx  l_dx
+        jeq  @pv_init
         ldx  l_open
         beq  @v_incl
         ; Phase 24 — semi-ouvert : N = dy pixels (au lieu de dy+1).
@@ -371,6 +379,25 @@ dlx_common:
         jmp  @v_loop
 
 @h_init:
+        ; ── Phase 25 : dispatch par pente — batched si dx >= 4*dy ──
+        ; La boucle batchée gagne dès que les runs font >= 2 px ; le
+        ; seuil 4 garantit des runs >= 4 (gain ~25 %+), les diagonales
+        ; gardent la boucle classique (zéro régression). asl détecte
+        ; l'overflow 8-bit de 4*dy (carry → forcément > dx → classique).
+        ldx  #0
+        lda  l_dy
+        asl  a
+        bcs  @h_disp_done
+        asl  a
+        bcs  @h_disp_done
+        cmp  l_dx
+        beq  @h_disp_batch
+        bcs  @h_disp_done
+@h_disp_batch:
+        ldx  #1
+@h_disp_done:
+        stx  l_batch
+
         ldx  l_open
         beq  @h_incl
         ; Phase 24 — semi-ouvert : N = dx pixels ; dégénéré (dx=dy=0,
@@ -380,13 +407,22 @@ dlx_common:
         jeq  @done
         sta  l_pix
         ldx  l_swap
-        bne  @h_go
+        bne  @h_enter
+        ; semi-ouvert sans swap : sauter le 1er pixel (step sans XOR)
+        ldx  l_batch
+        bne  @h_to_oe
         jmp  @h_body
+@h_to_oe:
+        jmp  @hb_open_entry
 @h_incl:
         lda  l_dx
         clc
         adc  #1
         sta  l_pix
+@h_enter:
+        ldx  l_batch
+        beq  @h_go
+        jmp  @hb_run
 @h_go:
         ; tomber sur @h_loop
 
@@ -503,6 +539,219 @@ dlx_common:
 @v_sy_inc:
         inc  l_ptr+1             ; patché $E6→$C6 si sy<0
         jmp  @v_loop
+
+;==================================================================
+; Boucle HORIZONTALE BATCHÉE — Phase 25 (dx >= 4*dy, cf. dispatch)
+;
+; Principe : les pixels consécutifs d'une même rangée ET d'un même
+; octet écran forment un "run" ; l'octet n'est lu/écrit (EOR/STA)
+; qu'UNE fois par run au lieu d'une fois par pixel. Le masque d'un
+; run contigu de single-bits se calcule sans boucle :
+;     run_mask = (l_start << 1) - end_mask
+; (ex : start=$20, end=$08 → $40-$08 = $38 = bits 5,4,3).
+; Invariant bit 6 : start <= $20 → run_mask <= $3F, bit 6 jamais
+; touché par l'EOR (même raisonnement que x_msk).
+;
+; ~25 c/px en run + ~45 c de flush par run, contre ~46 c/px en boucle
+; classique → gain dès run >= 2 ; le seuil de dispatch (runs >= 4)
+; donne ~25-30 % sur les segments quasi horizontaux, ~33 % sur les
+; horizontales pures (HUD 7-seg, lettres, ligne médiane UFO).
+;
+; Pas de SMC ici : dy/dx lus en ZP (+1 c/px) et step y testé via
+; l_sy (1×/run seulement) — n'alourdit pas le patcher SMC exécuté
+; à CHAQUE segment pour les boucles classiques.
+;
+; État : A = err (vivant pendant le run), l_mask = pixel courant,
+; l_start = 1er pixel du run, Y = 0, l_pix = pixels restants.
+;==================================================================
+@hb_run:                     ; nouveau run : départ au pixel courant
+        lda  l_mask
+        sta  l_start
+        lda  l_err_lo
+@hb_px:                      ; A = err ; le pixel courant fait partie du run
+        dec  l_pix
+        beq  @hb_last
+        clc
+        adc  l_dy
+        cmp  l_dx
+        bcs  @hb_ystep
+        lsr  l_mask
+        bcc  @hb_px
+        ; ── octet épuisé (le run a atteint le bit 0) : flush + col++ ──
+        sta  l_err_lo
+        lda  l_start
+        asl  a
+        sec
+        sbc  #$01            ; end = $01 → run = (start<<1) - 1
+        eor  (l_ptr),y
+        sta  (l_ptr),y
+        lda  #$20
+        sta  l_mask
+        inc  l_ptr
+        bne  @hb_run
+        inc  l_ptr+1
+        jmp  @hb_run
+
+@hb_ystep:                   ; err >= dx : flush, step y, step x
+        sbc  l_dx            ; carry set (bcs) → soustraction exacte
+        sta  l_err_lo
+        lda  l_start
+        asl  a
+        sec
+        sbc  l_mask          ; run = (start<<1) - end (= mask courant)
+        eor  (l_ptr),y
+        sta  (l_ptr),y
+        ; step y générique — testé 1×/run via l_sy, pas de SMC
+        lda  l_sy
+        bmi  @hb_yup
+        lda  l_ptr
+        clc
+        adc  #40
+        sta  l_ptr
+        bcc  @hb_xstep
+        inc  l_ptr+1
+        bcs  @hb_xstep       ; carry toujours set → branch inconditionnel
+@hb_yup:
+        lda  l_ptr
+        sec
+        sbc  #40
+        sta  l_ptr
+        bcs  @hb_xstep
+        dec  l_ptr+1
+@hb_xstep:
+        lsr  l_mask
+        bcc  @hb_run
+        lda  #$20
+        sta  l_mask
+        inc  l_ptr
+        bne  @hb_run
+        inc  l_ptr+1
+        jmp  @hb_run
+
+@hb_last:                    ; dernier pixel global : flush du run, fini
+        lda  l_start
+        asl  a
+        sec
+        sbc  l_mask
+        eor  (l_ptr),y
+        sta  (l_ptr),y
+        rts
+
+;------------------------------------------------------------------
+; Entrée semi-ouverte batchée (open && !swap) : avancer d'un pas
+; (err + step du pixel 1) SANS le tracer, puis démarrer le run au
+; pixel 2. Code générique (ZP + test l_sy) : exécuté 1×/segment,
+; aucune site SMC supplémentaire.
+;------------------------------------------------------------------
+@hb_open_entry:
+        lda  l_err_lo
+        clc
+        adc  l_dy
+        cmp  l_dx
+        bcc  @hb_oe_nostep
+        sbc  l_dx
+        sta  l_err_lo
+        lda  l_sy
+        bmi  @hb_oe_up
+        lda  l_ptr
+        clc
+        adc  #40
+        sta  l_ptr
+        bcc  @hb_oe_x
+        inc  l_ptr+1
+        bcs  @hb_oe_x        ; carry toujours set
+@hb_oe_up:
+        lda  l_ptr
+        sec
+        sbc  #40
+        sta  l_ptr
+        bcs  @hb_oe_x
+        dec  l_ptr+1
+        jmp  @hb_oe_x
+@hb_oe_nostep:
+        sta  l_err_lo
+@hb_oe_x:
+        lsr  l_mask
+        bcc  @hb_oe_go
+        lda  #$20
+        sta  l_mask
+        inc  l_ptr
+        bne  @hb_oe_go
+        inc  l_ptr+1
+@hb_oe_go:
+        jmp  @hb_run
+
+;==================================================================
+; Boucle VERTICALE PURE — Phase 25 (dx = 0)
+;
+; Pas d'erreur Bresenham (jamais de step x), masque invariant.
+; Deux boucles selon l_sy (test runtime 1×/segment, pas de SMC) ;
+; l'astuce carry évite le jmp de bouclage : adc #40 qui déborde
+; laisse carry=1 → bcs toujours pris après inc (qui ne touche pas
+; le carry) ; symétrique avec sbc/bcc côté montant.
+;
+; Note : dx=0 ⇒ lx0 == lx1 ⇒ jamais de swap ⇒ en semi-ouvert le
+; pixel exclu est toujours le 1er (pré-avance d'une rangée).
+;==================================================================
+@pv_init:
+        ldx  l_open
+        beq  @pv_incl
+        ; semi-ouvert : N = dy pixels, pré-avancer d'une rangée
+        lda  l_dy
+        sta  l_pix
+        lda  l_sy
+        bmi  @pv_pre_up
+        lda  l_ptr
+        clc
+        adc  #40
+        sta  l_ptr
+        bcc  @pv_dir
+        inc  l_ptr+1
+        bcs  @pv_dir         ; carry toujours set
+@pv_pre_up:
+        lda  l_ptr
+        sec
+        sbc  #40
+        sta  l_ptr
+        bcs  @pv_dir
+        dec  l_ptr+1
+        jmp  @pv_dir
+@pv_incl:
+        lda  l_dy
+        clc
+        adc  #1
+        sta  l_pix
+@pv_dir:
+        lda  l_sy
+        bmi  @pvu_loop
+@pvd_loop:                   ; ── verticale descendante (+40/rangée) ──
+        lda  l_mask
+        eor  (l_ptr),y
+        sta  (l_ptr),y
+        dec  l_pix
+        beq  @pv_done
+        lda  l_ptr
+        clc
+        adc  #40
+        sta  l_ptr
+        bcc  @pvd_loop
+        inc  l_ptr+1
+        bcs  @pvd_loop       ; carry toujours set
+@pvu_loop:                   ; ── verticale montante (-40/rangée) ──
+        lda  l_mask
+        eor  (l_ptr),y
+        sta  (l_ptr),y
+        dec  l_pix
+        beq  @pv_done
+        lda  l_ptr
+        sec
+        sbc  #40
+        sta  l_ptr
+        bcs  @pvu_loop
+        dec  l_ptr+1
+        bcc  @pvu_loop       ; carry toujours clear (borrow)
+@pv_done:
+        rts
 
 @done:
         rts

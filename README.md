@@ -127,13 +127,13 @@ des 9 phases.
   valider à l'oreille en interactif.
 - Debug Atmos : `asteroids.tap` ne fonctionne pas avec ROM Atmos
   (Oricutron + ROM Atmos signalé KO).
-- Axes perf/graphique restants (plan 2026-06-11, P6+P1+G1 faits Phase 24) :
-  P2 batch par octet dans line.s (1 seul EOR/STA par octet écran, jusqu'à
-  6 px) ; P3 sprites pré-rendus XOR pour asteroids (12 silhouettes fixes ×
-  6 shifts ≈ 8 Ko RAM, débloque les shapes arcade 10-12 sommets) ; P4
-  déroulage boucles h/v ; P5 cadence adaptative 50/25 Hz ; G2 flamme de
-  thrust clignotante ; G3 wraparound visuel du ship ; G4 couleur attributs
-  sur bande HUD.
+- Axes perf/graphique restants (plan 2026-06-11 ; P6+P1+G1 faits Phase 24,
+  P2 fait Phase 25) : P3 sprites pré-rendus XOR pour asteroids (12
+  silhouettes fixes × 6 shifts ≈ 8 Ko RAM, débloque les shapes arcade
+  10-12 sommets — le plus gros gain restant, les segments quasi verticaux
+  des shapes dominent le profil) ; P4 déroulage boucles h/v ; P5 cadence
+  adaptative 50/25 Hz ; G2 flamme de thrust clignotante ; G3 wraparound
+  visuel du ship ; G4 couleur attributs sur bande HUD.
 
 ## Sources
 

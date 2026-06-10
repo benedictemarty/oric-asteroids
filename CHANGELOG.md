@@ -7,6 +7,51 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 25 — Perf line.s : batch par octet (axe h) + verticale pure dédiée ✅
+
+Axe P2 du plan d'amélioration. Deux chemins rapides dans `_draw_line_xor`
+(+ variante open), sélectionnés par un dispatch par pente au setup :
+
+**Boucle h batchée (`dx >= 4*dy`)** : les pixels consécutifs d'une même
+rangée et d'un même octet écran forment un « run » ; l'octet n'est
+lu/écrit (EOR/STA) qu'une fois par run. Le masque d'un run contigu se
+calcule sans boucle : `run = (start_mask << 1) - end_mask`. L'erreur
+Bresenham vit dans A pendant le run (~25 c/px + ~45 c/flush, vs ~46 c/px
+classique). Le seuil de dispatch (runs >= 4) garantit zéro régression :
+les diagonales gardent la boucle classique SMC. Invariant bit 6 préservé
+(start <= $20 → run <= $3F). Pas de SMC dans le chemin batché : dy/dx en
+ZP (+1 c/px) et step y testé via l_sy 1×/run — n'alourdit pas le patcher
+exécuté à chaque segment.
+
+**Verticale pure (`dx == 0`)** : pas d'erreur Bresenham (jamais de step
+x), masque invariant → ~34 c/px vs ~47. Deux boucles (descendante adc
+#40 / montante sbc #40) avec bouclage par carry (pas de jmp). Montants
+de lettres, verticales 7-seg du HUD, bords verticaux de shapes.
+
+Le profil avait montré que la boucle verticale dominait la scène titre
+(les segments de shapes sont surtout quasi verticaux) — d'où l'ajout du
+chemin verticale pure en complément du batch horizontal.
+
+**ZP** : +`l_batch`, +`l_start` (les 2 octets libérés en Phase 24 —
+ZP de nouveau pleine).
+
+**Validation** :
+- Batch h seul : capture titre bit-à-bit IDENTIQUE à la référence
+  Phase 24 (`make check` PASS sans régénération) — preuve que le chemin
+  batché trace exactement les mêmes pixels.
+- + verticale pure : seule divergence = phase de clignotement PRESS
+  SPACE (frames plus rapides) ; lettres/shapes/HUD intacts au visuel ;
+  zéro résidu XOR après 20 s (682 px = nominal). Référence régénérée,
+  `make check` PASS déterministe, host-test 4/4.
+- Idle frame_wait au bench titre : 23,4 % → 24,3 % (+0,9 pt ; cumul
+  Phases 24+25 : 17,9 % → 24,3 %). Gain réel supérieur sur les écrans
+  riches en texte (game over, hi-scores, wave label, score HUD) qui
+  sont dominés par horizontales batchées + verticales pures.
+
+**Fichiers** : `src/asm/line.s` (+2 boucles, dispatch par pente).
+
+
+
 ### Phase 24 — Perf : anti-mul8x16 + sommets parfaits (Bresenham semi-ouvert) + bench gameplay ✅
 
 Trio P6+P1+G1 du plan d'amélioration performances/graphique (2026-06-11).
