@@ -80,6 +80,13 @@ def main():
     # Tables exposées au C (cc65 préfixe _) — utilisées par game.c
     print("        .export _ship_thrx, _ship_thry")
     print()
+    # Phase 27 (G2/G3) : le rendu du ship est en C (clip + duplication
+    # d'instance + flamme) → alias C des tables de sommets.
+    for name in ("pt0", "pt1", "pt2", "pt3", "pt4"):
+        for ax in ("x", "y"):
+            print(f"_ship_{name}{ax} = ship_{name}{ax}")
+            print(f"        .export _ship_{name}{ax}")
+    print()
 
     for vi, ((px, py), name) in enumerate(zip(VERTS, ("pt0", "pt1", "pt2", "pt3", "pt4"))):
         xs = [to_byte(rotate(px, py, i)[0]) for i in range(N)]

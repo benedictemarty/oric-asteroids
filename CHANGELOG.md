@@ -7,6 +7,47 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 27 — Flamme de thrust (G2) + wraparound visuel du ship (G3) ✅
+
+Le rendu du ship migre de ship.s vers game.c (`ship_render`) avec deux
+chemins :
+- **Chemin rapide 8 bits** (cas courant, ship intérieur à > 7 px des
+  bords) : 5 segments semi-ouverts in-degree 1 comme avant, arithmétique
+  unsigned char pure — coût comparable à l'ancien asm.
+- **Chemin bord** (rare) : coordonnées int, clip par segment, duplication
+  d'instance ±240/±200 (coins : jusqu'à 4 instances) — le ship navigue
+  désormais sur l'écran COMPLET [0,240)×[0,200) comme les asteroids et
+  traverse les bords comme l'arcade. La zone morte de 14 px (le ship
+  « sautait » d'un bord à l'autre) disparaît. Physique ship_update :
+  spans pleins 240/200 (plus d'offset WX_MIN/WY_MIN).
+
+**G2 — flamme de thrust** : 2 segments semi-ouverts P3→F et P4→F
+(F = centre − vecteur thrust, 6 px derrière), visibles quand UP est
+maintenu, clignotement 1 frame sur 2 (~12 Hz) comme l'arcade. L'erase
+XOR reste symétrique via `flame_was_drawn` (on efface exactement ce qui
+a été dessiné, avant toute modification d'état). Le tip F est XOR-é 2×
+(éteint) — invisible sur un effet qui clignote.
+
+**ship.s réduit à l'état pur** : compute_verts / draw_five_lines /
+_ship_draw / _ship_erase supprimés, **10 octets ZP libérés**
+(sh_tx0..sh_ty4). gen_ship.py émet des alias C (_ship_pt0x…) des tables
+de sommets.
+
+**Validation** : ship correct au bord gauche en build de debug (spawn
+x=2, collisions off) — clip à x=0 exact, pas de débordement côté droit,
+flamme clignotante confirmée sur séquence de captures (max-row alternant
+104/105) ; fausse alerte initiale due à un offset de bordure PPM erroné
+dans mon outil de dump (le PPM n'a PAS de bordure haute — les 24 lignes
+en plus sont la zone TEXT du bas). `make check` PASS sans régénération
+(l'écran titre n'a pas de ship) ; zéro résidu XOR après 20 s (733 px) ;
+partie réelle vérifiée (bench-game) ; host-test 4/4.
+
+**Fichiers** : `src/game.c` (ship_render + flamme + physique plein
+écran), `src/asm/ship.s` (état seul), `tools/gen_ship.py` (+alias C),
+`src/asm/ship_verts.s` (régénéré).
+
+
+
 ### Phase 26 — Sprites pré-rendus XOR (P3) + shapes arcade complètes restaurées ✅
 
 Le plus gros gain du plan perf : les asteroids ne tournent jamais, donc

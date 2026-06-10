@@ -41,10 +41,16 @@ extern unsigned char key_state;
 extern const signed char ship_thrx[32];
 extern const signed char ship_thry[32];
 
+/* Phase 27 (G2/G3) — tables de sommets (32 angles, ship_verts.s) pour
+ * le rendu C : clip par segment + duplication d'instance + flamme. */
+extern const signed char ship_pt0x[32], ship_pt0y[32];
+extern const signed char ship_pt1x[32], ship_pt1y[32];
+extern const signed char ship_pt2x[32], ship_pt2y[32];
+extern const signed char ship_pt3x[32], ship_pt3y[32];
+extern const signed char ship_pt4x[32], ship_pt4y[32];
+
 extern const unsigned char shape_radii[3];
 void ship_init(void);
-void ship_draw(void);
-void ship_erase(void);
 void ship_rotate(signed char delta);
 void key_scan(void);
 
@@ -158,6 +164,10 @@ static unsigned char hyper_cd;
 static unsigned char ship_invincible;
 static unsigned char ship_was_drawn;
 static unsigned char ufo_was_drawn;
+/* Phase 27 (G2) — flamme de thrust : état affiché (pour l'erase XOR
+ * symétrique) + compteur de clignotement (1 frame sur 2, comme l'arcade). */
+static unsigned char flame_was_drawn;
+static unsigned char flame_flick;
 
 /* Phase 7 — high scores en RAM (persistance .tap reportée Phase 9) */
 static unsigned int  hiscores[HISCORE_COUNT];
@@ -325,6 +335,108 @@ static void frame_wait(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* Ship render — Phase 27 (G2/G3)                                      */
+/* ------------------------------------------------------------------ */
+
+/* Extent max du ship : sommets ±6, flamme ±6 derrière le centre. */
+#define SHIP_EXTENT  7
+
+/* Segment semi-ouvert avec clip : skip si une extrémité hors HIRES
+ * (même compromis que les anciens segments d'asteroids — artefact d'un
+ * sommet manquant limité aux bords). */
+static void ship_seg_clip(int x0, int y0, int x1, int y1)
+{
+    if (x0 < 0 || x0 > 239 || y0 < 0 || y0 > 199) return;
+    if (x1 < 0 || x1 > 239 || y1 < 0 || y1 > 199) return;
+    lx0 = (unsigned char)x0; ly0 = (unsigned char)y0;
+    lx1 = (unsigned char)x1; ly1 = (unsigned char)y1;
+    draw_line_xor_open();
+}
+
+/* Une instance du ship (centre ox,oy en int — peut déborder l'écran,
+ * le clip par segment gère). Orientation in-degree 1 (Phase 24) :
+ * chaque sommet est l'arrivée d'exactement un segment → peint 1×.
+ * Flamme (G2) : 2 segments P3→F et P4→F semi-ouverts — P3/P4 gardent
+ * leur compte de toggles, F est XOR-é 2× (tip éteint, 1 px, invisible
+ * sur un effet qui clignote). */
+static void ship_render_at(int ox, int oy, unsigned char flame)
+{
+    unsigned char a = ship_angle;
+    int x0 = ox + ship_pt0x[a], y0 = oy + ship_pt0y[a];
+    int x1 = ox + ship_pt1x[a], y1 = oy + ship_pt1y[a];
+    int x2 = ox + ship_pt2x[a], y2 = oy + ship_pt2y[a];
+    int x3 = ox + ship_pt3x[a], y3 = oy + ship_pt3y[a];
+    int x4 = ox + ship_pt4x[a], y4 = oy + ship_pt4y[a];
+
+    ship_seg_clip(x3, y3, x0, y0);      /* peint P0 (apex) */
+    ship_seg_clip(x3, y3, x1, y1);      /* peint P1 */
+    ship_seg_clip(x0, y0, x4, y4);      /* peint P4 */
+    ship_seg_clip(x4, y4, x2, y2);      /* peint P2 */
+    ship_seg_clip(x4, y4, x3, y3);      /* peint P3 */
+    if (flame) {
+        int fx = ox - ship_thrx[a];
+        int fy = oy - ship_thry[a];
+        ship_seg_clip(x3, y3, fx, fy);
+        ship_seg_clip(x4, y4, fx, fy);
+    }
+}
+
+/* Segment 8-bit sans clip — chemin rapide intérieur. */
+static void ship_seg8(unsigned char x0, unsigned char y0,
+                      unsigned char x1, unsigned char y1)
+{
+    lx0 = x0; ly0 = y0; lx1 = x1; ly1 = y1;
+    draw_line_xor_open();
+}
+
+/* XOR le ship (+ flamme si demandé) à l'état COURANT (ship_x/y/angle).
+ * Idempotent : l'appelant rappelle avec le MÊME flag flamme pour
+ * effacer (cf. flame_was_drawn), avant toute modification d'état.
+ *
+ * G3 — wraparound visuel : près d'un bord (< SHIP_EXTENT), instances
+ * fantômes à ±240/±200 (coins : jusqu'à 4), comme les asteroids.
+ * Cas courant (intérieur) : chemin rapide 8 bits sans clip ni int. */
+static void ship_render(unsigned char flame)
+{
+    unsigned char a;
+    if (ship_x >= SHIP_EXTENT && ship_x <= 239 - SHIP_EXTENT &&
+        ship_y >= SHIP_EXTENT && ship_y <= 199 - SHIP_EXTENT) {
+        unsigned char x0, y0, x1, y1, x2, y2, x3, y3, x4, y4;
+        a  = ship_angle;
+        x0 = ship_x + ship_pt0x[a]; y0 = ship_y + ship_pt0y[a];
+        x1 = ship_x + ship_pt1x[a]; y1 = ship_y + ship_pt1y[a];
+        x2 = ship_x + ship_pt2x[a]; y2 = ship_y + ship_pt2y[a];
+        x3 = ship_x + ship_pt3x[a]; y3 = ship_y + ship_pt3y[a];
+        x4 = ship_x + ship_pt4x[a]; y4 = ship_y + ship_pt4y[a];
+        ship_seg8(x3, y3, x0, y0);
+        ship_seg8(x3, y3, x1, y1);
+        ship_seg8(x0, y0, x4, y4);
+        ship_seg8(x4, y4, x2, y2);
+        ship_seg8(x4, y4, x3, y3);
+        if (flame) {
+            unsigned char fx = ship_x - ship_thrx[a];
+            unsigned char fy = ship_y - ship_thry[a];
+            ship_seg8(x3, y3, fx, fy);
+            ship_seg8(x4, y4, fx, fy);
+        }
+        return;
+    }
+    /* Bord : clip + duplication d'instance (rare). */
+    {
+        int cx = ship_x, cy = ship_y;
+        int dup_x = 0, dup_y = 0;
+        if (ship_x < SHIP_EXTENT)            dup_x = +240;
+        else if (ship_x > 239 - SHIP_EXTENT) dup_x = -240;
+        if (ship_y < SHIP_EXTENT)            dup_y = +200;
+        else if (ship_y > 199 - SHIP_EXTENT) dup_y = -200;
+        ship_render_at(cx, cy, flame);
+        if (dup_x) ship_render_at(cx + dup_x, cy, flame);
+        if (dup_y) ship_render_at(cx, cy + dup_y, flame);
+        if (dup_x && dup_y) ship_render_at(cx + dup_x, cy + dup_y, flame);
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /* Ship physics + hyperespace                                          */
 /* ------------------------------------------------------------------ */
 
@@ -347,31 +459,31 @@ static void ship_update(void)
      * signed (cast modulaire unsigned). Le wrap est testé selon le signe
      * de la vélocité (sinon arithmétique modulo 65536 mélange overflow
      * et sous-flow → wrap au milieu d'écran au lieu du côté opposé).
-     * Note : la zone jouable ship [WX_MIN..WX_MAX] est plus étroite que
-     * l'écran complet, donc on n'utilise pas la même constante (X_SPAN_FIX)
-     * que les asteroids. */
+     * Phase 27 (G3) : le ship navigue désormais sur l'écran COMPLET
+     * [0,240)×[0,200) comme les asteroids — le rendu C gère le clip et
+     * la duplication d'instance aux bords (plus de zone morte 14 px). */
     {
-        unsigned int x_span_fix = (unsigned int)WX_SPAN << 8;
-        pos16 = (((unsigned int)(ship_x - WX_MIN)) << 8) | ship_x_frac;
+        unsigned int x_span_fix = (unsigned int)240 << 8;
+        pos16 = ((unsigned int)ship_x << 8) | ship_x_frac;
         pos16 += (unsigned int)ship_vx;
         if (ship_vx >= 0) {
             if (pos16 >= x_span_fix) pos16 -= x_span_fix;
         } else {
             if (pos16 >= x_span_fix) pos16 += x_span_fix;
         }
-        ship_x      = (unsigned char)((pos16 >> 8) + WX_MIN);
+        ship_x      = (unsigned char)(pos16 >> 8);
         ship_x_frac = (unsigned char)(pos16 & 0xFF);
     }
     {
-        unsigned int y_span_fix = (unsigned int)WY_SPAN << 8;
-        pos16 = (((unsigned int)(ship_y - WY_MIN)) << 8) | ship_y_frac;
+        unsigned int y_span_fix = (unsigned int)200 << 8;
+        pos16 = ((unsigned int)ship_y << 8) | ship_y_frac;
         pos16 += (unsigned int)ship_vy;
         if (ship_vy >= 0) {
             if (pos16 >= y_span_fix) pos16 -= y_span_fix;
         } else {
             if (pos16 >= y_span_fix) pos16 += y_span_fix;
         }
-        ship_y      = (unsigned char)((pos16 >> 8) + WY_MIN);
+        ship_y      = (unsigned char)(pos16 >> 8);
         ship_y_frac = (unsigned char)(pos16 & 0xFF);
     }
 }
@@ -761,7 +873,8 @@ static void hiscores_draw_table(void)
 static void game_reset(void)
 {
     /* Effacer tous les objets actuels (XOR état ⇒ nettoyage écran) */
-    if (ship_was_drawn) ship_erase();
+    if (ship_was_drawn) ship_render(flame_was_drawn);
+    flame_was_drawn = 0;
     bullets_render();           /* efface les tirs encore actifs */
     asteroids_draw();           /* efface les asteroids actifs */
     if (ufo_was_drawn) ufo_draw();   /* efface UFO si dessiné */
@@ -783,7 +896,7 @@ static void game_reset(void)
     ship_invincible = 0;
 
     /* Première frame visible */
-    ship_draw();
+    ship_render(0);
     ship_was_drawn = 1;
     asteroids_draw();
     hud_draw();
@@ -809,6 +922,8 @@ void game_run(void)
     ship_invincible     = 0;
     ship_was_drawn      = 0;
     ufo_was_drawn       = 0;
+    flame_was_drawn     = 0;
+    flame_flick         = 0;
     prev_gameover       = 0;
     final_score         = 0;
     hiscores_drawn      = 0;
@@ -882,8 +997,10 @@ void game_run(void)
     thump_timer = THUMP_PERIOD_BASE;
     lives_prev = lives;
     wave_displayed = 0;
+    flame_was_drawn = 0;
+    flame_flick = 0;
 
-    ship_draw();
+    ship_render(0);
     ship_was_drawn = 1;
     asteroids_draw();
     hud_draw();
@@ -1011,7 +1128,9 @@ void game_run(void)
          * à ~10 lignes de code (input apply + ship_update +
          * collisions_ship_asteroids + bookkeeping) au lieu des ~50 du
          * refactor précédent. */
-        if (ship_was_drawn) ship_erase();    /* erase à pos/angle N-1 */
+        /* erase ship + flamme à pos/angle N-1 (état encore inchangé —
+         * flame_was_drawn garantit l'XOR symétrique de la flamme). */
+        if (ship_was_drawn) ship_render(flame_was_drawn);
 
         if (!gameover) {
             /* Rotation : 2 angles/frame. Avec MAX_ASTEROIDS=6 + shapes
@@ -1050,10 +1169,18 @@ void game_run(void)
                        (ship_invincible == 0 || (ship_invincible & 2));
 
         if (ship_visible) {
-            ship_draw();                     /* draw à pos/angle N */
+            /* G2 — flamme arcade : visible si thrust maintenu, 1 frame
+             * sur 2 (clignotement ~12 Hz). flame_was_drawn mémorise ce
+             * qui est À L'ÉCRAN pour l'erase de la frame suivante. */
+            unsigned char flame_now;
+            flame_flick++;
+            flame_now = (key_state & 0x04) && (flame_flick & 1);
+            ship_render(flame_now);          /* draw à pos/angle N */
+            flame_was_drawn = flame_now;
             ship_was_drawn = 1;
         } else {
             ship_was_drawn = 0;
+            flame_was_drawn = 0;
         }
         /* ===== FIN BLOC SHIP ===== */
 

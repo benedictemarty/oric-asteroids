@@ -127,13 +127,12 @@ des 9 phases.
   valider à l'oreille en interactif.
 - Debug Atmos : `asteroids.tap` ne fonctionne pas avec ROM Atmos
   (Oricutron + ROM Atmos signalé KO).
-- Axes perf/graphique restants (plan 2026-06-11 ; P6+P1+G1 faits Phase 24,
-  P2 Phase 25, P3 Phase 26 — idle frame_wait : 17,9 % → 39,8 % au total,
-  shapes arcade 11-13 sommets restaurées) : P4 déroulage boucles h/v
-  (line.s ne sert plus que ship/UFO/lettres/debris) ; P5 cadence
-  adaptative 50/25 Hz (la marge dégagée rend le 50 Hz plausible en scène
-  légère) ; G2 flamme de thrust clignotante ; G3 wraparound visuel du
-  ship ; G4 couleur attributs sur bande HUD.
+- Axes perf/graphique restants (plan 2026-06-11 ; faits : P6+P1+G1
+  Phase 24, P2 Phase 25, P3 Phase 26 — idle 17,9 % → 39,8 %, shapes
+  arcade restaurées —, G2+G3 Phase 27 — flamme de thrust + ship plein
+  écran) : P4 déroulage boucles h/v ; P5 cadence adaptative 50/25 Hz
+  (la marge dégagée rend le 50 Hz plausible en scène légère) ; G4
+  couleur attributs sur bande HUD.
 
 ## Sources
 
