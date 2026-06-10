@@ -56,6 +56,7 @@
 
         .export   _key_scan
         .importzp _key_state
+        .import   mixer_shadow       ; sound.s (BSS) — dernière valeur R7 (Phase 23)
         .exportzp kb_pcr_save        ; partagé avec sound.s
 
         VIA_ORB    = $0300
@@ -145,10 +146,16 @@ _key_scan:
         lda  #$F7
         sta  VIA_DDRB
 
-        ; PSG reg 7 = $7F : mixer tout muet + Port A en input (bit 6 = 1).
-        ; Si bit 6 = 0 (Port A en output côté PSG), le matériel ne peut
-        ; PAS lire la matrice → PB3 reste à 0 quoi qu'il arrive.
-        lda  #$7F
+        ; PSG reg 7 : le bit 6 (direction port A) doit être à 1 (= port A
+        ; en OUTPUT côté PSG) pour que R14 pilote les rangées de la matrice
+        ; clavier ; sinon PB3 reste à 0 quoi qu'il arrive.
+        ;
+        ; Phase 23 — on réécrit la valeur mixer COURANTE (mixer_shadow,
+        ; maintenue par sound.s, bit 6 toujours = 1) au lieu d'un $7F figé :
+        ; $7F coupait les 6 bits tone/noise à chaque scan (1×/frame) et
+        ; hachait tous les canaux actifs jusqu'au sound_tick pair suivant
+        ; (jusqu'à 40 ms) — cause du bug « audio ship explosion » au backlog.
+        lda  mixer_shadow
         ldy  #7
         jsr  psg_write
 

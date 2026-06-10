@@ -24,6 +24,7 @@
         .export   _tune_play_note, _tune_stop
         .export   _irq_handler, _irq_install
         .exportzp _sfx_id, _sfx_timer, _frame_cnt
+        .export   mixer_shadow
 
         .importzp kb_pcr_save
 
@@ -78,6 +79,10 @@ _frame_cnt:   .res 1     ; incrémenté à 50 Hz par _irq_handler
 ; sound_tmp : scratch pour _psg_write (hors ZP — adressage absolu suffisant)
         .segment "BSS"
 sound_tmp: .res 1
+mixer_shadow: .res 1     ; dernière valeur R7 écrite (Phase 23) — relue par
+                         ; key_scan (input.s) au lieu d'un $7F figé qui
+                         ; mutait tous les canaux actifs à chaque scan.
+                         ; Hors ZP (pleine) : lu 1×/scan, absolu suffisant.
 
         .segment "RODATA"
 
@@ -155,6 +160,7 @@ update_mixer:
         beq  @no_c
         and  #$7B
 @no_c:
+        sta  mixer_shadow   ; refléter R7 pour key_scan (Phase 23)
         ldy  #7
         jsr  _psg_write
         rts
@@ -186,6 +192,7 @@ _sound_init:
 
         ; Mixer = $7F (tout off)
         lda  #$7F
+        sta  mixer_shadow
         ldy  #7
         jsr  _psg_write
 
@@ -561,7 +568,9 @@ _sound_tick:
         jmp  @skip          ; rien d'actif → skip
 @tick_start:
 
-        sei
+        ; Phase 23 : pas de sei/cli ici — _sound_tick n'est appelé que
+        ; depuis _irq_handler (I déjà masqué). Le cli prématuré ouvrait
+        ; une fenêtre de réentrance IRQ avant le RTI du handler.
         lda  VIA_DDRA
         pha
         lda  #$FF
@@ -759,7 +768,6 @@ _sound_tick:
 
         pla
         sta  VIA_DDRA
-        cli
 
 @skip:
         rts
@@ -793,7 +801,8 @@ _tune_play_note:
         lda  #$0A
         ldy  #8
         jsr  _psg_write
-        lda  #$7E           ; tone A on, port A input
+        lda  #$7E           ; tone A on, port A reste piloté (bit 6=1)
+        sta  mixer_shadow
         ldy  #7
         jsr  _psg_write
 
@@ -819,6 +828,7 @@ _tune_stop:
         ldy  #8
         jsr  _psg_write
         lda  #$7F
+        sta  mixer_shadow
         ldy  #7
         jsr  _psg_write
 

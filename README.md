@@ -119,11 +119,12 @@ des 9 phases.
 - VSync Option B : vrai bit ULA pour anti-tearing parfait (bloqué côté
   Phosphoric — modélisation à ajouter).
 - Test sur Oric‑1 physique (revision PAL).
-- **Bug audio à investiguer** : son d'explosion ship inaudible (signalé
-  utilisateur, fix Phase 21b non validé en interactif). Possibles
-  causes restantes : enveloppe AY partagée 3 canaux, override
-  séquentiel, vol A/B nuls quand FX_EXPLODE débute. Investiguer en
-  Phosphoric `-D` interactif + `--trace-irq` + dump RAM `_sfx_id`.
+- ~~Bug audio : son d'explosion ship inaudible~~ — cause identifiée et
+  corrigée Phase 23 : `key_scan` écrivait `R7 = $7F` figé à chaque frame
+  (mute des 6 bits tone/noise jusqu'au `sound_tick` pair suivant →
+  hachage ~25 Hz de tous les canaux actifs). Fix : `key_scan` réécrit
+  `mixer_shadow` (dernière valeur R7 maintenue par sound.s). Reste à
+  valider à l'oreille en interactif.
 - Debug Atmos : `asteroids.tap` ne fonctionne pas avec ROM Atmos
   (Oricutron + ROM Atmos signalé KO).
 

@@ -7,6 +7,56 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 23 — Fix mute audio key_scan + durcissement IRQ + collisions toriques ✅
+
+Correctifs issus d'une revue de code complète (2026-06-10).
+
+**Fix principal — `key_scan` mutait tous les canaux son à chaque frame**
+(cause probable du bug « audio ship explosion » du backlog Phase 22+) :
+`_key_scan` écrivait `R7 = $7F` figé (« mixer tout muet ») à chaque scan
+pour mettre le port A du PSG en pilotage matrice. Conséquence : les 6 bits
+tone/noise étaient coupés 1×/frame, et le son restait muet jusqu'au
+`sound_tick` *pair* suivant (jusqu'à 40 ms) → hachage ~25 Hz de tous les
+effets, surtout perceptible sur les effets longs (FX_EXPLODE = 25 ticks).
+Solution : `sound.s` maintient `mixer_shadow` (BSS, dernière valeur R7
+écrite par `update_mixer`/`tune_*`/`sound_init`) et `key_scan` réécrit
+cette valeur courante — le bit 6 (direction port A) y est toujours à 1,
+le scan clavier reste fonctionnel, les canaux actifs ne sont plus coupés.
+
+**Durcissement IRQ** : suppression du `sei`/`cli` dans `_sound_tick` —
+appelé uniquement depuis `_irq_handler` (flag I déjà masqué), le `cli`
+final ouvrait une fenêtre de réentrance IRQ avant le `RTI` du handler.
+Sans symptôme aujourd'hui (T1 seul actif), mais mine désamorcée si une
+autre source IRQ est activée plus tard.
+
+**Collisions toriques** : `collide()` (game.c) utilise désormais la
+distance modulaire `min(d, SPAN-d)` par axe (240 en X, 200 en Y). Avant,
+un astéroïde dont l'instance fantôme était visible au bord opposé
+(duplication d'instance Phase 10l) ne collisionnait ni avec le ship ni
+avec les bullets de ce côté — on pouvait traverser un astéroïde affiché.
+Coût : +1 comparaison +1 soustraction par axe (~35 appels/frame, négligeable).
+
+**Nettoyages** : commentaires debris désynchronisés (durée 50→40 frames,
+séquence 40/35/30/25/20/15, -5/fragment) ; boucle morte dans
+`hiscores_init` (`for i=5; i<5`) supprimée ; commentaire input.s corrigé
+(bit 6 R7 = port A *output* pour piloter R14, pas input).
+
+**Note ZP** : la page zéro étant pleine (overflow ld65 d'1 octet),
+`mixer_shadow` est en BSS — adressage absolu suffisant (1 lecture/scan).
+
+**Tests** : `make host-test` PASS (4/4). `make check` : la référence
+`phase9_release.ppm` divergeait déjà sur HEAD avant ces correctifs
+(dérive de phase d'animation des asteroids démo accumulée depuis la
+Phase 9 — décalage de quelques px, rendu sain vérifié visuellement).
+Référence régénérée (`make ref`), `make check` PASS et déterministe.
+Outil `bin2tap` recompilé dans le dépôt Oric1 (binaire absent).
+
+**Fichiers modifiés** : `src/asm/sound.s` (+`mixer_shadow`, -`sei`/`cli`
+tick), `src/asm/input.s` (R7 ← `mixer_shadow`), `src/game.c` (`collide`
+torique, commentaires, `hiscores_init`), `tests/ref/phase9_release.ppm`.
+
+
+
 ### Phase 22 — Architecture son 3 canaux AY-3-8912 indépendants ✅
 
 **Problème** : politique mono-effet → thump, UFO et explosions se coupaient

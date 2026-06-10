@@ -177,7 +177,7 @@ static unsigned char wave_displayed;
 
 /* Phase 12 — debris ship/UFO arcade-fidèle (port DoShipExplsn $7465 +
  * ShipExpVelTbl $50EC). 6 fragments avec vélocités prédéfinies fixes
- * (pas RNG comme Phase 10i), durée 50 frames avec disparition
+ * (pas RNG comme Phase 10i), durée max DEBRIS_TTL frames avec disparition
  * SÉQUENTIELLE — les fragments disparaissent un par un dans le temps,
  * conformément au comportement arcade rev 4. */
 #define DEBRIS_COUNT      6
@@ -276,8 +276,18 @@ static unsigned char collide(unsigned char x1, unsigned char y1,
                              unsigned char x2, unsigned char y2,
                              unsigned char r)
 {
-    if (abs_diff(x1, x2) > r) return 0;
-    if (abs_diff(y1, y2) > r) return 0;
+    /* Distance torique min(d, SPAN-d) par axe (Phase 23) : une entité
+     * proche d'un bord est dessinée aussi en instance fantôme de l'autre
+     * côté (duplication d'instance) — la collision doit voir cette
+     * proximité à travers le bord, sinon on traverse un astéroïde
+     * pourtant affiché. Coût : 1 comparaison + 1 soustraction par axe. */
+    unsigned char d;
+    d = abs_diff(x1, x2);
+    if (d > 120) d = (unsigned char)(240 - d);   /* wrap X (span 240) */
+    if (d > r) return 0;
+    d = abs_diff(y1, y2);
+    if (d > 100) d = (unsigned char)(200 - d);   /* wrap Y (span 200) */
+    if (d > r) return 0;
     return 1;
 }
 
@@ -387,8 +397,8 @@ static void ship_respawn(void)
 
 /* Phase 12 — Spawn de 6 fragments arcade-fidèles à la position passée.
  * Vélocités prédéfinies depuis ShipExpVelTbl arcade ; disparition
- * séquentielle via TTL décroissant (-6 par fragment) → fragment 0
- * disparaît à 50 frames, fragment 5 à 20 frames. Effet "explosion
+ * séquentielle via TTL décroissant (-5 par fragment) → fragment 0
+ * disparaît à 40 frames, fragment 5 à 15 frames. Effet "explosion
  * qui se dissout en éclats successifs" reconnaissable de l'arcade. */
 static void debris_spawn(unsigned char ax, unsigned char ay)
 {
@@ -398,7 +408,7 @@ static void debris_spawn(unsigned char ax, unsigned char ay)
         dbr_y[i]   = ay;
         dbr_vx[i]  = ship_debris_vx[i];
         dbr_vy[i]  = ship_debris_vy[i];
-        dbr_ttl[i] = DEBRIS_TTL - i * 5;      /* 30/25/20/15/10/5 séquentielle */
+        dbr_ttl[i] = DEBRIS_TTL - i * 5;      /* 40/35/30/25/20/15 séquentielle */
     }
 }
 
@@ -698,15 +708,13 @@ static void check_next_wave(void)
 
 static void hiscores_init(void)
 {
-    unsigned char i;
-    /* Valeurs par défaut décroissantes */
+    /* Valeurs par défaut décroissantes (HISCORE_COUNT = 5, toutes posées) */
     hiscores[0] = 1000;
     hiscores[1] = 500;
     hiscores[2] = 200;
     hiscores[3] = 100;
     hiscores[4] = 50;
     hiscores_drawn = 0;
-    for (i = 5; i < HISCORE_COUNT; i++) hiscores[i] = 0;
 }
 
 /* Insère final_score dans la table triée si éligible.
