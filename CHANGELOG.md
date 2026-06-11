@@ -7,6 +7,22 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 37 — tuning : vitesse des astéroïdes réduite ✅
+
+Retour joueur après validation manuelle des torpilles 2×2 : les
+météores restaient trop rapides pour viser confortablement à 25 Hz.
+
+- **Spawn de vague** : 0.375 / 0.75 px/frame (96/192 en 8.8) au lieu
+  de 0.5 / 1.0 (-25 %).
+- **Fragments** : clamp `V_MAX_AST` 960 → 576 (2.25 px/frame max au
+  lieu de 3.75), `V_MIN_AST` 192 → 128 (0.5 px/frame min).
+  `rand_offset` (port arcade SetAstVel, scale ×64) inchangé — la
+  dispersion des directions est préservée, seules les bornes bougent.
+- **Tests** : host 4/4 PASS ; capture titre divergente (vitesses du
+  drift d'attract) → référence régénérée (`make ref`), `make check`
+  PASS ; vitesses vérifiées par mesure de centroïdes sur 2 s de jeu
+  émulé (0.36 / 0.72 px/frame mesurés). `dist/asteroids.tap` régénéré.
+
 ### Phase 36 — torpilles 2×2 px + rendu compact + fix BSS crt0 ✅
 
 Suite au retour testeur matériel réel (« fire beam hardly visible »),

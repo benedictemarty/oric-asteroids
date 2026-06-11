@@ -128,11 +128,13 @@ void asteroids_spawn_wave(void)
         p->x_frac = 0;
         p->y_frac = 0;
 
-        /* Vélocité 8.8 (scale ×128) : base RNG (1 ou 2 px) × 128
-         * → 128 ou 256 = 0.5 ou 1.0 px/frame initial. */
+        /* Vélocité 8.8 : 96 ou 192 = 0.375 ou 0.75 px/frame initial.
+         * Phase 37 (tuning) : -25 % vs 128/256 — les gros astéroïdes
+         * traversaient l'écran trop vite après validation manuelle
+         * des torpilles 2×2 (retour joueur 2026-06-12). */
         r = rng8();
-        p->vx = ((r & 1) ? 1 : -1) * ((r & 2) ? 256 : 128);
-        p->vy = ((r & 4) ? 1 : -1) * ((r & 8) ? 256 : 128);
+        p->vx = ((r & 1) ? 1 : -1) * ((r & 2) ? 192 : 96);
+        p->vy = ((r & 4) ? 1 : -1) * ((r & 8) ? 192 : 96);
     }
     /* Marquer les autres comme libres */
     for (; i < MAX_ASTEROIDS; i++, p++) {
@@ -337,16 +339,20 @@ void asteroids_render(void)
     }
 }
 
-/* 8.8 fixed-point pour asteroid velocities — scale ×64 (= 0.25 px/unit) :
- *   V_MAX_AST = 15 × 64 = 960 ≈ 3.75 px/frame max
- *   V_MIN_AST =  3 × 64 = 192 ≈ 0.75 px/frame min (asteroid ne peut pas s'arrêter)
+/* 8.8 fixed-point pour asteroid velocities — rand_offset en scale ×64
+ * (= 0.25 px/unit, port arcade inchangé), bornes clampées séparément :
+ *   V_MAX_AST = 576 = 2.25 px/frame max
+ *   V_MIN_AST = 128 = 0.50 px/frame min (asteroid ne peut pas s'arrêter)
  *
  * Tuning gameplay : l'échelle ×128 d'origine donnait des petits fragments
  * à 7.5 px/frame (écran traversé en 1.3 s à 25 Hz) — injouable. ×64
- * divise par 2 les vitesses de fragmentation ; le spawn de vague
- * (128/256 = 0.5/1.0 px/frame) reste inchangé. */
-#define V_MAX_AST    960
-#define V_MIN_AST    192
+ * (Phase 10f) divisait par 2. Phase 37 : nouveau retour joueur après
+ * validation des torpilles 2×2 — les fragments au clamp 960
+ * (3.75 px/frame) restaient trop durs à viser à 25 Hz ; max abaissé à
+ * 576 et min à 128 (l'offset RNG ±960 sature plus souvent le clamp,
+ * la dispersion des directions reste intacte). */
+#define V_MAX_AST    576
+#define V_MIN_AST    128
 
 /* RNG signé en 8.8 — port de SetAstVel ($7203) :
  *   AND #$8F garde sign + 4 bits magnitude, scale ×64.
