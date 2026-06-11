@@ -325,9 +325,12 @@ Checklist obligatoire à exécuter **avant de marquer le projet "Done"** :
       peuvent rejeter. *Note* : CLAUDE.md acte explicitement Phosphoric
       comme l'émulateur du projet ; ce point ne bloque pas la release
       mais améliorerait la portabilité.
-- [ ] **Test Oric‑1 physique** (si disponible) : charger le `.tap` sur
-      un Oric‑1 réel via interface cassette ou disque dur, vérifier
-      gameplay 5 min minimum.
+- [x] **Test Oric‑1 physique** — **confirmé 2026-06-11** par un
+      testeur externe : le jeu charge et tourne sur Oric‑1 réel.
+      Ce test a révélé un signal vidéo 60 Hz hors standard (attribut
+      `$1C` au lieu de `$1E` — bit 1 ULA = 50 Hz), corrigé en
+      Phase 35. Reste à revalider le lock RGB2HDMI avec le `.tap`
+      corrigé.
 - [x] ~~**Glitch zone TEXT du bas en HIRES**~~ — **résolu 2026-05-13**.
       Pas un bug Phosphoric : charset HIRES `$9800` non initialisé
       côté binaire. Fix : copie `$B400 → $9800` dans `_hires_init`.

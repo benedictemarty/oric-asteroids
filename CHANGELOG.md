@@ -7,6 +7,27 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 35 — fix signal vidéo 50 Hz sur matériel réel ✅
+
+Premier retour matériel réel (testeur externe, 2026-06-11) : le jeu
+tourne sur Oric-1 physique, mais son RGB2HDMI ne parvenait pas à
+verrouiller le signal — sortie vidéo hors standard Oric.
+
+- **Cause** : `_hires_init` (`src/asm/line.s`) écrivait l'attribut
+  vidéo `$1C` à `$BB80`. Dans l'encodage ULA (attributs 24–31), le
+  bit 2 sélectionne HIRES mais le **bit 1 sélectionne 50 Hz** :
+  `$1C` = HIRES **60 Hz** (~264 lignes), `$1E` = HIRES **50 Hz**
+  (PAL standard, ~312 lignes). Invisible sous Phosphoric (le contenu
+  du framebuffer est identique), révélé uniquement par le matériel.
+- **Fix** : attribut `$1E` à l'init. Aucun impact sur la vitesse du
+  jeu — la logique est cadencée par le Timer 1 du VIA (20 ms fixes),
+  pas par le vsync vidéo.
+- **Tests** : host 4/4 PASS ; `make check` PASS (capture Phosphoric
+  bit-à-bit identique à la référence — seul le timing du signal de
+  sortie change, pas les pixels).
+- `dist/asteroids.tap` régénéré ; revalidation RGB2HDMI sur matériel
+  réel attendue. CLAUDE.md et ROADMAP mis à jour en conséquence.
+
 ## [1.0.0-beta] — 2026-06-11
 
 Première beta publique : jeu complet (vagues, fragmentation arcade,

@@ -31,7 +31,7 @@ Phase de cadrage. Le dépôt ne contient pour l'instant qu'un seul document : `a
   - Pixel : bit 7 = 1 → inverse vidéo ; bits 5‑0 → 6 pixels (bit 5 = gauche).
   - **bit 6 = bit de sécurité** : toujours mettre à 1 dans les octets pixel (`ORA #$40`) pour éviter la détection attribut quand aucun bit pixel n'est allumé.
 - Cas du jeu (monochrome PAPER 0 / INK 7) : Phosphoric réinitialise ink=BLANC/paper=NOIR à chaque scanline → **aucun attribut INK/PAPER nécessaire**. Écriture de pixels uniquement avec bit 6 = 1 (`ORA #$40`).
-- **Init HIRES** : écrire `0x1C` à `$BB80` (attribut video mode = 4 → HIRES, persist entre frames), puis remplir `$A000`–`$BF3F` avec **`0x40`** (JAMAIS `0x80` — `(0x80 & 0x60) = 0` serait classé attribut).
+- **Init HIRES** : écrire **`0x1E`** à `$BB80` (attributs 24–31 : bit 2 = HIRES, **bit 1 = 50 Hz** ; `0x1C` = HIRES 60 Hz → signal hors standard PAL, invisible sous Phosphoric mais pas de lock RGB2HDMI sur Oric réel — bug corrigé Phase 35), puis remplir `$A000`–`$BF3F` avec **`0x40`** (JAMAIS `0x80` — `(0x80 & 0x60) = 0` serait classé attribut).
 - Résolution utile : **240 px** en monochrome sans attributs par ligne.
 
 ### Carte mémoire (cf. §6)

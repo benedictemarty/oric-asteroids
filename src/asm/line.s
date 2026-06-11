@@ -131,10 +131,13 @@ _hires_init:
         bne  @cs_pg
 
         ; ----------------------------------------------------------------
-        ; 2. Bascule en mode HIRES : écrire attribut vid_mode=4 ($1C)
-        ;    à $BB80 (l'ULA lit ce premier octet à chaque scanline 0).
+        ; 2. Bascule en mode HIRES : écrire attribut vidéo $1E à $BB80
+        ;    (l'ULA lit ce premier octet à chaque scanline 0).
+        ;    Attributs 24-31 : bit2 = HIRES, bit1 = 50 Hz.
+        ;    $1E = HIRES 50 Hz (PAL standard) ; $1C serait HIRES 60 Hz
+        ;    → signal hors-norme sur Oric réel (RGB2HDMI sans lock).
         ; ----------------------------------------------------------------
-        lda  #$1C
+        lda  #$1E
         sta  $BB80
 
         ; ----------------------------------------------------------------
