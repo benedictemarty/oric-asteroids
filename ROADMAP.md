@@ -65,6 +65,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 26 | Sprites pré-rendus XOR (P3) + shapes arcade 11-13 sommets restaurées (idle → 39,8 %) | — | 1 j |
 | ✅ | 27 | Flamme de thrust (G2) + wraparound visuel du ship plein écran (G3) | — | 1 j |
 | ✅ | 28 | Ordonnanceur à pas fixe + rattrapage (P5) — fin des stalls 60 ms, 25 Hz constant | — | 1 j |
+| ✅ | 29 | Tuning gameplay : vitesse fragments ÷2 (échelle ×64, V_MAX 3,75 px/frame) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.

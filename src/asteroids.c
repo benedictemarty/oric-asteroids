@@ -336,15 +336,19 @@ void asteroids_render(void)
     }
 }
 
-/* 8.8 fixed-point pour asteroid velocities — scale ×128 (= 0.5 px/unit) :
- *   V_MAX_AST = 15 × 128 = 1920 ≈ 7.5 px/frame max
- *   V_MIN_AST =  3 × 128 =  384 ≈ 1.5 px/frame min (asteroid ne peut pas s'arrêter)
- */
-#define V_MAX_AST   1920
-#define V_MIN_AST    384
+/* 8.8 fixed-point pour asteroid velocities — scale ×64 (= 0.25 px/unit) :
+ *   V_MAX_AST = 15 × 64 = 960 ≈ 3.75 px/frame max
+ *   V_MIN_AST =  3 × 64 = 192 ≈ 0.75 px/frame min (asteroid ne peut pas s'arrêter)
+ *
+ * Tuning gameplay : l'échelle ×128 d'origine donnait des petits fragments
+ * à 7.5 px/frame (écran traversé en 1.3 s à 25 Hz) — injouable. ×64
+ * divise par 2 les vitesses de fragmentation ; le spawn de vague
+ * (128/256 = 0.5/1.0 px/frame) reste inchangé. */
+#define V_MAX_AST    960
+#define V_MIN_AST    192
 
 /* RNG signé en 8.8 — port de SetAstVel ($7203) :
- *   AND #$8F garde sign + 4 bits magnitude, scale ×128.
+ *   AND #$8F garde sign + 4 bits magnitude, scale ×64.
  *
  * Revue senior C #1 : ancienne version utilisait `r |= 0xF0` sur
  * unsigned puis cast en signed — fonctionnel mais sémantiquement
@@ -362,7 +366,7 @@ static int rand_offset(void)
      * via or 0xF0 si bit 7 set (idem version précédente) mais sans
      * dépendre du détail d'impl. */
     if (s < 0) s |= (signed char)0xF0;   /* sign-extend bits 4-6 */
-    return ((int)s) << 7;     /* ×128 = scale 8.8 (matches V_MAX/MIN_AST) */
+    return ((int)s) << 6;     /* ×64 = scale 8.8 (matches V_MAX/MIN_AST) */
 }
 
 /* Clamp arcade GetAstVelocity ($7233) en 8.8 fixed-point. */

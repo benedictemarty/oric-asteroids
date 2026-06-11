@@ -11,7 +11,7 @@
  * Vérifie :
  *   T1 — déterminisme : seed identique ⇒ séquence identique.
  *   T2 — période : LFSR Galois 8-bit non nul a période 255.
- *   T3 — bornes rand_offset : sortie ∈ [-16*128, +15*128] = [-2048, +1920].
+ *   T3 — bornes rand_offset : sortie ∈ [-16*64, +15*64] = [-1024, +960].
  *        Asymétrie : (signed char)0x80 sign-extend en -16 (pas -15) car le
  *        AND #$8F sur bit 7 + bits 0-3 produit magnitude 0..15 ou -16..-1.
  *   T4 — distribution rand_offset : bit signe ~50/50 sur 1024 tirages.
@@ -32,12 +32,13 @@ static unsigned char rng8(void)
     return rng_state;
 }
 
-/* Identique à src/asteroids.c:332-346 (version révisée batch 5) */
+/* Identique à src/asteroids.c rand_offset() (scale ×64 depuis le
+ * tuning vitesse fragments — voir CHANGELOG) */
 static int rand_offset(void)
 {
     signed char s = (signed char)(rng8() & 0x8F);
     if (s < 0) s |= (signed char)0xF0;
-    return ((int)s) << 7;
+    return ((int)s) << 6;
 }
 
 /* ── Tests ───────────────────────────────────────────────────────── */
@@ -87,8 +88,8 @@ static int test_rand_offset_bounds(void)
     rng_state = 0x42;
     for (i = 0; i < 4096; i++) {
         int v = rand_offset();
-        if (v < -16 * 128 || v > 15 * 128) {
-            printf("FAIL T3 : rand_offset()=%d hors [-2048, +1920]\n", v);
+        if (v < -16 * 64 || v > 15 * 64) {
+            printf("FAIL T3 : rand_offset()=%d hors [-1024, +960]\n", v);
             return 0;
         }
     }

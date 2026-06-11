@@ -7,6 +7,26 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 29 — Tuning gameplay : vitesse des fragments d'asteroids ✅
+
+**Retour playtest** : les petits asteroids étaient trop rapides. Cause :
+`rand_offset()` (port de SetAstVel $7203) appliquait l'échelle ×128
+(0,5 px/unité) — chaque fragmentation ajoutait jusqu'à ±8 px/frame à la
+vitesse du parent (vs 0,5–1 px/frame au spawn de vague), et le clamp
+`V_MAX_AST` autorisait 7,5 px/frame : un petit, fragmenté deux fois,
+saturait vite ce clamp et traversait l'écran en ~1,3 s à 25 Hz.
+
+**Fix** (`src/asteroids.c`) : échelle des vitesses de fragmentation
+divisée par 2 → ×64 (0,25 px/unité) :
+- `rand_offset()` : `<< 6` au lieu de `<< 7` (perturbation max ±4 px/frame)
+- `V_MAX_AST` : 960 (3,75 px/frame) au lieu de 1920 (7,5 px/frame)
+- `V_MIN_AST` : 192 (0,75 px/frame) au lieu de 384 (1,5 px/frame)
+- Vitesses de spawn de vague (0,5/1,0 px/frame) inchangées.
+
+Tests : `tests/host/test_rng.c` T3 réaligné sur les nouvelles bornes
+[-1024, +960] ; `make host-test` 4/4 PASS, `make check` (diff bit-à-bit
+Phosphoric) PASS.
+
 ### Phase 28 — Ordonnanceur à pas fixe avec rattrapage (P5) ✅
 
 **Le bug de cadence historique** : `frame_wait()` échantillonnait
