@@ -54,7 +54,7 @@ void ship_init(void);
 void ship_rotate(signed char delta);
 void key_scan(void);
 
-/* sound.s — tune player pour la mélodie titre (port Mine Storm Vectrex) */
+/* sound.s — tune player pour le jingle titre (table chromatique C3..C5) */
 void tune_play_note(unsigned char idx);
 void tune_stop(void);
 
@@ -114,14 +114,30 @@ void tune_stop(void);
 
 /* Phase 22 — UFO sound géré dans ufo.c (canal C auto-restart) */
 
-/* Phase 31 — jingle d'entrée d'écran titre. Indices dans note_lo/hi de
- * sound.s (0..6 = G2 GS2 A2 AS2 B2 C3 CS3). Riff bas G–AS–C–CS–C–AS–G,
- * 8 frames/note à 25 Hz ≈ 2,2 s, staccato (coupure 2 frames avant la
- * note suivante). Joué une seule fois à l'arrivée sur le titre, puis
- * silence en attract (fidèle arcade). */
-static const unsigned char title_tune[] = { 0, 3, 5, 6, 5, 3, 0 };
-#define TITLE_TUNE_LEN          7
-#define TITLE_TUNE_NOTE_FRAMES  8
+/* Phase 32 — jingle d'entrée d'écran titre façon Galaga (l'arcade
+ * Asteroids n'avait aucune musique, et Mine Storm Vectrex seulement le
+ * jingle de boot console — composition originale demandée en playtest).
+ * Indices = demi-tons depuis C3 dans la table chromatique de sound.s
+ * (C3=0, C4=12, C5=24). Structure : rebond basse/aigu I-IV-V (la basse
+ * alternée imite les 2 voix de Galaga sur un seul canal AY), gamme
+ * montante rapide, C5 final tenu. 98 frames à 25 Hz ≈ 3,9 s, staccato
+ * (coupure 1 frame avant chaque note suivante). Joué une seule fois,
+ * puis silence en attract (fidèle arcade). */
+static const unsigned char title_tune_note[] = {
+     0,12,  0,16,  0,19,  0,24,     /* I  : C3 vs C4-E4-G4-C5  */
+     5,17,  5,21,  5,24,  5,21,     /* IV : F3 vs F4-A4-C5-A4  */
+     7,19,  7,23,  7,19,  7,16,     /* V  : G3 vs G4-B4-G4-E4  */
+    12,14, 16,17, 19,21, 23,        /* gamme montante C4→B4    */
+    24                              /* C5 final tenu           */
+};
+static const unsigned char title_tune_dur[] = {
+     3,3, 3,3, 3,3, 3,3,
+     3,3, 3,3, 3,3, 3,3,
+     3,3, 3,3, 3,3, 3,3,
+     2,2, 2,2, 2,2, 2,
+    12
+};
+#define TITLE_TUNE_LEN  32
 
 /* Score asteroid + UFO arcade */
 static const unsigned int score_by_size[3] = { 100, 50, 20 };
@@ -1010,16 +1026,16 @@ void game_run(void)
             key_scan();
             if ((key_state & 0x08) && !prev_space) break;
             prev_space = key_state & 0x08;
-            /* Phase 31 — avancer le jingle d'un pas par frame titre.
+            /* Phase 31/32 — avancer le jingle d'un pas par frame titre.
              * Non bloquant : SPACE reste réactif pendant la mélodie
              * (tune_stop final sous la boucle coupe une note en cours). */
             if (tune_pos < TITLE_TUNE_LEN) {
                 if (tune_frame == 0)
-                    tune_play_note(title_tune[tune_pos]);
+                    tune_play_note(title_tune_note[tune_pos]);
                 tune_frame++;
-                if (tune_frame == TITLE_TUNE_NOTE_FRAMES - 2)
+                if (tune_frame == title_tune_dur[tune_pos] - 1)
                     tune_stop();             /* staccato */
-                if (tune_frame >= TITLE_TUNE_NOTE_FRAMES) {
+                if (tune_frame >= title_tune_dur[tune_pos]) {
                     tune_frame = 0;
                     tune_pos++;
                 }

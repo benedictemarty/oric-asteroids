@@ -761,11 +761,16 @@ _sound_tick:
         rts
 
 ;-----------------------------------------------------------------
-; _tune_play_note — A = index note (0..6) : G2 GS2 A2 AS2 B2 C3 CS3
+; _tune_play_note — A = index note (0..24) : chromatique C3..C5
+; (period = 62500/f, AY 1 MHz). Phase 32 : table étendue de 7 notes
+; graves (G2-CS3, reliquat Mine Storm) à 2 octaves pour le jingle
+; titre façon Galaga. Index = demi-tons depuis C3 (C4=12, C5=24).
 ; Joue sur canal A (overrides sfx canal A).
 ;-----------------------------------------------------------------
-note_lo:  .byte $7E, $5A, $38, $18, $FA, $DE, $C3
-note_hi:  .byte $02, $02, $02, $02, $01, $01, $01
+note_lo:  .byte $DE, $C3, $AA, $92, $7B, $66, $52, $3F, $2D, $1C, $0C, $FD
+          .byte $EF, $E1, $D5, $C9, $BE, $B3, $A9, $9F, $96, $8E, $86, $7F, $77
+note_hi:  .byte $01, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01, $00
+          .byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
 _tune_play_note:
         sta  sound_tmp

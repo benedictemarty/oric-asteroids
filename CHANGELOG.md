@@ -7,6 +7,25 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 32 — Jingle titre façon Galaga ✅
+
+Retour playtest : le riff bas Phase 31 « pas top ». Vérification
+historique : l'arcade Atari Asteroids n'avait AUCUNE musique, et Mine
+Storm Vectrex seulement le jingle de boot de la console → composition
+originale demandée, dans l'esprit de l'intro de Galaga.
+
+- `src/asm/sound.s` : table de notes du tune player étendue de 7 notes
+  graves (G2–CS3, reliquat du projet Mine Storm) à **2 octaves
+  chromatiques C3→C5** (25 entrées, period = 62500/f, index =
+  demi-tons depuis C3).
+- `src/game.c` : mélodie 32 notes ≈ 3,9 s — rebond basse/aigu sur
+  I-IV-V (C3 alterné avec C4-E4-G4-C5, etc. : la basse alternée imite
+  les 2 voix de Galaga sur un seul canal AY), gamme montante rapide
+  C4→B4, C5 final tenu. Durées par note (`title_tune_dur[]`), staccato
+  1 frame. Toujours non bloquant et one-shot, silence en attract.
+
+Tests : `make host-test` 4/4 PASS, `make check` PASS.
+
 ### Phase 31 — Jingle d'entrée d'écran titre ✅
 
 Demande playtest : une musique à l'arrivée sur la page titre. Le tune
