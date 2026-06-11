@@ -1,11 +1,16 @@
-; crt0.s — startup Oric-1 utilisant initlib/donelib de cc65
+; crt0.s — startup Oric-1 utilisant zerobss/initlib/donelib de cc65
 ;
-; initlib appelle zerobss (clear BSS officiel) puis les constructeurs.
+; Phase 36 : zerobss est un appel SÉPARÉ — initlib ne lance que les
+; constructeurs CONDES. L'ancien commentaire « initlib appelle
+; zerobss » était faux : la BSS partait avec le pattern RAM $55
+; (constaté par dump Phosphoric) alors que le C suppose static = 0.
+; Resté invisible tant que tout l'état était initialisé explicitement ;
+; révélé par l'état écran des torpilles (blt_drawn, Phase 36).
 ; donelib appelle les destructeurs (à RTS de _main).
 
         .import         _main
         .import         __STACKSTART__
-        .import         initlib, donelib
+        .import         zerobss, initlib, donelib
         .importzp       c_sp
 
         .segment        "STARTUP"
@@ -20,7 +25,10 @@ start:
         lda     #>__STACKSTART__
         sta     c_sp+1
 
-        ; Init lib cc65 (zerobss + constructeurs CONDES)
+        ; BSS = 0 (exigence C pour les statics sans initialiseur)
+        jsr     zerobss
+
+        ; Init lib cc65 (constructeurs CONDES)
         jsr     initlib
 
         ; Programme principal

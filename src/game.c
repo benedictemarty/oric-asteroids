@@ -71,13 +71,14 @@ void tune_stop(void);
 #define BULLET_TTL      15
 #define FIRE_COOLDOWN   2     /* ~12 tirs/s à 25 Hz */
 /* Bornes de la fenêtre HIRES pour le wrap bullet. On tient compte du
- * fait que la torpille fait 2 px (plot blt_x ET blt_x+1) : x ∈ [0..238]. */
+ * fait que la torpille fait 2×2 px (plots blt_x..blt_x+1, blt_y..blt_y+1) :
+ * x ∈ [0..238], y ∈ [0..198]. */
 #define BLT_X_MIN       0
 #define BLT_X_MAX       238
 #define BLT_Y_MIN       0
-#define BLT_Y_MAX       199
+#define BLT_Y_MAX       198
 #define BLT_X_SPAN      (BLT_X_MAX - BLT_X_MIN + 1)   /* 239 */
-#define BLT_Y_SPAN      (BLT_Y_MAX - BLT_Y_MIN + 1)   /* 200 */
+#define BLT_Y_SPAN      (BLT_Y_MAX - BLT_Y_MIN + 1)   /* 199 */
 
 /* 8.8 fixed-point pour ship_vx/vy (16 bits signed).
  *   - V_MAX_FIXED = 2048 = 8.00 px/frame max (à 25 Hz = 200 px/s).
@@ -187,6 +188,13 @@ static unsigned char blt_y[BULLETS];
 static signed char   blt_vx[BULLETS];
 static signed char   blt_vy[BULLETS];
 static unsigned char blt_ttl[BULLETS];
+/* Phase 36 — état écran des torpilles, découplé de blt_ttl : bitmask
+ * des slots actuellement XOR-és en VRAM + position du dernier draw.
+ * Permet d'effacer toujours exactement ce qui a été dessiné, quel que
+ * soit le site de kill (collision, TTL, reset). */
+static unsigned char blt_drawn;
+static unsigned char blt_px[BULLETS];
+static unsigned char blt_py[BULLETS];
 
 static unsigned char fire_cd;
 static unsigned char prev_hyper;
@@ -306,6 +314,16 @@ static void plot(unsigned char x, unsigned char y)
     /* Phase 16 : plot_dot (40 c) au lieu de draw_line_xor (~80 c) */
     lx0 = x; ly0 = y;
     plot_dot();
+}
+
+/* Bloc 2×2 px en XOR — torpilles (Phase 36). L'appelant garantit
+ * x ≤ 238 et y ≤ 198. */
+static void plot4(unsigned char x, unsigned char y)
+{
+    plot(x,     y);
+    plot(x + 1, y);
+    plot(x,     y + 1);
+    plot(x + 1, y + 1);
 }
 
 static unsigned char abs_diff(unsigned char a, unsigned char b)
@@ -742,17 +760,34 @@ static void bullets_update(void)
     }
 }
 
-static void bullets_render(void)
+/* Phase 36 — rendu compact des torpilles : erase à la position du
+ * dernier draw (frame N-1) immédiatement suivi du draw à la position
+ * courante. L'ancien schéma (erase en début de boucle, draw en fin)
+ * laissait les torpilles absentes de la VRAM pendant quasi tout le
+ * temps de calcul : selon la phase balayage CRT / Timer 1, elles
+ * devenaient à peine visibles — constaté sur Oric-1 réel via RGB2HDMI
+ * (retour testeur 2026-06-12), reproduit sous Phosphoric (phase
+ * verrouillée ⇒ invisibles à 100 %). Fenêtre d'absence désormais
+ * ~320 c par torpille au lieu de ~80 % de la frame.
+ *
+ * Torpille = bloc 2×2 px (le trait 2×1 restait peu lisible à 240×200
+ * sur matériel réel). blt_x ≤ 238, blt_y ≤ 198 (cf. clip
+ * bullets_update) ⇒ pas d'overflow à +1. Coût pire cas : 8 plot_dot
+ * × 40 c × 4 balles ≈ 1280 c/frame. */
+static void bullets_commit(void)
 {
-    unsigned char i;
-    for (i = 0; i < BULLETS; i++) {
-        if (blt_ttl[i] == 0) continue;
-        /* Torpille = 2 pixels adjacents (mini-trait horizontal) pour
-         * être lisible à 240×200. Un seul pixel était quasi invisible
-         * surtout en mouvement. blt_x reste dans [1..238] (cf. clip
-         * bullets_update), donc blt_x+1 ≤ 239, pas d'overflow. */
-        plot(blt_x[i],          blt_y[i]);
-        plot(blt_x[i] + 1,      blt_y[i]);
+    unsigned char i, m;
+    for (i = 0, m = 1; i < BULLETS; i++, m <<= 1) {
+        if (blt_drawn & m) {
+            plot4(blt_px[i], blt_py[i]);            /* erase */
+            blt_drawn &= (unsigned char)~m;
+        }
+        if (blt_ttl[i]) {
+            plot4(blt_x[i], blt_y[i]);              /* draw */
+            blt_px[i] = blt_x[i];
+            blt_py[i] = blt_y[i];
+            blt_drawn |= m;
+        }
     }
 }
 
@@ -938,11 +973,9 @@ static void game_reset(void)
     /* Effacer tous les objets actuels (XOR état ⇒ nettoyage écran) */
     if (ship_was_drawn) ship_render(flame_was_drawn);
     flame_was_drawn = 0;
-    bullets_render();           /* efface les tirs encore actifs */
     asteroids_draw();           /* efface les asteroids actifs */
     if (ufo_was_drawn) ufo_draw();   /* efface UFO si dessiné */
     ufo_was_drawn = 0;
-    ufo_bullet_draw();
 
     /* Réinit complète */
     ship_init();
@@ -951,6 +984,11 @@ static void game_reset(void)
     asteroids_spawn_wave();
     ufo_init();
     hud_init();
+    /* Phase 36 : les init ci-dessus ont mis ttl/active à 0 mais ne
+     * touchent pas l'état écran (blt_drawn / ufo_blt_drawn) — les
+     * commits effacent donc les tirs encore affichés, sans redraw. */
+    bullets_commit();
+    ufo_bullet_commit();
     ship_was_drawn  = 0;
     /* Pas d'invincibilité au new game : INVINCIBLE_FRAMES est prévu
      * pour le respawn mid-game (= attendre fin animation explosion +
@@ -1159,11 +1197,12 @@ void game_run(void)
          *    avec leur bloc per-entity. */
         asteroid_debris_render();
         debris_render();
-        ufo_bullet_draw();
-        bullets_render();
         /* Note : ufo_draw n'est plus appelé ici. Bloc UFO compact
          * placé après asteroids_render (cf. plus bas) pour minimiser
-         * la fenêtre d'absence à l'écran (anti-flicker). */
+         * la fenêtre d'absence à l'écran (anti-flicker). Phase 36 :
+         * les torpilles (joueur + UFO) ne sont plus erasées ici non
+         * plus — bullets_commit / ufo_bullet_commit en fin de frame
+         * font erase+draw consécutifs (cf. bullets_commit). */
 
         /* 2. Bullets : input fire (level-trigger = auto-repeat) puis
          *    update. bullet_fire() court-circuite sur fire_cd, donc la
@@ -1276,9 +1315,10 @@ void game_run(void)
         /* ===== FIN BLOC SHIP ===== */
 
         /* 6. Draw entités mobiles restantes à pos N (UFO déjà fait dans
-         *    son bloc compact ci-dessus). */
-        bullets_render();
-        ufo_bullet_draw();
+         *    son bloc compact ci-dessus). Torpilles : erase N-1 + draw N
+         *    consécutifs (Phase 36, cf. bullets_commit). */
+        bullets_commit();
+        ufo_bullet_commit();
         debris_render();
         asteroid_debris_render();
 

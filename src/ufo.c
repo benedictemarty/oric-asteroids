@@ -46,6 +46,12 @@ static unsigned int  ufo_spawn_timer;     /* frames avant prochain spawn */
 static unsigned char ufo_fire_timer;      /* frames avant prochain tir */
 static unsigned char ufo_drift_timer;     /* alterne vy ±1 */
 
+/* Phase 36 — état écran du tir, découplé de ufo_bullet_active
+ * (cf. ufo_bullet_commit). Jamais réinitialisé par ufo_init : ce qui
+ * est en VRAM y reste tant qu'un commit ne l'a pas effacé. */
+static unsigned char ufo_blt_drawn;       /* 1 = tir actuellement en VRAM */
+static unsigned char ufo_blt_px, ufo_blt_py;  /* position du dernier draw */
+
 #define UFO_BULLET_TTL      30
 #define UFO_BULLET_SPEED    4
 #define UFO_FIRE_PERIOD     35    /* ~2 s à 17 Hz */
@@ -309,19 +315,54 @@ void ufo_bullet_update(void)
     ny = (int)ufo_bullet_y + (int)ufo_bullet_vy;
     /* Wraparound arcade : dans l'Atari rev, UFO et joueur partagent les
      * mêmes shot slots ($021F-$0222) ⇒ même traitement aux bords. Bullet
-     * UFO = 1 pixel, donc x ∈ [0..239], y ∈ [0..199]. Vélocité max ±4
-     * ⇒ un seul ajustement par bord suffit. TTL borne la portée totale. */
-    if (nx < 0)        nx += 240;
-    else if (nx > 239) nx -= 240;
-    if (ny < 0)        ny += 200;
-    else if (ny > 199) ny -= 200;
+     * UFO = bloc 2×2 px (cf. ufo_bullet_commit), donc x ∈ [0..238],
+     * y ∈ [0..198]. Vélocité max ±4 ⇒ un seul ajustement par bord
+     * suffit. TTL borne la portée totale. */
+    if (nx < 0)        nx += 239;
+    else if (nx > 238) nx -= 239;
+    if (ny < 0)        ny += 199;
+    else if (ny > 198) ny -= 199;
     ufo_bullet_x = (unsigned char)nx;
     ufo_bullet_y = (unsigned char)ny;
     ufo_bullet_ttl--;
 }
 
-void ufo_bullet_draw(void)
+/* Bloc 2×2 px en XOR (plot_dot ne modifie pas lx0/ly0 ; 4 × 40 c,
+ * moins cher que 4 line()). L'appelant garantit x ≤ 238, y ≤ 198. */
+static void ufo_dot4(unsigned char x, unsigned char y)
 {
-    if (!ufo_bullet_active) return;
-    line(ufo_bullet_x, ufo_bullet_y, ufo_bullet_x, ufo_bullet_y);
+    lx0 = x;
+    ly0 = y;
+    plot_dot();
+    lx0 = (unsigned char)(x + 1);
+    plot_dot();
+    ly0 = (unsigned char)(y + 1);
+    plot_dot();
+    lx0 = x;
+    plot_dot();
+}
+
+void ufo_bullet_commit(void)
+{
+    /* Phase 36 — même schéma que bullets_commit (game.c) : erase à la
+     * position du dernier draw, immédiatement suivi du draw à la
+     * position courante. L'état écran (ufo_blt_drawn) est découplé de
+     * ufo_bullet_active : un tir tué n'importe où (collision asteroid,
+     * ship, ufo_kill, TTL) est toujours effacé exactement là où il a
+     * été dessiné — aucun pixel fantôme.
+     *
+     * Bloc 2×2 px, aligné sur les torpilles joueur (1 px était encore
+     * moins lisible — retour testeur matériel réel 2026-06-12). Spawn à
+     * ufo_x/ufo_y ∈ [4..235]×[25..175] et clip update ⇒ x ≤ 238,
+     * y ≤ 198, pas d'overflow à +1. */
+    if (ufo_blt_drawn) {
+        ufo_dot4(ufo_blt_px, ufo_blt_py);           /* erase */
+        ufo_blt_drawn = 0;
+    }
+    if (ufo_bullet_active) {
+        ufo_dot4(ufo_bullet_x, ufo_bullet_y);       /* draw */
+        ufo_blt_px = ufo_bullet_x;
+        ufo_blt_py = ufo_bullet_y;
+        ufo_blt_drawn = 1;
+    }
 }

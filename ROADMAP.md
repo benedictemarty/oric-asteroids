@@ -312,10 +312,12 @@ n'est pas validée par :
   nouveau matériel à adresser. Phosphoric émule l'IJK (`-j keys` /
   `-j gamepad`), le développement et les tests headless sont donc
   possibles sans joystick physique. Candidat naturel pour une v1.1.
-- **Visibilité des torpilles** : 2 px adjacents (cf. `bullets_render`,
-  `game.c`) déjà élargis depuis 1 px ; un testeur les trouve encore peu
-  visibles sur matériel réel. Option : bloc 2×2 px (+2 appels
-  `plot_dot`, ~80 cycles/balle) si retours concordants.
+- ~~**Visibilité des torpilles**~~ — **fait en Phase 36 (2026-06-12)** :
+  bloc 2×2 px (joueur + UFO) **et** surtout rendu compact
+  erase+draw consécutifs (`bullets_commit`) — l'ancien schéma laissait
+  les torpilles hors VRAM pendant quasi toute la frame, cause réelle
+  du « hardly visible » sur matériel. Fix bonus : `jsr zerobss`
+  manquant dans crt0 (BSS = pattern $55 au boot).
 - Port Atmos avec optimisations spécifiques (RAM utile à $0400 différente).
 - Mode 2 joueurs alterné.
 - Variations cosmétiques (bonus shapes type Battlezone tank, easter egg).

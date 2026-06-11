@@ -24,6 +24,8 @@ void ufo_draw(void);
 void ufo_kill(void);             /* désactive UFO + son tir */
 unsigned char ufo_radius(void);  /* rayon collision selon type */
 void ufo_bullet_update(void);
-void ufo_bullet_draw(void);
+/* Phase 36 — erase (à la position du dernier draw) + draw consécutifs,
+ * 1 appel par frame. Remplace l'ancien ufo_bullet_draw symétrique. */
+void ufo_bullet_commit(void);
 
 #endif /* UFO_H */

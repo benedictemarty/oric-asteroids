@@ -7,6 +7,42 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 36 — torpilles 2×2 px + rendu compact + fix BSS crt0 ✅
+
+Suite au retour testeur matériel réel (« fire beam hardly visible »),
+l'investigation a révélé **trois** problèmes distincts :
+
+- **Torpilles 2×2 px** (joueur ET tir UFO) : le trait 2×1 px (joueur)
+  et le pixel unique (UFO) restaient peu lisibles à 240×200 sur
+  matériel réel. Bornes wrap ajustées (x ≤ 238, y ≤ 198) des deux
+  côtés. Coût pire cas : 8 plot_dot × 4 balles ≈ 1280 c/frame.
+- **Rendu compact des torpilles** (la vraie cause de l'invisibilité) :
+  l'ancien pipeline les effaçait en début de boucle et les redessinait
+  en fin — absentes de la VRAM pendant quasi tout le temps de calcul.
+  Selon la phase balayage CRT / Timer 1, elles devenaient à peine
+  visibles (matériel réel, phase dérivante) voire invisibles à 100 %
+  (Phosphoric, phase verrouillée — reproduit : 0/20 captures avec
+  torpille en RAM pourtant active, vérifié par dump `blt_ttl`).
+  Nouveau schéma `bullets_commit` / `ufo_bullet_commit` : erase à la
+  position du dernier draw + draw consécutifs, état écran
+  (`blt_drawn`) découplé de l'état logique (`blt_ttl`) ⇒ aucun pixel
+  fantôme quel que soit le site de kill (collision, TTL, ufo_kill en
+  transition gameover, reset). Après fix : 8/8 captures avec torpille
+  visible, ship/asteroids avaient déjà leurs blocs compacts.
+- **Fix crt0 : BSS non nettoyée** — le commentaire « initlib appelle
+  zerobss » était faux (cc65 : appel séparé). La BSS démarrait avec le
+  pattern RAM `$55`, révélé par un bloc fantôme XOR à (85,85) au
+  premier commit (`blt_drawn`=$55). `jsr zerobss` ajouté au startup —
+  fix systémique : le C suppose static = 0.
+- **Tests** : host 4/4 PASS ; `make check` PASS (titre inchangé) ;
+  scénario tir scripté (`--type-keys` + captures échantillonnées +
+  dumps RAM symbolisés via relink `-Ln`) ; bench-game 20 s : écran
+  propre, UFO actif, pas de fantômes. `dist/asteroids.tap` régénéré.
+- Au passage : documentation du piège harnais — un appui `--type-keys`
+  dure 40 ms = exactement 1 frame de jeu à 25 Hz ; en déterministe il
+  peut tomber systématiquement entre deux `key_scan` (rafale d'espaces
+  nécessaire pour scripter le tir).
+
 ### 2026-06-12 — revalidation matérielle du fix 50 Hz (retour testeur)
 
 - **Lock RGB2HDMI confirmé sur Oric-1 réel** avec le `.tap` Phase 35
