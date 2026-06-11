@@ -7,6 +7,15 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Distribution — `dist/asteroids.tap` versionné ✅
+
+Le binaire jouable (`.tap`, état Phase 34) est désormais publié dans
+`dist/` (exception `.gitignore` dédiée — `build/` reste ignoré).
+Utilisable tel quel sur Oric-1 réel ou émulateur :
+`oric1-emu -m oric1 -r basic10.rom -t dist/asteroids.tap -f`.
+À régénérer (`make && cp build/asteroids.tap dist/`) à chaque jalon
+jouable.
+
 ### Phase 34 — Jingle titre : legato + doublure d'octave (2 voix) ✅
 
 Retour playtest : jingle « très haché, pas d'harmonique ».

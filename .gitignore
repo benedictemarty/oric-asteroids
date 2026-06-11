@@ -10,6 +10,8 @@ build/
 *.dsk
 # Exception : tape de scénario de test versionné
 !tests/scenarios/*.tap
+# Exception : binaire distribué (jouable sur Oric-1 réel / émulateur)
+!dist/*.tap
 
 # Snapshots de test générés (les références vont dans tests/ref/, à versionner)
 tests/out/
