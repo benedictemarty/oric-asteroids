@@ -7,6 +7,20 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### 2026-06-12 — revalidation matérielle du fix 50 Hz (retour testeur)
+
+- **Lock RGB2HDMI confirmé sur Oric-1 réel** avec le `.tap` Phase 35
+  (« works much better now », capture vidéo fournie). Le point
+  « revalider RGB2HDMI » de la checklist ROADMAP passe à fait.
+- Audio non vérifiable sur ce matériel (AY de l'Oric du testeur HS) ;
+  le jeu a bien du son (3 canaux : tirs, explosions, thrust,
+  thump-thump, soucoupe, jingle titre) — couvert par Phosphoric.
+- Retour testeur : torpilles peu visibles sur matériel réel — limitation
+  connue (2 px à 240×200, vélocité jusqu'à 12 px/frame), option bloc
+  2×2 px notée en ROADMAP (Hors-roadmap).
+- Demande testeur : support **joystick IJK** — ajouté aux idées
+  différées (candidat v1.1, Phosphoric émule l'IJK via `-j`).
+
 ### Phase 35 — fix signal vidéo 50 Hz sur matériel réel ✅
 
 Premier retour matériel réel (testeur externe, 2026-06-11) : le jeu

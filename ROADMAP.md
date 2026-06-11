@@ -306,6 +306,16 @@ n'est pas validée par :
 
 ## Hors‑roadmap (idées différées)
 
+- **Support joystick IJK** (demande testeur externe, 2026-06-12) :
+  l'interface IJK se lit via le Port A du PSG AY-3-8912 (actif bas),
+  donc à travers le VIA comme l'AY déjà piloté par `sound.s` — pas de
+  nouveau matériel à adresser. Phosphoric émule l'IJK (`-j keys` /
+  `-j gamepad`), le développement et les tests headless sont donc
+  possibles sans joystick physique. Candidat naturel pour une v1.1.
+- **Visibilité des torpilles** : 2 px adjacents (cf. `bullets_render`,
+  `game.c`) déjà élargis depuis 1 px ; un testeur les trouve encore peu
+  visibles sur matériel réel. Option : bloc 2×2 px (+2 appels
+  `plot_dot`, ~80 cycles/balle) si retours concordants.
 - Port Atmos avec optimisations spécifiques (RAM utile à $0400 différente).
 - Mode 2 joueurs alterné.
 - Variations cosmétiques (bonus shapes type Battlezone tank, easter egg).
@@ -329,8 +339,10 @@ Checklist obligatoire à exécuter **avant de marquer le projet "Done"** :
       testeur externe : le jeu charge et tourne sur Oric‑1 réel.
       Ce test a révélé un signal vidéo 60 Hz hors standard (attribut
       `$1C` au lieu de `$1E` — bit 1 ULA = 50 Hz), corrigé en
-      Phase 35. Reste à revalider le lock RGB2HDMI avec le `.tap`
-      corrigé.
+      Phase 35. **Lock RGB2HDMI revalidé 2026-06-12** par le même
+      testeur avec le `.tap` corrigé (capture vidéo à l'appui).
+      Audio non vérifié sur matériel (AY de l'Oric du testeur HS) —
+      reste couvert par les tests Phosphoric.
 - [x] ~~**Glitch zone TEXT du bas en HIRES**~~ — **résolu 2026-05-13**.
       Pas un bug Phosphoric : charset HIRES `$9800` non initialisé
       côté binaire. Fix : copie `$B400 → $9800` dans `_hires_init`.
