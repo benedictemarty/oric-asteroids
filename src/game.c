@@ -114,30 +114,36 @@ void tune_stop(void);
 
 /* Phase 22 — UFO sound géré dans ufo.c (canal C auto-restart) */
 
-/* Phase 32 — jingle d'entrée d'écran titre façon Galaga (l'arcade
- * Asteroids n'avait aucune musique, et Mine Storm Vectrex seulement le
- * jingle de boot console — composition originale demandée en playtest).
+/* Phase 33 — jingle titre : « Dans l'antre du roi de la montagne »
+ * (Grieg, Peer Gynt, 1875 — domaine public), transposé en la mineur.
  * Indices = demi-tons depuis C3 dans la table chromatique de sound.s
- * (C3=0, C4=12, C5=24). Structure : rebond basse/aigu I-IV-V (la basse
- * alternée imite les 2 voix de Galaga sur un seul canal AY), gamme
- * montante rapide, C5 final tenu. 98 frames à 25 Hz ≈ 3,9 s, staccato
- * (coupure 1 frame avant chaque note suivante). Joué une seule fois,
- * puis silence en attract (fidèle arcade). */
+ * (C3=0, C4=12, C5=24).
+ *
+ * Thème (1 2 b3 4 5 b3 5 | #4 2 #4 | 4 b2 4) énoncé 3 fois avec
+ * l'accelerando caractéristique du morceau :
+ *   S1 sur A3, croche = 4 frames (lent, menaçant)
+ *   S2 sur E4 (à la quinte), croche = 3 frames
+ *   S3 sur E4, croche = 2 frames (rapide)
+ * puis A4 final tenu. ~158 frames à 25 Hz ≈ 6,3 s, staccato (coupure
+ * 1 frame avant chaque note suivante). Joué une seule fois à l'arrivée
+ * sur le titre, puis silence en attract ; SPACE coupe et démarre. */
 static const unsigned char title_tune_note[] = {
-     0,12,  0,16,  0,19,  0,24,     /* I  : C3 vs C4-E4-G4-C5  */
-     5,17,  5,21,  5,24,  5,21,     /* IV : F3 vs F4-A4-C5-A4  */
-     7,19,  7,23,  7,19,  7,16,     /* V  : G3 vs G4-B4-G4-E4  */
-    12,14, 16,17, 19,21, 23,        /* gamme montante C4→B4    */
-    24                              /* C5 final tenu           */
+    /* S1 — A3 : A B C D E C E | D# B D# | D Bb D */
+     9, 11, 12, 14, 16, 12, 16,   15, 11, 15,   14, 10, 14,
+    /* S2 — E4 : E F# G A B G B | A# F# A# | A F A */
+    16, 18, 19, 21, 23, 19, 23,   22, 18, 22,   21, 17, 21,
+    /* S3 — E4, presto */
+    16, 18, 19, 21, 23, 19, 23,   22, 18, 22,   21, 17, 21,
+    /* cadence finale */
+    21
 };
 static const unsigned char title_tune_dur[] = {
-     3,3, 3,3, 3,3, 3,3,
-     3,3, 3,3, 3,3, 3,3,
-     3,3, 3,3, 3,3, 3,3,
-     2,2, 2,2, 2,2, 2,
-    12
+     4, 4, 4, 4, 4, 4, 8,   4, 4, 8,   4, 4, 8,
+     3, 3, 3, 3, 3, 3, 6,   3, 3, 6,   3, 3, 6,
+     2, 2, 2, 2, 2, 2, 4,   2, 2, 4,   2, 2, 4,
+    14
 };
-#define TITLE_TUNE_LEN  32
+#define TITLE_TUNE_LEN  40
 
 /* Score asteroid + UFO arcade */
 static const unsigned int score_by_size[3] = { 100, 50, 20 };

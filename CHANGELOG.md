@@ -7,6 +7,23 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 33 — Jingle titre : Grieg, « Dans l'antre du roi de la montagne » ✅
+
+Retour playtest : remplacer la composition Phase 32 par une vraie
+mélodie. Le thème de Galaga (Namco, 1981) étant toujours protégé,
+choix d'une œuvre du domaine public adaptée à l'ambiance Asteroids :
+le thème de Peer Gynt (Grieg, 1875), transposé en la mineur.
+
+- `src/game.c` : thème (1 2 b3 4 5 b3 5 | #4 2 #4 | 4 b2 4) énoncé
+  3 fois avec l'accelerando caractéristique — A3 lent (croche =
+  4 frames), E4 à la quinte (3 frames), E4 presto (2 frames), puis
+  A4 final tenu. 40 notes, ~158 frames à 25 Hz ≈ 6,3 s. Toujours
+  non bloquant (SPACE coupe et démarre), one-shot, attract silencieux.
+- La table chromatique C3→C5 de la Phase 32 couvre tout le thème sans
+  modification de `sound.s`.
+
+Tests : `make host-test` 4/4 PASS, `make check` PASS.
+
 ### Phase 32 — Jingle titre façon Galaga ✅
 
 Retour playtest : le riff bas Phase 31 « pas top ». Vérification
