@@ -7,6 +7,23 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 34 — Jingle titre : legato + doublure d'octave (2 voix) ✅
+
+Retour playtest : jingle « très haché, pas d'harmonique ».
+
+- **Legato** (`src/game.c`) : le staccato systématique coupait chaque
+  note 1 frame avant la suivante — les croches de 80 ms sonnaient
+  40 ms + 40 ms de silence (effet mitraillette). Désormais les croches
+  s'enchaînent sans coupure (le changement de hauteur articule seul) ;
+  respiration d'1 frame uniquement en fin de phrase (notes ≥ 6 frames).
+- **Doublure d'octave** (`src/asm/sound.s`) : `_tune_play_note` joue
+  maintenant 2 voix — mélodie canal A (vol $0A) + même note à l'octave
+  inférieure canal B (period × 2 via asl/rol 16-bit, vol $08 en
+  retrait), mixer $7C. Timbre « orgue » classique sur AY, nettement
+  plus épais qu'une voix carrée seule. `_tune_stop` coupe aussi R9.
+
+Tests : `make host-test` 4/4 PASS, `make check` PASS.
+
 ### Phase 33b — Fix tune player muet : scratch écrasé par psg_write ✅
 
 Retour playtest : le jingle Grieg était inaudible. Cause

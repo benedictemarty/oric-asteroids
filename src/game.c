@@ -1039,8 +1039,15 @@ void game_run(void)
                 if (tune_frame == 0)
                     tune_play_note(title_tune_note[tune_pos]);
                 tune_frame++;
-                if (tune_frame == title_tune_dur[tune_pos] - 1)
-                    tune_stop();             /* staccato */
+                /* Phase 34 — legato : les croches s'enchaînent sans
+                 * coupure (le changement de hauteur articule tout
+                 * seul) ; respiration d'1 frame uniquement en fin de
+                 * phrase (notes ≥ 6 frames). Le staccato systématique
+                 * d'avant hachait le thème (notes de 80 ms coupées à
+                 * 40 ms). */
+                if (title_tune_dur[tune_pos] >= 6 &&
+                    tune_frame == title_tune_dur[tune_pos] - 1)
+                    tune_stop();
                 if (tune_frame >= title_tune_dur[tune_pos]) {
                     tune_frame = 0;
                     tune_pos++;

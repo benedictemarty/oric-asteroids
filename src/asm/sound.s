@@ -80,6 +80,7 @@ _frame_cnt:   .res 1     ; incrémenté à 50 Hz par _irq_handler
         .segment "BSS"
 sound_tmp: .res 1
 tune_tmp:  .res 1        ; index note du tune player — scratch SÉPARÉ :
+tune_tmp2: .res 1        ; period hi <<1 (voix octave inférieure, canal B)
                          ; _psg_write écrase sound_tmp (c'est son propre
                          ; brouillon), un ldx sound_tmp après psg_write
                          ; relisait la DERNIÈRE VALEUR ÉCRITE au PSG
@@ -770,8 +771,9 @@ _sound_tick:
 ; _tune_play_note — A = index note (0..24) : chromatique C3..C5
 ; (period = 62500/f, AY 1 MHz). Phase 32 : table étendue de 7 notes
 ; graves (G2-CS3, reliquat Mine Storm) à 2 octaves pour le jingle
-; titre façon Galaga. Index = demi-tons depuis C3 (C4=12, C5=24).
-; Joue sur canal A (overrides sfx canal A).
+; titre. Index = demi-tons depuis C3 (C4=12, C5=24).
+; Joue sur canaux A (mélodie) + B (doublure octave inférieure,
+; Phase 34) — overrides sfx des canaux A et B.
 ;-----------------------------------------------------------------
 note_lo:  .byte $DE, $C3, $AA, $92, $7B, $66, $52, $3F, $2D, $1C, $0C, $FD
           .byte $EF, $E1, $D5, $C9, $BE, $B3, $A9, $9F, $96, $8E, $86, $7F, $77
@@ -797,10 +799,30 @@ _tune_play_note:
         lda  note_hi,x
         ldy  #1
         jsr  _psg_write
-        lda  #$0A
+
+        ; Phase 34 — 2e voix : même note à l'octave INFÉRIEURE sur le
+        ; canal B (period × 2). Une seule voix carrée sonne maigre
+        ; (retour playtest « pas d'harmonique ») ; la doublure d'octave
+        ; épaissit le timbre façon orgue, classique sur AY.
+        ldx  tune_tmp
+        lda  note_hi,x
+        sta  tune_tmp2
+        lda  note_lo,x
+        asl                  ; period <<1 (16-bit via rol tmp2)
+        rol  tune_tmp2
+        ldy  #2
+        jsr  _psg_write      ; R2 = lo de l'octave basse
+        lda  tune_tmp2
+        ldy  #3
+        jsr  _psg_write      ; R3 = hi (4 bits utiles, max $0470 OK)
+
+        lda  #$0A           ; vol A (mélodie)
         ldy  #8
         jsr  _psg_write
-        lda  #$7E           ; tone A on, port A reste piloté (bit 6=1)
+        lda  #$08           ; vol B (octave basse, en retrait)
+        ldy  #9
+        jsr  _psg_write
+        lda  #$7C           ; tone A + tone B on, port A piloté (bit 6=1)
         sta  mixer_shadow
         ldy  #7
         jsr  _psg_write
@@ -825,6 +847,9 @@ _tune_stop:
 
         lda  #$00
         ldy  #8
+        jsr  _psg_write
+        lda  #$00           ; vol B = 0 (2e voix octave basse, Phase 34)
+        ldy  #9
         jsr  _psg_write
         lda  #$7F
         sta  mixer_shadow
