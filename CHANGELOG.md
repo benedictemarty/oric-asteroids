@@ -7,6 +7,14 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [1.0.0-beta] — 2026-06-11
+
+Première beta publique : jeu complet (vagues, fragmentation arcade,
+soucoupes, hyperespace, high scores, son AY 3 canaux, jingle titre),
+25 Hz constants, binaire jouable `dist/asteroids.tap` validé Oric-1 et
+Atmos sous Phosphoric. Annoncée sur le forum Defence Force ; non encore
+validée sur matériel réel.
+
 ### Distribution — `dist/asteroids.tap` versionné ✅
 
 Le binaire jouable (`.tap`, état Phase 34) est désormais publié dans
