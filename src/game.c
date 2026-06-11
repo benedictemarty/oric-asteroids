@@ -323,15 +323,47 @@ static void timer_init(void)
     /* IER configurée par irq_install() : disable all, puis enable T1 */
 }
 
+/* Phase 28 (P5) — cible de tick persistante de l'ordonnanceur à pas
+ * fixe. Incrémentée de VSYNCS_PER_FRAME par frame ; resynchronisée si
+ * le retard dépasse une frame complète. */
+static unsigned char frame_target;
+
 static void frame_wait(void)
 {
-    /* Attendre VSYNCS_PER_FRAME tics IRQ T1 (= 2 × 20 ms = 40 ms = 25 Hz).
-     * frame_cnt est incrémenté par _irq_handler à chaque tick T1 (50 Hz).
-     * On échantillonne la valeur initiale puis attend que le delta atteigne
-     * VSYNCS_PER_FRAME. Robuste au wraparound 8-bit modulo 256.
-     */
-    unsigned char start = frame_cnt;
-    while ((unsigned char)(frame_cnt - start) < VSYNCS_PER_FRAME) { }
+    /* Phase 28 (P5) — ordonnanceur à PAS FIXE avec rattrapage.
+     *
+     * ANCIEN comportement : start = frame_cnt à l'ENTRÉE (= fin du
+     * travail de la frame), attendre delta 2. Tant que le travail
+     * tenait dans le 1er tick (< 20 ms), la grille absolue du timer
+     * free-run donnait bien 40 ms/frame. MAIS une frame dépassant
+     * 20 ms repartait pour 2 ticks PLEINS depuis un point situé après
+     * le 1er tick → 60 ms (16,7 Hz) au lieu de 40. D'où les « 17 Hz
+     * effectifs » historiques en scène chargée.
+     *
+     * NOUVEAU : frame_target avance de 2 ticks par frame, indépendamment
+     * du moment où le travail finit. Une frame en retard d'un tick
+     * n'attend que le tick manquant (40 ms au total) et le retard se
+     * rattrape sur les frames suivantes. d = frame_cnt - frame_target
+     * (mod 256) :
+     *   d >= 128 → cible dans le futur → attendre ;
+     *   d < 128  → cible atteinte ou dépassée → partir tout de suite.
+     * Si le retard atteint une frame complète (d >= VSYNCS_PER_FRAME),
+     * resynchroniser la cible — évite une rafale de rattrapage après
+     * un long dépassement.
+     *
+     * frame_cnt (ZP, écrit sous IRQ) est relu à chaque itération par
+     * cc65 — pattern identique à l'ancienne boucle, validé en pratique.
+     *
+     * Note 50 Hz : un mode adaptatif 1 tick/frame doublerait la vitesse
+     * du jeu (toute la physique est en px/frame) — rejeté, cf. CHANGELOG
+     * Phase 28 pour l'analyse chiffrée. */
+    unsigned char d;
+    frame_target += VSYNCS_PER_FRAME;
+    for (;;) {
+        d = (unsigned char)(frame_cnt - frame_target);
+        if (d < 128) break;
+    }
+    if (d >= VSYNCS_PER_FRAME) frame_target = frame_cnt;
 }
 
 /* ------------------------------------------------------------------ */
@@ -936,6 +968,7 @@ void game_run(void)
     timer_init();
     sound_init();
     irq_install();                    /* active T1 IRQ + handler sound */
+    frame_target = frame_cnt;         /* Phase 28 — amorce l'ordonnanceur */
 
     /* Phase 9c/9e/10e/10m — écran titre :
      *   - "ASTEROIDS" statique

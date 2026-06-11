@@ -7,6 +7,52 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 28 — Ordonnanceur à pas fixe avec rattrapage (P5) ✅
+
+**Le bug de cadence historique** : `frame_wait()` échantillonnait
+`frame_cnt` à son ENTRÉE (= fin du travail de la frame) puis attendait
+2 ticks. Tant que le travail tenait dans le 1er tick (< 20 ms), la
+grille absolue du timer T1 free-run donnait bien 40 ms/frame ; mais dès
+qu'une frame dépassait 20 ms, elle repartait pour 2 ticks PLEINS depuis
+un point situé après le 1er tick → **60 ms (16,7 Hz) au lieu de 40 ms**.
+C'est l'origine des « 17 Hz effectifs » mentionnés depuis la Phase 18 en
+scène chargée.
+
+**Fix** : cible de tick persistante `frame_target += 2` par frame,
+indépendante du moment où le travail finit. Une frame en retard d'un
+tick n'attend que le tick manquant (40 ms au total), le retard se
+rattrape sur les frames suivantes, et un dépassement d'une frame
+complète resynchronise la cible (pas de rafale de rattrapage après les
+gels longs — title_draw initial, séquences game over). Comparaison
+modulaire 8-bit : d = frame_cnt − frame_target ; d ≥ 128 = cible future.
+
+Avec les gains Phases 24-26, les scènes qui dépassaient 20 ms (4-6
+asteroids + UFO + bullets ≈ 23 000 c) tombaient dans la pénalité 60 ms ;
+elles tiennent désormais un vrai 25 Hz constant avec rattrapage.
+
+**50 Hz adaptatif : étudié et REJETÉ** (l'objectif « polish » du guide
+§6 est requalifié) :
+- *Fixe 50 Hz* : impossible — 5 gros asteroids = 2×~2 000 c de blit × 5
+  ≈ 20 500 c > budget 20 000 c à eux seuls.
+- *Adaptatif 1-2 ticks/frame* : toute la physique est en px/frame
+  (vitesses 8.8 ship/asteroids, bullets ±12 px/frame en entier, UFO
+  ±1 px/frame, debris, et ~15 familles de timers en frames : TTL,
+  cooldowns, thump, spawn, invincibilité, séquencement game over).
+  Passer à 50 Hz par moments doublerait la vitesse du jeu sauf à
+  rescaler TOUT (l'UFO ±1 px/frame n'est même pas divisible sans
+  conversion 8.8). Risque de régression majeur, zéro test gameplay
+  automatisé — bénéfice : fluidité visuelle seulement en scène légère.
+  Décision : 25 Hz constant et fiable > 50 Hz intermittent et risqué.
+
+**Validation** : `make check` PASS déterministe (référence régénérée :
+décalage de phase one-shot au boot — title_draw initial > 1 frame →
+resync au lieu de pénalité) ; zéro résidu XOR après 20 s ; bench-game
+OK ; host-test 4/4.
+
+**Fichiers** : `src/game.c` (frame_wait + frame_target).
+
+
+
 ### Phase 27 — Flamme de thrust (G2) + wraparound visuel du ship (G3) ✅
 
 Le rendu du ship migre de ship.s vers game.c (`ship_render`) avec deux

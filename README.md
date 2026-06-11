@@ -130,9 +130,10 @@ des 9 phases.
 - Axes perf/graphique restants (plan 2026-06-11 ; faits : P6+P1+G1
   Phase 24, P2 Phase 25, P3 Phase 26 — idle 17,9 % → 39,8 %, shapes
   arcade restaurées —, G2+G3 Phase 27 — flamme de thrust + ship plein
-  écran) : P4 déroulage boucles h/v ; P5 cadence adaptative 50/25 Hz
-  (la marge dégagée rend le 50 Hz plausible en scène légère) ; G4
-  couleur attributs sur bande HUD.
+  écran, P5 Phase 28 — ordonnanceur
+  à pas fixe, fin des stalls 60 ms ; le 50 Hz adaptatif est REJETÉ,
+  cf. CHANGELOG Phase 28) : P4 déroulage boucles h/v ; G4 couleur
+  attributs sur bande HUD.
 
 ## Sources
 

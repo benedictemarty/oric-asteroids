@@ -64,6 +64,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 25 | Perf line.s : batch par octet (axe h) + verticale pure (idle 17,9 → 24,3 % vs P23) | — | 1 j |
 | ✅ | 26 | Sprites pré-rendus XOR (P3) + shapes arcade 11-13 sommets restaurées (idle → 39,8 %) | — | 1 j |
 | ✅ | 27 | Flamme de thrust (G2) + wraparound visuel du ship plein écran (G3) | — | 1 j |
+| ✅ | 28 | Ordonnanceur à pas fixe + rattrapage (P5) — fin des stalls 60 ms, 25 Hz constant | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.
