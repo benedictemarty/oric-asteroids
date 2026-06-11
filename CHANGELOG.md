@@ -7,6 +7,22 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 31 — Jingle d'entrée d'écran titre ✅
+
+Demande playtest : une musique à l'arrivée sur la page titre. Le tune
+player de `sound.s` (`tune_play_note`/`tune_stop`, 7 notes G2–CS3)
+existait depuis la Phase 11 mais n'était plus utilisé.
+
+- `src/game.c` : riff bas G–AS–C–CS–C–AS–G (7 notes × 8 frames à 25 Hz
+  ≈ 2,2 s), staccato (coupure 2 frames avant chaque note suivante),
+  joué une seule fois à l'arrivée sur le titre. L'attract reste ensuite
+  silencieux (fidèle arcade). Non bloquant : la mélodie avance d'un pas
+  par frame de la boucle titre, SPACE reste réactif et coupe la note en
+  cours (`tune_stop` en sortie de boucle, idempotent).
+
+Tests : `make host-test` 4/4 PASS, `make check` PASS (le jingle
+n'altère pas le rendu ; la capture titre reste bit-à-bit identique).
+
 ### Phase 30 — Fix sons manquants : thump, UFO, hyperespace, extra ship ✅
 
 **Retour playtest** : la boucle de fond (thump accéléré) et le son UFO

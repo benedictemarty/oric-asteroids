@@ -114,6 +114,15 @@ void tune_stop(void);
 
 /* Phase 22 — UFO sound géré dans ufo.c (canal C auto-restart) */
 
+/* Phase 31 — jingle d'entrée d'écran titre. Indices dans note_lo/hi de
+ * sound.s (0..6 = G2 GS2 A2 AS2 B2 C3 CS3). Riff bas G–AS–C–CS–C–AS–G,
+ * 8 frames/note à 25 Hz ≈ 2,2 s, staccato (coupure 2 frames avant la
+ * note suivante). Joué une seule fois à l'arrivée sur le titre, puis
+ * silence en attract (fidèle arcade). */
+static const unsigned char title_tune[] = { 0, 3, 5, 6, 5, 3, 0 };
+#define TITLE_TUNE_LEN          7
+#define TITLE_TUNE_NOTE_FRAMES  8
+
 /* Score asteroid + UFO arcade */
 static const unsigned int score_by_size[3] = { 100, 50, 20 };
 #define UFO_SCORE_LARGE     200U
@@ -984,11 +993,14 @@ void game_run(void)
         unsigned char i = 0;
         unsigned char prev_space = 0;
         unsigned char ps_visible = 1;     /* PRESS SPACE actuellement affiché */
-        /* Option C : aucune musique en écran titre — silence, comme
-         * l'arcade Atari Asteroids originale (le thump cadencé commence
-         * uniquement quand le jeu démarre). Boucle d'attente SPACE
-         * sans timeout : on reste en attract mode tant que le joueur
-         * n'a pas appuyé sur SPACE (edge-trigger), comme l'arcade. */
+        unsigned char tune_pos = 0;       /* Phase 31 — jingle d'intro */
+        unsigned char tune_frame = 0;
+        /* Phase 31 : jingle d'intro one-shot à l'arrivée sur le titre
+         * (cf. title_tune), puis silence en attract — l'arcade Atari
+         * Asteroids originale n'a pas de musique de fond (le thump
+         * cadencé commence uniquement quand le jeu démarre). Boucle
+         * d'attente SPACE sans timeout : on reste en attract mode tant
+         * que le joueur n'a pas appuyé sur SPACE (edge-trigger). */
         for (;;) {
             key_scan();
             if ((key_state & 0x08) && !prev_space) break;
@@ -998,6 +1010,20 @@ void game_run(void)
             key_scan();
             if ((key_state & 0x08) && !prev_space) break;
             prev_space = key_state & 0x08;
+            /* Phase 31 — avancer le jingle d'un pas par frame titre.
+             * Non bloquant : SPACE reste réactif pendant la mélodie
+             * (tune_stop final sous la boucle coupe une note en cours). */
+            if (tune_pos < TITLE_TUNE_LEN) {
+                if (tune_frame == 0)
+                    tune_play_note(title_tune[tune_pos]);
+                tune_frame++;
+                if (tune_frame == TITLE_TUNE_NOTE_FRAMES - 2)
+                    tune_stop();             /* staccato */
+                if (tune_frame >= TITLE_TUNE_NOTE_FRAMES) {
+                    tune_frame = 0;
+                    tune_pos++;
+                }
+            }
             /* Toggle PRESS SPACE tous les 8 frames (~0.5 s à 17 Hz). */
             if ((i & 0x07) == 0x07) {
                 if (ps_visible) {
@@ -1013,6 +1039,9 @@ void game_run(void)
         }
         /* Garantir l'état "effacé" en sortie (XOR cohérence) */
         if (ps_visible) presspace_erase(110);
+        /* Phase 31 — couper la note en cours si SPACE a interrompu le
+         * jingle (idempotent si déjà silencieux). */
+        tune_stop();
     }
     title_erase();
     /* Phase 10e — current_wave passe à 1 dans asteroids_spawn_wave ci-dessus.
