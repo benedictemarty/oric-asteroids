@@ -251,24 +251,21 @@ _sound_play_fx:
         cmp  #FX_THUMP
         bne  @b_thump2
 
-        ; FX_THUMP — Beat1, sweep 134→81 Hz, enveloppe \___ decay
+        ; FX_THUMP — Beat1, sweep 134→81 Hz, volume FIXE (pas d'enveloppe).
+        ; Fix « thump inaudible » : l'ancienne version utilisait R9=$10
+        ; (enveloppe) avec période $000A → decay complet en ~5 ms = clic
+        ; inaudible. Pire : la réécriture de R13 à chaque beat redémarrait
+        ; l'enveloppe PARTAGÉE et hachait le decay des FX du canal A
+        ; (fire/explosions). Volume fixe + coupure par sfx_b_timer (2
+        ; ticks = 80 ms) → beat franc, zéro interaction avec le canal A.
         lda  thump1_per_lo
         ldy  #2
         jsr  _psg_write
         lda  thump1_per_hi
         ldy  #3
         jsr  _psg_write
-        lda  #$10           ; vol B = enveloppe
+        lda  #$0C           ; vol B fixe (12/15)
         ldy  #9
-        jsr  _psg_write
-        lda  #$0A           ; env period ≈82 ms decay
-        ldy  #11
-        jsr  _psg_write
-        lda  #$00
-        ldy  #12
-        jsr  _psg_write
-        lda  #$00           ; shape \___
-        ldy  #13
         jsr  _psg_write
         lda  #1
         sta  sweep_b_idx
@@ -284,17 +281,8 @@ _sound_play_fx:
         lda  thump2_per_hi
         ldy  #3
         jsr  _psg_write
-        lda  #$10
+        lda  #$0C           ; vol B fixe (cf. Beat1)
         ldy  #9
-        jsr  _psg_write
-        lda  #$0A
-        ldy  #11
-        jsr  _psg_write
-        lda  #$00
-        ldy  #12
-        jsr  _psg_write
-        lda  #$00
-        ldy  #13
         jsr  _psg_write
         lda  #1
         sta  sweep_b_idx
@@ -439,11 +427,11 @@ _sound_play_fx:
         lda  #$10           ; vol A = enveloppe
         ldy  #8
         jsr  _psg_write
-        lda  #$44           ; env period lo (~558 ms)
+        lda  #$44           ; env period lo
         ldy  #11
         jsr  _psg_write
-        lda  #$00
-        ldy  #12
+        lda  #$04           ; env period hi — $0444 ≈ 560 ms (était $0044
+        ldy  #12            ; = 35 ms : blip inaudible, hi-byte manquant)
         jsr  _psg_write
         lda  #$00           ; shape \___
         ldy  #13
@@ -490,12 +478,12 @@ _sound_play_fx:
         lda  #$10           ; vol A = enveloppe
         ldy  #8
         jsr  _psg_write
-        lda  #$80           ; env period lo (~33 ms/phase, decay rapide)
+        lda  #$80           ; env period lo
         ldy  #11
         jsr  _psg_write
-        lda  #$00
-        ldy  #12
-        jsr  _psg_write
+        lda  #$02           ; env period hi — $0280 ≈ 330 ms : couvre les
+        ldy  #12            ; 4 notes du chime (était $0080 = 65 ms → seule
+        jsr  _psg_write     ; la 1re note était audible)
         lda  #$00           ; shape \___
         ldy  #13
         jsr  _psg_write

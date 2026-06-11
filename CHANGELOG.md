@@ -7,6 +7,38 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 30 — Fix sons manquants : thump, UFO, hyperespace, extra ship ✅
+
+**Retour playtest** : la boucle de fond (thump accéléré) et le son UFO
+étaient absents en jeu. Trois causes distinctes identifiées en croisant
+`sound.s` avec l'émulation AY de Phosphoric (`ay3891x.c`) :
+
+1. **Thump inaudible** (`src/asm/sound.s`) : volume canal B en mode
+   enveloppe avec période $000A → decay complet en ~5 ms = clic
+   inaudible (le commentaire « ≈82 ms » était faux d'un facteur 32).
+   En prime, la réécriture de R13 à chaque beat redémarrait l'enveloppe
+   PARTAGÉE de l'AY et hachait le decay des effets du canal A.
+   → Fix : volume B fixe ($0C), plus aucune écriture R11-R13 ; le beat
+   est coupé net par sfx_b_timer (2 ticks = 80 ms). Canal B désormais
+   totalement découplé de l'enveloppe du canal A.
+
+2. **UFO jamais spawné en jeu actif** (`src/asteroids.c`) :
+   `ast_break_timer` rechargé à 80 frames à chaque asteroid touché ;
+   80 frames à 25 Hz = 3,2 s (l'arcade : 80 frames à 60 Hz = 1,33 s).
+   Un joueur actif touche un asteroid plus souvent que toutes les
+   3,2 s → spawn saucer repoussé indéfiniment, son UFO jamais entendu.
+   → Fix : reload 33 frames (≈1,32 s à 25 Hz = durée arcade).
+
+3. **Hyperespace et extra ship quasi muets** (`src/asm/sound.s`) :
+   même classe de bug que le thump — périodes d'enveloppe trop courtes.
+   FX_HYPER $0044 (35 ms) → $0444 (~560 ms, aligné sur FX_FIRE $0445,
+   le hi-byte manquait). FX_LIFE $0080 (65 ms, seule la 1re note du
+   chime audible) → $0280 (~330 ms, couvre les 4 notes).
+
+Tests : `make host-test` 4/4 PASS, `make check` (diff bit-à-bit
+Phosphoric) PASS. Validation auditive à faire en playtest manuel
+(Phosphoric SDL2) — le headless ne capture pas l'audio.
+
 ### Phase 29 — Tuning gameplay : vitesse des fragments d'asteroids ✅
 
 **Retour playtest** : les petits asteroids étaient trop rapides. Cause :

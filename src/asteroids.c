@@ -43,8 +43,9 @@ unsigned char scr_speedup;
 
 /* Phase 10k — AstBreakTimer arcade ($02F9) : compteur frames après
  * destruction d'un asteroid. Pendant ce délai, le saucer ne peut pas
- * spawn. Reload à 80 dans BreakAsteroid ($75EE), décrément 1/frame
- * dans DoScrTmrUpdate ($6BAF). */
+ * spawn. Reload dans BreakAsteroid ($75EE — 80 frames arcade 60 Hz,
+ * transposé 33 frames à 25 Hz), décrément 1/frame dans DoScrTmrUpdate
+ * ($6BAF). */
 unsigned char ast_break_timer;
 
 /* RNG : LFSR 8-bit Galois (polynôme x^8 + x^6 + x^5 + x^4 + 1) */
@@ -399,9 +400,13 @@ void asteroids_fragment(unsigned char idx)
 
     if (!p->active) return;
 
-    /* Phase 10k : reload AstBreakTimer = 80 (arcade $75EE).  Tout hit
-     * d'asteroid retarde le prochain spawn saucer de 80 frames. */
-    ast_break_timer = 80;
+    /* Phase 10k : reload AstBreakTimer (arcade $75EE = 80 frames à
+     * 60 Hz ≈ 1,33 s).  Tout hit d'asteroid retarde le prochain spawn
+     * saucer.  Fix « UFO ne spawn jamais » : la valeur 80 transposée
+     * telle quelle à notre boucle 25 Hz donnait 3,2 s — un joueur actif
+     * touche un asteroid plus souvent que ça, repoussant le saucer
+     * indéfiniment.  33 frames à 25 Hz ≈ 1,32 s = durée arcade. */
+    ast_break_timer = 33;
 
     /* Petit détruit complètement (cf. arcade : size devient 0, asteroid disparu).
      * Le tracé existant à prev_x/prev_y sera effacé par asteroids_render
