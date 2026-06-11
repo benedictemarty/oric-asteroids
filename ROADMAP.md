@@ -70,6 +70,7 @@ détaillée : [`asteroids-oric1-48k-guide.md`](./asteroids-oric1-48k-guide.md) (
 | ✅ | 31 | Jingle d'entrée écran titre (riff G–AS–C–CS–C–AS–G, non bloquant, one-shot) | — | 1 j |
 | ✅ | 32 | Jingle titre façon Galaga (table chromatique C3→C5, rebond I-IV-V, ~3,9 s) | — | 1 j |
 | ✅ | 33 | Jingle titre : Grieg « Roi de la montagne » (domaine public, accelerando ×3, ~6,3 s) | — | 1 j |
+| ✅ | 33b | Fix tune player muet (scratch tune_tmp dédié, sound_tmp écrasé par psg_write) | — | 1 j |
 | | **Total** | | **~3 mois** | **~6 mois** |
 
 Légende : 🔜 prochaine — 🚧 en cours — ✅ terminée — ⏳ planifiée — ❌ abandonnée.

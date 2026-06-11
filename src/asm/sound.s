@@ -79,6 +79,12 @@ _frame_cnt:   .res 1     ; incrémenté à 50 Hz par _irq_handler
 ; sound_tmp : scratch pour _psg_write (hors ZP — adressage absolu suffisant)
         .segment "BSS"
 sound_tmp: .res 1
+tune_tmp:  .res 1        ; index note du tune player — scratch SÉPARÉ :
+                         ; _psg_write écrase sound_tmp (c'est son propre
+                         ; brouillon), un ldx sound_tmp après psg_write
+                         ; relisait la DERNIÈRE VALEUR ÉCRITE au PSG
+                         ; (bug Phase 31-33 : notes du jingle titre à
+                         ; des hauteurs aberrantes, quasi inaudibles).
 mixer_shadow: .res 1     ; dernière valeur R7 écrite (Phase 23) — relue par
                          ; key_scan (input.s) au lieu d'un $7F figé qui
                          ; mutait tous les canaux actifs à chaque scan.
@@ -773,7 +779,7 @@ note_hi:  .byte $01, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01, $00
           .byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
 _tune_play_note:
-        sta  sound_tmp
+        sta  tune_tmp        ; PAS sound_tmp : _psg_write l'écrase
         sei
         lda  VIA_PCR
         and  #$11
@@ -783,11 +789,11 @@ _tune_play_note:
         lda  #$FF
         sta  VIA_DDRA
 
-        ldx  sound_tmp
+        ldx  tune_tmp
         lda  note_lo,x
         ldy  #0
         jsr  _psg_write
-        ldx  sound_tmp
+        ldx  tune_tmp        ; survit au _psg_write (scratch séparé)
         lda  note_hi,x
         ldy  #1
         jsr  _psg_write

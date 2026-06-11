@@ -7,6 +7,22 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 33b — Fix tune player muet : scratch écrasé par psg_write ✅
+
+Retour playtest : le jingle Grieg était inaudible. Cause
+(`src/asm/sound.s`) : `_tune_play_note` rangeait l'index de note dans
+`sound_tmp` puis appelait `_psg_write`… qui utilise `sound_tmp` comme
+propre brouillon et l'écrase. La relecture `ldx sound_tmp` pour R1
+(period hi) indexait alors la table avec la DERNIÈRE VALEUR ÉCRITE AU
+PSG → lecture hors table → hauteurs aberrantes. Bug présent depuis la
+Phase 31 (les jingles 31/32 sonnaient faux — « pas top top » — et avec
+la table chromatique Phase 32+ le garbage tombait dans l'inaudible).
+
+Fix : scratch dédié `tune_tmp` (BSS), qui survit aux appels
+`_psg_write`. Première écoute du jingle aux hauteurs écrites.
+
+Tests : `make host-test` 4/4 PASS, `make check` PASS.
+
 ### Phase 33 — Jingle titre : Grieg, « Dans l'antre du roi de la montagne » ✅
 
 Retour playtest : remplacer la composition Phase 32 par une vraie
