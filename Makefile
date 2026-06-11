@@ -73,7 +73,7 @@ BENCH_PROF     = tests/out/phase6_bench.prof
 # redéfinir au cas par cas.
 TEST_INPUT     = "0:\n"
 
-.PHONY: all clean run test ref check bench bench-game gen_ship host-test
+.PHONY: all clean run run-joy test ref check bench bench-game gen_ship host-test
 
 # ── Tests host (x86) ──────────────────────────────────────────────────
 # Vérifient le déterminisme et les bornes des routines portables
@@ -178,6 +178,15 @@ $(TAP): $(BIN)
 
 run: $(TAP)
 	$(EMU) -m oric1 -r $(ROM) -t $(TAP) -f \
+	       --type-keys $(TEST_INPUT)
+
+# Phase 38 — playtest joystick IJK : `-j keys` mappe les flèches SDL
+# + RCTRL/RALT (fire) sur l'interface IJK émulée. Ces touches sont
+# consommées par le joystick et NE passent PAS par la matrice clavier
+# → si le ship répond, c'est le chemin IJK (lecture R14) qui marche.
+# SPACE reste clavier (utile pour comparer les deux chemins).
+run-joy: $(TAP)
+	$(EMU) -m oric1 -r $(ROM) -t $(TAP) -f -j keys \
 	       --type-keys $(TEST_INPUT)
 
 test: $(TAP)

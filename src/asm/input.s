@@ -1,12 +1,13 @@
 ;=================================================================
 ; input.s — Scan clavier Oric-1 direct (VIA + PSG), Phase 18e
+;           + joystick IJK OR-é dans le même bitmask (Phase 38)
 ;
 ; Exporte _key_scan : remplit _key_state avec un bitmask :
-;   bit 0 : ← (LEFT, HW row 5 col 4)
-;   bit 1 : → (RIGHT, HW row 7 col 4)
-;   bit 2 : ↑ (UP, HW row 3 col 4) — thrust
-;   bit 3 : SPACE (HW row 0 col 4) — tir
-;   bit 4 : ↓ (DOWN, HW row 6 col 4) — hyperespace
+;   bit 0 : ← (LEFT, HW row 5 col 4)        | IJK Left
+;   bit 1 : → (RIGHT, HW row 7 col 4)       | IJK Right
+;   bit 2 : ↑ (UP, HW row 3 col 4) — thrust | IJK Up
+;   bit 3 : SPACE (HW row 0 col 4) — tir    | IJK Fire
+;   bit 4 : ↓ (DOWN, HW row 6 col 4) — hyper| IJK Down
 ;   bit 5 : ESC (HW row 5 col 1) — quitter vers BASIC en game over
 ;
 ; Mapping HW Oric-1 (validé contre Phosphoric corrigé) : TOUTES les
@@ -276,6 +277,89 @@ _key_scan:
         lda  #$FF
         ldy  #14
         jsr  psg_write
+
+        ;------------------------------------------------------------
+        ; Joystick IJK (Phase 38) — lecture du port A du PSG (R14 en
+        ; mode Read Data), actif bas : 0 = pressé, $FF = repos.
+        ;
+        ;   bit 0 = Left, bit 1 = Right, bit 3 = Down, bit 4 = Up,
+        ;   bit 5 = Fire (layout IJK standard).
+        ;
+        ; La lecture retourne rangées_clavier[col ORB] AND état_IJK
+        ; (les deux actifs bas, même bus) : on sélectionne la col 0
+        ; (aucune touche de jeu — SPACE/flèches = col 4, ESC = col 1)
+        ; pour que le clavier n'introduise pas de directions fantômes.
+        ; Sans interface IJK les lignes restent à 1 ⇒ aucun input.
+        ; Le résultat est OR-é dans _key_state : clavier ET joystick
+        ; actifs simultanément, zéro changement côté C.
+        ;------------------------------------------------------------
+        lda  VIA_ORB
+        and  #$F8             ; col 0
+        sta  VIA_ORB
+
+        ; Latch address 14 (DDRA encore $FF output ici)
+        lda  #14
+        sta  VIA_ORA
+        lda  kb_pcr_save
+        ora  #(PCR_BDR_HI | PCR_BC1_HI)   ; $EE — Latch Address
+        sta  VIA_PCR
+        lda  kb_pcr_save
+        ora  #(PCR_BDR_LO | PCR_BC1_LO)   ; $CC — Inactive
+        sta  VIA_PCR
+
+        ; Port A en input puis Read Data (BDIR=0, BC1=1)
+        lda  #$00
+        sta  VIA_DDRA
+        lda  kb_pcr_save
+        ora  #(PCR_BDR_LO | PCR_BC1_HI)   ; $CE — Read Data
+        sta  VIA_PCR
+        nop                   ; stabilisation bus (cf. scans clavier)
+        nop
+        lda  VIA_ORA          ; état IJK (actif bas)
+        sta  kb_tmp
+        lda  kb_pcr_save
+        ora  #(PCR_BDR_LO | PCR_BC1_LO)   ; $CC — Inactive
+        sta  VIA_PCR
+
+        ; Décodage : inversion (actif haut) puis mapping vers le
+        ; bitmask _key_state (L→0, R→1, Up→2 thrust, Fire→3 tir,
+        ; Down→4 hyperespace). Bits 2/6/7 IJK ignorés.
+        lda  kb_tmp
+        eor  #$FF
+        sta  kb_tmp
+        beq  @ijk_done        ; rien pressé (cas courant) → sortie
+
+        lda  kb_tmp
+        and  #$01             ; IJK Left
+        beq  :+
+        lda  _key_state
+        ora  #$01
+        sta  _key_state
+:       lda  kb_tmp
+        and  #$02             ; IJK Right
+        beq  :+
+        lda  _key_state
+        ora  #$02
+        sta  _key_state
+:       lda  kb_tmp
+        and  #$10             ; IJK Up → thrust
+        beq  :+
+        lda  _key_state
+        ora  #$04
+        sta  _key_state
+:       lda  kb_tmp
+        and  #$20             ; IJK Fire → tir
+        beq  :+
+        lda  _key_state
+        ora  #$08
+        sta  _key_state
+:       lda  kb_tmp
+        and  #$08             ; IJK Down → hyperespace
+        beq  @ijk_done
+        lda  _key_state
+        ora  #$10
+        sta  _key_state
+@ijk_done:
 
         ; Restaurer DDRA et DDRB
         lda  kb_ddra_save

@@ -7,6 +7,29 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 38 — support joystick IJK ✅
+
+Demande du testeur externe (xahmol, forum Defence-Force). L'interface
+IJK (l'adaptateur joystick Oric le plus répandu) se lit sur le port A
+du PSG AY-3-8912, actif bas — le même bus que la matrice clavier.
+
+- **`key_scan` (input.s)** : après le scan clavier, lecture R14 en
+  mode Read Data (latch addr 14 → DDRA input → PCR `$CE`), décodage
+  IJK (L/R/Up/Down/Fire, actif bas) et OR dans le bitmask `key_state`
+  → clavier et joystick actifs simultanément, **zéro changement côté
+  C** (titre, jeu, restart fonctionnent d'office). Coût ~100 cycles.
+- **Anti-fantômes** : la lecture R14 retourne `rangées[col] AND ijk` ;
+  la colonne ORB est mise à 0 (aucune touche de jeu : SPACE/flèches =
+  col 4, ESC = col 1) pour qu'une touche pressée n'injecte pas de
+  direction. Sans interface, les lignes lisent $FF → aucun input.
+- **`make run-joy`** : playtest Phosphoric avec `-j keys` (flèches +
+  RCTRL/RALT = fire routés vers l'IJK émulée, PAS vers la matrice
+  clavier — valide spécifiquement le chemin joystick).
+- **Tests** : host 4/4 PASS ; `make check` PASS (lecture IJK au repos
+  = $FF, comportement inchangé) ; non-régression clavier vérifiée
+  (scénario tir scripté : torpilles présentes). Validation sur stick
+  IJK physique en attente (testeur). `dist/asteroids.tap` régénéré.
+
 ### Phase 37 — tuning : vitesse des astéroïdes réduite ✅
 
 Retour joueur après validation manuelle des torpilles 2×2 : les

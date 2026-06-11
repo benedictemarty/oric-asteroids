@@ -306,12 +306,11 @@ n'est pas validée par :
 
 ## Hors‑roadmap (idées différées)
 
-- **Support joystick IJK** (demande testeur externe, 2026-06-12) :
-  l'interface IJK se lit via le Port A du PSG AY-3-8912 (actif bas),
-  donc à travers le VIA comme l'AY déjà piloté par `sound.s` — pas de
-  nouveau matériel à adresser. Phosphoric émule l'IJK (`-j keys` /
-  `-j gamepad`), le développement et les tests headless sont donc
-  possibles sans joystick physique. Candidat naturel pour une v1.1.
+- ~~**Support joystick IJK**~~ — **fait en Phase 38 (2026-06-12)** :
+  lecture R14 (port A PSG, actif bas) intégrée à `key_scan`, OR-ée
+  dans `key_state` (clavier + joystick simultanés, zéro changement C).
+  Playtest émulé via `make run-joy` (`-j keys`). **Reste à valider
+  sur interface IJK physique** (demander au testeur du forum).
 - ~~**Visibilité des torpilles**~~ — **fait en Phase 36 (2026-06-12)** :
   bloc 2×2 px (joueur + UFO) **et** surtout rendu compact
   erase+draw consécutifs (`bullets_commit`) — l'ancien schéma laissait
