@@ -1,6 +1,7 @@
 ;=================================================================
 ; input.s — Scan clavier Oric-1 direct (VIA + PSG), Phase 18e
-;           + joystick IJK OR-é dans le même bitmask (Phase 38)
+;           + joystick IJK OR-é dans le même bitmask (Phase 38,
+;           protocole VIA direct corrigé Phase 39 — cf. bloc IJK)
 ;
 ; Exporte _key_scan : remplit _key_state avec un bitmask :
 ;   bit 0 : ← (LEFT, HW row 5 col 4)        | IJK Left
@@ -279,82 +280,82 @@ _key_scan:
         jsr  psg_write
 
         ;------------------------------------------------------------
-        ; Joystick IJK (Phase 38) — lecture du port A du PSG (R14 en
-        ; mode Read Data), actif bas : 0 = pressé, $FF = repos.
+        ; Joystick IJK (Phase 38, protocole corrigé Phase 39) —
+        ; l'interface IJK est sur le port IMPRIMANTE = port A du VIA
+        ; en DIRECT (pas via le PSG ! — bug v1 signalé par xahmol sur
+        ; matériel réel, protocole validé contre Oricutron) :
         ;
-        ;   bit 0 = Left, bit 1 = Right, bit 3 = Down, bit 4 = Up,
-        ;   bit 5 = Fire (layout IJK standard).
+        ;   - enable  : PB4 (strobe imprimante) en sortie, à 0
+        ;   - select  : ORA bits 6-7 en sortie — bit6=1 → stick A,
+        ;               bit7=1 → stick B, les DEUX à 1 → rien
+        ;   - lecture : ORA bits 0-5 en entrée, actif bas :
+        ;               bit0=Right, bit1=Left, bit2=Fire,
+        ;               bit3=Down,  bit4=Up,
+        ;               bit5=présence (0 = interface branchée)
         ;
-        ; La lecture retourne rangées_clavier[col ORB] AND état_IJK
-        ; (les deux actifs bas, même bus) : on sélectionne la col 0
-        ; (aucune touche de jeu — SPACE/flèches = col 4, ESC = col 1)
-        ; pour que le clavier n'introduise pas de directions fantômes.
-        ; Sans interface IJK les lignes restent à 1 ⇒ aucun input.
-        ; Le résultat est OR-é dans _key_state : clavier ET joystick
-        ; actifs simultanément, zéro changement côté C.
+        ; Le PSG doit être inactif (PCR $CC — c'est le cas ici, après
+        ; le restore R14). Sans interface, bit5 lit 1 (pull-up) ⇒ on
+        ; ignore tout : aucun input fantôme possible. Le résultat est
+        ; OR-é dans _key_state : clavier ET joystick simultanés.
         ;------------------------------------------------------------
+        ; PB4 = 0 (enable IJK). DDRB vaut $F7 ici → PB4 déjà en sortie.
         lda  VIA_ORB
-        and  #$F8             ; col 0
+        and  #$EF
         sta  VIA_ORB
 
-        ; Latch address 14 (DDRA encore $FF output ici)
-        lda  #14
-        sta  VIA_ORA
-        lda  kb_pcr_save
-        ora  #(PCR_BDR_HI | PCR_BC1_HI)   ; $EE — Latch Address
-        sta  VIA_PCR
-        lda  kb_pcr_save
-        ora  #(PCR_BDR_LO | PCR_BC1_LO)   ; $CC — Inactive
-        sta  VIA_PCR
-
-        ; Port A en input puis Read Data (BDIR=0, BC1=1)
-        lda  #$00
+        ; DDRA = $C0 (bits 6-7 sortie = select, bits 0-5 entrée),
+        ; select stick A : bit6=1, bit7=0.
+        lda  #$C0
         sta  VIA_DDRA
-        lda  kb_pcr_save
-        ora  #(PCR_BDR_LO | PCR_BC1_HI)   ; $CE — Read Data
-        sta  VIA_PCR
-        nop                   ; stabilisation bus (cf. scans clavier)
+        lda  #$40
+        sta  VIA_ORA
+        nop                   ; stabilisation lignes (pull-ups)
         nop
-        lda  VIA_ORA          ; état IJK (actif bas)
+        lda  VIA_ORA          ; bits 0-5 = état stick A (actif bas)
         sta  kb_tmp
-        lda  kb_pcr_save
-        ora  #(PCR_BDR_LO | PCR_BC1_LO)   ; $CC — Inactive
-        sta  VIA_PCR
+
+        ; PB4 = 1 (disable IJK — strobe imprimante au repos)
+        lda  VIA_ORB
+        ora  #$10
+        sta  VIA_ORB
+
+        ; Présence : bit5 = 0 si interface branchée, sinon ignorer
+        lda  kb_tmp
+        and  #$20
+        bne  @ijk_done
 
         ; Décodage : inversion (actif haut) puis mapping vers le
-        ; bitmask _key_state (L→0, R→1, Up→2 thrust, Fire→3 tir,
-        ; Down→4 hyperespace). Bits 2/6/7 IJK ignorés.
+        ; bitmask _key_state (Left→0, Right→1, Up→2 thrust,
+        ; Fire→3 tir, Down→4 hyperespace).
         lda  kb_tmp
         eor  #$FF
         sta  kb_tmp
-        beq  @ijk_done        ; rien pressé (cas courant) → sortie
 
-        lda  kb_tmp
-        and  #$01             ; IJK Left
+        and  #$02             ; IJK bit 1 = Left
         beq  :+
         lda  _key_state
         ora  #$01
         sta  _key_state
 :       lda  kb_tmp
-        and  #$02             ; IJK Right
+        and  #$01             ; IJK bit 0 = Right
         beq  :+
         lda  _key_state
         ora  #$02
         sta  _key_state
 :       lda  kb_tmp
-        and  #$10             ; IJK Up → thrust
+        and  #$10             ; IJK bit 4 = Up → thrust
         beq  :+
         lda  _key_state
         ora  #$04
         sta  _key_state
 :       lda  kb_tmp
-        and  #$20             ; IJK Fire → tir
+        and  #$04             ; IJK bit 2 = Fire → tir
         beq  :+
         lda  _key_state
         ora  #$08
         sta  _key_state
 :       lda  kb_tmp
-        and  #$08             ; IJK Down → hyperespace
+        and  #$08             ; IJK bit 3 = Down → hyperespace
         beq  @ijk_done
         lda  _key_state
         ora  #$10

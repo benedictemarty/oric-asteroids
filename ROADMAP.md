@@ -306,11 +306,13 @@ n'est pas validée par :
 
 ## Hors‑roadmap (idées différées)
 
-- ~~**Support joystick IJK**~~ — **fait en Phase 38 (2026-06-12)** :
-  lecture R14 (port A PSG, actif bas) intégrée à `key_scan`, OR-ée
-  dans `key_state` (clavier + joystick simultanés, zéro changement C).
-  Playtest émulé via `make run-joy` (`-j keys`). **Reste à valider
-  sur interface IJK physique** (demander au testeur du forum).
+- ~~**Support joystick IJK**~~ — Phase 38 (lecture R14 PSG) **invalidée
+  sur matériel réel** par xahmol ; **protocole corrigé en Phase 39
+  (2026-06-12)** : port imprimante = VIA port A direct (PB4 bas,
+  select broches 6-7, layout réel R/L/F/D/U bits 0-4, bit 5 =
+  présence), OR-é dans `key_state`. Phosphoric corrigé en parallèle
+  (v1.16.83, modèle IJK hardware-accurate). **Revalidation interface
+  IJK physique demandée au testeur.**
 - ~~**Visibilité des torpilles**~~ — **fait en Phase 36 (2026-06-12)** :
   bloc 2×2 px (joueur + UFO) **et** surtout rendu compact
   erase+draw consécutifs (`bullets_commit`) — l'ancien schéma laissait

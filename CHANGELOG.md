@@ -7,6 +7,33 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Phase 39 — fix protocole joystick IJK (retour matériel réel) ✅
+
+Retour xahmol (forum, 2026-06-12) : le tir 2×2 est confirmé corrigé
+sur matériel réel, mais **l'IJK Phase 38 ne fonctionnait pas** sur sa
+vraie interface (alors qu'elle marche avec d'autres jeux). Cause : le
+protocole Phase 38 (lecture R14 du PSG) reproduisait le modèle IJK de
+Phosphoric… qui était **faux**. Protocole réel (validé contre
+Oricutron) :
+
+- L'IJK est sur le **port imprimante = port A du VIA en direct**, pas
+  sur le PSG : enable par **PB4 (strobe) en sortie à 0**, sélection du
+  stick par les **broches 6-7 du port A** (bit6=1 → stick A), état sur
+  bits 0-5 actif bas avec le layout réel **Right=0, Left=1, Fire=2,
+  Down=3, Up=4**, et **bit 5 = présence** (0 = interface branchée).
+- `input.s` réécrit en conséquence : DDRA=$C0/ORA=$40 + PB4 bas le
+  temps de la lecture, restauration ensuite ; le **bit de présence
+  remplace l'heuristique anti-fantômes** (sans interface, bit5=1 ⇒
+  lecture ignorée — plus robuste que le pari sur les pull-ups).
+- **Phosphoric corrigé en parallèle (v1.16.83-alpha, Sprint 37)** :
+  modèle IJK port-imprimante hardware-accurate + 7 tests dont un rejeu
+  de la séquence 6502 exacte du jeu — `make run-joy` teste désormais
+  le vrai protocole de bout en bout.
+- **Tests** : host 4/4 PASS ; `make check` PASS sous l'émulateur
+  corrigé ; non-régression clavier (scénario tir scripté OK).
+  Revalidation sur interface IJK physique demandée à xahmol.
+  `dist/asteroids.tap` régénéré.
+
 ### Phase 38 — support joystick IJK ✅
 
 Demande du testeur externe (xahmol, forum Defence-Force). L'interface
