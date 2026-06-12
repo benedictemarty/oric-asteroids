@@ -148,3 +148,13 @@ Développé en autonomie agile sur 9 phases.
 Identité git : `bmarty <bmarty@mailo.com>`.
 
 🤖 Co-développé avec [Claude Code](https://claude.com/claude-code).
+
+## Licence
+
+Le code original du projet est sous **EUPL v1.2** (texte officiel
+français et anglais équivalents — voir [LICENSE](LICENSE)). La logique
+de jeu adaptée du désassemblage Atari et les shapes extraites de la ROM
+**ne sont pas couvertes** : aucun droit n'est revendiqué sur l'œuvre
+d'Atari (*Asteroids*, © 1979 Atari, Inc. ; marque d'Atari Interactive).
+Projet d'étude et de préservation, non commercial, non affilié.
+Détails et périmètre exact : [NOTICE.md](NOTICE.md).

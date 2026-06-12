@@ -7,6 +7,19 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### 2026-06-12 — licence EUPL v1.2 + NOTICE
+
+- **LICENSE** : texte officiel EUPL v1.2 (copyleft, droit du pays de
+  résidence du licencieur, texte français juridiquement équivalent,
+  compatible GPL/MPL/CeCILL en aval).
+- **NOTICE.md** : périmètre exact — la licence couvre le travail
+  original (rendu HIRES, routines 6502, sons AY recréés, build,
+  tests) ; la logique adaptée du désassemblage Atari rev 4 et les
+  shapes extraites de la ROM sont explicitement **hors licence**
+  (aucun droit revendiqué, marque Asteroids = Atari Interactive,
+  projet d'étude non commercial non affilié).
+- Section « Licence » ajoutée au README.
+
 ### Phase 39 — fix protocole joystick IJK (retour matériel réel) ✅
 
 Retour xahmol (forum, 2026-06-12) : le tir 2×2 est confirmé corrigé
