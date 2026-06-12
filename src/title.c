@@ -1,11 +1,12 @@
 /*
- * title.c — Écran titre "ASTEROIDS" Phase 9c
+ * title.c — Écran titre "ASTERORIC" Phase 9c (retitré 2026-06-12,
+ * ex-"ASTEROIDS" — cf. NOTICE.md, marque Atari Interactive)
  *
  * Lettres dessinées en segments XOR via _draw_line_xor.
  * Format compact : liste de segments delta hardcodés par lettre.
  * Hauteur lettre = 10 px, largeur 8 px, espace inter-lettre = 12 px.
  *
- * "ASTEROIDS" = 9 lettres × 4-5 segments = ~40 segments XOR.
+ * "ASTERORIC" = 9 lettres × 4-5 segments = ~40 segments XOR.
  */
 
 #include "line.h"
@@ -79,18 +80,6 @@ static const unsigned char letter_I[] = {
     0, 9, 8, 9,
     0xFF,
     4, 0,  4, 9,
-    0xFE
-};
-
-static const unsigned char letter_D[] = {
-    0, 0, 0, 9,
-    0, 0, 6, 0,
-    6, 0, 8, 3,
-    8, 3, 8, 6,
-    8, 6, 6, 9,
-    6, 9, 0, 9,
-    0xFF,
-    0, 0,  6, 0,  8, 3,  8, 6,  6, 9,  0, 9,
     0xFE
 };
 
@@ -199,7 +188,9 @@ static void draw_letter(const unsigned char *segs,
     }
 }
 
-/* Dessine "ASTEROIDS" centré horizontalement à y donné.
+/* Dessine "ASTERORIC" centré horizontalement à y donné (retitrage
+ * 2026-06-12 : marque Asteroids = Atari Interactive, cf. NOTICE.md ;
+ * même nombre de lettres que l'ancien titre ⇒ centrage inchangé).
  * Largeur totale = 9 * 12 - 4 = 104 pixels → x = (240 - 104) / 2 = 68. */
 void title_draw(void)
 {
@@ -211,9 +202,9 @@ void title_draw(void)
     draw_letter(letter_E, x +  36, y);
     draw_letter(letter_R, x +  48, y);
     draw_letter(letter_O, x +  60, y);
-    draw_letter(letter_I, x +  72, y);
-    draw_letter(letter_D, x +  84, y);
-    draw_letter(letter_S, x +  96, y);
+    draw_letter(letter_R, x +  72, y);
+    draw_letter(letter_I, x +  84, y);
+    draw_letter(letter_C, x +  96, y);
 }
 
 /* Erase = même routine (XOR idempotent) */

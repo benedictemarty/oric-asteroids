@@ -1,7 +1,9 @@
-# Asteroids — portage Oric-1 48 Ko
+# Astéroric — portage Oric-1 48 Ko
 
-Clone fidèle d'**Asteroids arcade** (Atari, 1979) pour **Oric-1 48 Ko**,
-développé en C + assembleur 6502.
+**Astéroric** (« an Asteroids clone for the Oric-1 48K ») : clone
+d'étude fidèle d'**Asteroids arcade** (Atari, 1979) pour **Oric-1
+48 Ko**, développé en C + assembleur 6502. Le binaire jouable est
+`dist/asteroric.tap`.
 
 ## Build
 

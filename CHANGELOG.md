@@ -7,6 +7,24 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### 2026-06-12 — retitrage : « Astéroric »
+
+Le jeu s'appelle désormais **Astéroric** (« an Asteroids clone for the
+Oric-1 48K ») — la marque *Asteroids* appartient à Atari Interactive
+(cf. NOTICE.md), et le retitrage est l'usage homebrew prudent avant la
+v1.0 finale.
+
+- Écran titre : « ASTERORIC » (même longueur que l'ancien titre ⇒
+  centrage inchangé ; lettre C réutilisée de PRESS SPACE, lettre D
+  orpheline supprimée).
+- `PROJECT = asteroric` : binaire `build/asteroric.tap`, nom de
+  cassette `asteroric`, distribution `dist/asteroric.tap`
+  (`dist/asteroids.tap` supprimé).
+- README retitré ; référence de capture titre régénérée, `make check`
+  PASS ; host 4/4 PASS.
+- Le dépôt GitHub garde son nom `oric-asteroids` (les liens forum et
+  oric.org publiés restent valides).
+
 ### 2026-06-12 — licence EUPL v1.2 + NOTICE
 
 - **LICENSE** : texte officiel EUPL v1.2 (copyleft, droit du pays de

@@ -1,4 +1,4 @@
-PROJECT   = asteroids
+PROJECT   = asteroric
 ROM       = /home/bmarty/Oric1/roms/basic10.rom
 EMU       = /home/bmarty/Oric1/oric1-emu
 BIN2TAP   = /home/bmarty/Oric1/bin2tap
@@ -180,11 +180,11 @@ run: $(TAP)
 	$(EMU) -m oric1 -r $(ROM) -t $(TAP) -f \
 	       --type-keys $(TEST_INPUT)
 
-# Phase 38 — playtest joystick IJK : `-j keys` mappe les flèches SDL
+# Phase 38/39 — playtest joystick IJK : `-j keys` mappe les flèches SDL
 # + RCTRL/RALT (fire) sur l'interface IJK émulée. Ces touches sont
 # consommées par le joystick et NE passent PAS par la matrice clavier
-# → si le ship répond, c'est le chemin IJK (lecture R14) qui marche.
-# SPACE reste clavier (utile pour comparer les deux chemins).
+# → si le ship répond, c'est le chemin IJK (port imprimante VIA,
+# protocole Phase 39) qui marche. SPACE reste clavier (comparaison).
 run-joy: $(TAP)
 	$(EMU) -m oric1 -r $(ROM) -t $(TAP) -f -j keys \
 	       --type-keys $(TEST_INPUT)
