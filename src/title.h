@@ -22,4 +22,8 @@ void hiscores_label_erase(unsigned char py);
 void quit_label_draw(unsigned char py);
 void quit_label_erase(unsigned char py);
 
+/* Phase 40 — "K CONTROLS" sur l'écran titre */
+void keyshint_draw(unsigned char py);
+void keyshint_erase(unsigned char py);
+
 #endif /* TITLE_H */

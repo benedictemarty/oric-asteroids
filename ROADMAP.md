@@ -306,6 +306,12 @@ n'est pas validée par :
 
 ## Hors‑roadmap (idées différées)
 
+- ~~**Touches configurables**~~ — **fait en Phase 40 (2026-08-09)** :
+  écran CONTROLS accessible par `K` au titre (police A-Z complète
+  `font.c`, table matrice `keys_tab.h`, `_key_map`/`_key_probe` dans
+  input.s, écran `keys.c`). ESC annule, doublons refusés, mapping RAM
+  sans persistance. Tests host `test_keys.c` + validation Phosphoric
+  bout en bout scriptée.
 - ~~**Support joystick IJK**~~ — Phase 38 (lecture R14 PSG) **invalidée
   sur matériel réel** par xahmol ; **protocole corrigé en Phase 39
   (2026-06-12)** : port imprimante = VIA port A direct (PB4 bas,

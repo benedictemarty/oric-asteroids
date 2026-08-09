@@ -7,6 +7,53 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### 2026-08-09 — Phase 40 : écran de configuration des touches
+
+Touches remappables via un écran CONTROLS accessible par `K` depuis
+l'écran titre (nouveau label « K CONTROLS », y=140).
+
+- **`src/font.c`/`font.h`** (nouveau) : police vectorielle A-Z complète.
+  Les 14 glyphes historiques migrent depuis title.c ; 12 nouvelles
+  lettres (B D F J K L N Q U X Y Z), même format compact
+  segments + replots anti double-XOR. `text_draw(str, x, y)` générique
+  (pitch 12, chiffres 7-seg via hud_xor_digit).
+- **`src/title.c`** : réécrit sur text_draw (chaînes au lieu des listes
+  de draw_letter) — passe de 334 à ~110 lignes, rendu vérifié identique.
+  Nouveau label `keyshint_draw/erase`.
+- **`src/asm/input.s`** :
+  - `_key_map` (DATA, 5 × [colonne ORB, masque R14]) : les 5 actions
+    de `_key_scan` sont désormais pilotées par table (défauts =
+    flèches + SPACE, inchangés). ESC et joystick IJK non remappables.
+  - `_key_probe` (nouveau) : scan complet matrice 8×8, retourne
+    col*8+row de la première touche pressée ou $FF. 8 psg_write par
+    appel (une par rangée) — réservé aux écrans titre/config.
+  - Setup/teardown VIA factorisés (`kb_setup`/`kb_teardown`),
+    partagés entre les deux routines.
+- **`src/keys_tab.h`** (nouveau) : matrice Oric-1 complète → noms de
+  touches (64 positions, source : tables ROM $FF70 via Phosphoric
+  keyboard.c, cohérente avec les positions déjà validées sur matériel
+  réel). Positions non documentées = NULL (refusées — on n'invente pas).
+- **`src/keys.c`/`keys.h`** (nouveau) : écran CONTROLS. Les 5 actions
+  (LEFT, RIGHT, THRUST, FIRE, HYPER) sont saisies séquentiellement
+  (action courante soulignée) ; doublons et positions inconnues
+  refusés ; ESC annule et restaure ; FX_FIRE en feedback d'assignation.
+  Cadencé sur frame_cnt 50 Hz (volatile, revue n°2). Mapping en RAM,
+  pas de persistance.
+- **`src/game.c`** : hook K dans la boucle titre (textes effacés,
+  démo astéroïdes gelée, redraw au retour), keyshint effacé au start.
+
+Tests :
+- **`tests/host/test_keys.c`** (nouveau, branché dans host-test) :
+  4 tests sur la VRAIE table partagée `keys_tab.h` (défauts nommés,
+  ancres matrice validées, unicité des noms, formule col/masque =
+  valeurs historiques de input.s). Host 8/8 PASS.
+- Validation Phosphoric headless bout en bout (`--type-keys`) :
+  ouverture par K, remap LEFT→A affiché, ESC restaure les défauts,
+  remap complet AZERT puis démarrage par R (nouveau FIRE) et rotation
+  du ship par A (nouveau LEFT) constatée en jeu.
+- Référence titre régénérée (label K CONTROLS), `make check` PASS ;
+  `dist/asteroric.tap` régénéré (22 928 octets).
+
 ### 2026-08-09 — revue senior n°2 : 6 correctifs (bugs critiques/majeurs)
 
 Application des correctifs prioritaires de la seconde revue senior

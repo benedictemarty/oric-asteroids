@@ -16,6 +16,7 @@
 #include "ufo.h"
 #include "sound.h"
 #include "title.h"
+#include "keys.h"
 /* hiscores_label_draw exposé via title.h depuis Phase 15 */
 
 /* ------------------------------------------------------------------ */
@@ -1047,6 +1048,7 @@ void game_run(void)
      * Au démarrage du jeu, on garde l'état asteroids en place. */
     title_draw();
     presspace_draw(110);
+    keyshint_draw(140);               /* Phase 40 — "K CONTROLS" */
     asteroids_init(0x42);
     asteroids_spawn_wave();
     asteroids_draw();
@@ -1071,6 +1073,22 @@ void game_run(void)
             key_scan();
             if ((key_state & 0x08) && !prev_space) break;
             prev_space = key_state & 0x08;
+            /* Phase 40 — K ouvre l'écran de config des touches. On
+             * efface les textes du titre (les asteroids démo restent,
+             * gelés — le re-XOR de l'écran config sortira propre),
+             * puis on redessine tout au retour. */
+            if (key_probe() == KEY_PROBE_K) {
+                tune_stop();
+                if (ps_visible) presspace_erase(110);
+                keyshint_erase(140);
+                title_erase();
+                keys_screen();
+                title_draw();
+                keyshint_draw(140);
+                presspace_draw(110);
+                ps_visible = 1;
+                prev_space = 0;
+            }
             /* Phase 31/32 — avancer le jingle d'un pas par frame titre.
              * Non bloquant : SPACE reste réactif pendant la mélodie
              * (tune_stop final sous la boucle coupe une note en cours). */
@@ -1107,6 +1125,7 @@ void game_run(void)
         }
         /* Garantir l'état "effacé" en sortie (XOR cohérence) */
         if (ps_visible) presspace_erase(110);
+        keyshint_erase(140);
         /* Phase 31 — couper la note en cours si SPACE a interrompu le
          * jingle (idempotent si déjà silencieux). */
         tune_stop();

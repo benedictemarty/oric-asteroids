@@ -2,37 +2,26 @@
 ; input.s — Scan clavier Oric-1 direct (VIA + PSG), Phase 18e
 ;           + joystick IJK OR-é dans le même bitmask (Phase 38,
 ;           protocole VIA direct corrigé Phase 39 — cf. bloc IJK)
+;           + touches remappables via _key_map et scan complet
+;             _key_probe pour l'écran de config (Phase 40)
 ;
 ; Exporte _key_scan : remplit _key_state avec un bitmask :
-;   bit 0 : ← (LEFT, HW row 5 col 4)        | IJK Left
-;   bit 1 : → (RIGHT, HW row 7 col 4)       | IJK Right
-;   bit 2 : ↑ (UP, HW row 3 col 4) — thrust | IJK Up
-;   bit 3 : SPACE (HW row 0 col 4) — tir    | IJK Fire
-;   bit 4 : ↓ (DOWN, HW row 6 col 4) — hyper| IJK Down
-;   bit 5 : ESC (HW row 5 col 1) — quitter vers BASIC en game over
+;   bit 0 : LEFT   (défaut ←, HW col 4 row 5)  | IJK Left
+;   bit 1 : RIGHT  (défaut →, HW col 4 row 7)  | IJK Right
+;   bit 2 : THRUST (défaut ↑, HW col 4 row 3)  | IJK Up
+;   bit 3 : FIRE   (défaut SPACE, col 4 row 0) | IJK Fire
+;   bit 4 : HYPER  (défaut ↓, HW col 4 row 6)  | IJK Down
+;   bit 5 : ESC (HW col 1 row 5) — quitter, NON remappable
 ;
-; Mapping HW Oric-1 (validé contre Phosphoric corrigé) : TOUTES les
-; touches utilisées sont sur HW colonne 4 (la colonne LSHIFT/FUNCT
-; du 74LS138), différenciées par leur ligne PSG R14 :
+; Phase 40 : les 5 touches d'action sont lues depuis _key_map (DATA,
+; modifiable par keys.c), 2 octets par action : (colonne ORB, masque
+; R14 actif bas). Les défauts ci-dessus reproduisent le mapping
+; historique flèches + SPACE (validé Phosphoric + Oric-1 réel).
 ;
-;   ┌────────┬──────────┬─────────────┬─────────┐
-;   │ Touche │ HW col   │ HW row      │ R14     │
-;   │        │ (VIA ORB)│ (mask R14)  │ scan    │
-;   ├────────┼──────────┼─────────────┼─────────┤
-;   │ SPACE  │ 4        │ 0           │ $FE     │
-;   │ UP     │ 4        │ 3           │ $F7     │
-;   │ LEFT   │ 4        │ 5           │ $DF     │
-;   │ DOWN   │ 4        │ 6           │ $BF     │
-;   │ RIGHT  │ 4        │ 7           │ $7F     │
-;   ├────────┼──────────┼─────────────┼─────────┤
-;   │ LSHIFT │ 4        │ 4           │ $EF     │ (non utilisé ici)
-;   └────────┴──────────┴─────────────┴─────────┘
-;
-; Algo : ORB[0:2] = 4 fixé pour toute la séquence. Pour chaque touche,
-; on écrit le R14 correspondant (un seul bit à 0 = ligne active) et on
-; lit PB3 :
-;   - PB3 = 1 → touche pressée à (R14_row, col=4)
-;   - PB3 = 0 → pas de touche pressée
+; Exporte _key_probe : scan complet de la matrice 8×8, retourne dans A
+; le code col*8+row de la première touche pressée trouvée (ordre de
+; scan : row-major), ou $FF si aucune. Réservé aux écrans titre/config
+; (~8 psg_write + 64 lectures ORB par appel).
 ;
 ; Architecture clavier Oric-1 :
 ;   - VIA Port B bits 0-2 ($0300) sélectionnent la colonne (74LS138)
@@ -57,6 +46,8 @@
 ;=================================================================
 
         .export   _key_scan
+        .export   _key_probe
+        .export   _key_map
         .importzp _key_state
         .import   mixer_shadow       ; sound.s (BSS) — dernière valeur R7 (Phase 23)
         .exportzp kb_pcr_save        ; partagé avec sound.s
@@ -80,10 +71,31 @@ kb_pcr_save:  .res 1     ; bits préservés du PCR (0 et 4)
 kb_ddra_save: .res 1     ; DDRA d'origine (à restaurer après)
 kb_ddrb_save: .res 1     ; DDRB d'origine (à restaurer après)
 kb_tmp:       .res 1
+kb_bit:       .res 1     ; bit key_state de l'action en cours (Phase 40)
+
+;-----------------------------------------------------------------
+; _key_map — 5 actions × (colonne ORB, masque R14 actif bas).
+; Ordre = bits 0-4 de _key_state : LEFT, RIGHT, THRUST, FIRE, HYPER.
+; Modifiée par keys.c (key_apply). Défauts = flèches + SPACE.
+;-----------------------------------------------------------------
+        .segment "DATA"
+_key_map:
+        .byte 4, $DF        ; LEFT   = ← (col 4, row 5)
+        .byte 4, $7F        ; RIGHT  = → (col 4, row 7)
+        .byte 4, $F7        ; THRUST = ↑ (col 4, row 3)
+        .byte 4, $FE        ; FIRE   = SPACE (col 4, row 0)
+        .byte 4, $BF        ; HYPER  = ↓ (col 4, row 6)
+
+;-----------------------------------------------------------------
+; kb_rowmask — masque R14 par rangée (un seul bit à 0)
+;-----------------------------------------------------------------
+        .segment "RODATA"
+kb_rowmask:
+        .byte $FE, $FD, $FB, $F7, $EF, $DF, $BF, $7F
 
 ;-----------------------------------------------------------------
 ; psg_write — écrit la valeur A dans le registre Y du PSG
-; Détruit : A
+; Détruit : A. Préserve X et Y.
 ;
 ; Séquence (BDIR / BC1) :
 ;   1. ORA = numéro de registre, PCR = $EE (latch addr)
@@ -118,15 +130,12 @@ psg_write:
         rts
 
 ;-----------------------------------------------------------------
-; _key_scan — lit les 5 touches de jeu, écrit le bitmask dans _key_state
-;
-; ORB[0:2] = 4 (col fixe).  Pour chaque touche :
-;   - PSG reg14 = mask avec UN SEUL bit à 0 (ligne active)
-;   - Lecture PB3 → 1 si touche pressée
+; kb_setup — préambule commun _key_scan / _key_probe (sous SEI).
+; Sauve PCR (bits invariants), DDRA/DDRB, force les directions, et
+; réécrit R7 = mixer_shadow (bit 6 = 1 ⇒ port A PSG en sortie, sinon
+; R14 ne pilote pas les rangées et PB3 reste muet — cf. Phase 23).
 ;-----------------------------------------------------------------
-_key_scan:
-        sei                   ; pas d'IRQ ROM pendant l'accès PSG
-
+kb_setup:
         ; Sauvegarde bits invariants du PCR
         lda  VIA_PCR
         and  #$11             ; bit 0 (CA1) + bit 4 (CB1)
@@ -148,32 +157,56 @@ _key_scan:
         lda  #$F7
         sta  VIA_DDRB
 
-        ; PSG reg 7 : le bit 6 (direction port A) doit être à 1 (= port A
-        ; en OUTPUT côté PSG) pour que R14 pilote les rangées de la matrice
-        ; clavier ; sinon PB3 reste à 0 quoi qu'il arrive.
-        ;
-        ; Phase 23 — on réécrit la valeur mixer COURANTE (mixer_shadow,
-        ; maintenue par sound.s, bit 6 toujours = 1) au lieu d'un $7F figé :
-        ; $7F coupait les 6 bits tone/noise à chaque scan (1×/frame) et
-        ; hachait tous les canaux actifs jusqu'au sound_tick pair suivant
-        ; (jusqu'à 40 ms) — cause du bug « audio ship explosion » au backlog.
+        ; PSG reg 7 : réécrire la valeur mixer COURANTE (mixer_shadow,
+        ; maintenue par sound.s, bit 6 toujours = 1) au lieu d'un $7F figé
+        ; qui hacherait les canaux actifs (bug « audio ship explosion »).
         lda  mixer_shadow
         ldy  #7
-        jsr  psg_write
+        jmp  psg_write        ; tail-call (rts de psg_write)
 
-        ; Sélectionner HW col 4 sur ORB[0:2] (commun à tous les tests).
-        lda  VIA_ORB
-        and  #$F8
-        ora  #4
-        sta  VIA_ORB
+;-----------------------------------------------------------------
+; kb_teardown — épilogue commun : R14 = $FF (toutes rangées off),
+; restaure DDRA/DDRB. L'appelant fait le cli.
+;-----------------------------------------------------------------
+kb_teardown:
+        lda  #$FF
+        ldy  #14
+        jsr  psg_write
+        lda  kb_ddra_save
+        sta  VIA_DDRA
+        lda  kb_ddrb_save
+        sta  VIA_DDRB
+        rts
+
+;-----------------------------------------------------------------
+; _key_scan — lit les 5 actions (_key_map) + ESC, écrit le bitmask
+; dans _key_state, puis OR-e le joystick IJK.
+;
+; Pour chaque action :
+;   - ORB[0:2] = colonne (key_map[2i])
+;   - PSG reg14 = masque rangée (key_map[2i+1], un seul bit à 0)
+;   - Lecture PB3 → 1 si touche pressée → key_state |= 1<<i
+;-----------------------------------------------------------------
+_key_scan:
+        sei                   ; pas d'IRQ ROM pendant l'accès PSG
+        jsr  kb_setup
 
         lda  #0
         sta  _key_state
+        lda  #$01
+        sta  kb_bit           ; bit de l'action courante (1,2,4,8,16)
+        ldx  #0               ; index dans _key_map (0,2,4,6,8)
 
-        ;------------------------------------------------------------
-        ; SPACE = HW row 0, col 4 → reg14 = $FE (bit 0)
-        ;------------------------------------------------------------
-        lda  #$FE
+@scan_loop:
+        ; ORB[0:2] = colonne de l'action
+        lda  VIA_ORB
+        and  #$F8
+        ora  _key_map,x
+        sta  VIA_ORB
+        inx
+        ; R14 = masque rangée (psg_write préserve X)
+        lda  _key_map,x
+        inx
         ldy  #14
         jsr  psg_write
         ; Délai de stabilisation matériel (le PSG met ~1 cycle à
@@ -182,80 +215,18 @@ _key_scan:
         nop
         lda  VIA_ORB
         and  #$08             ; PB3 = 1 si touche pressée
-        beq  @no_fire
+        beq  @no_key
         lda  _key_state
-        ora  #$08             ; bit 3 → SPACE
+        ora  kb_bit
         sta  _key_state
-@no_fire:
-
-        ;------------------------------------------------------------
-        ; UP = HW row 3, col 4 → reg14 = $F7 (bit 3)
-        ;------------------------------------------------------------
-        lda  #$F7
-        ldy  #14
-        jsr  psg_write
-        nop
-        nop
-        lda  VIA_ORB
-        and  #$08
-        beq  @no_up
-        lda  _key_state
-        ora  #$04             ; bit 2 → UP
-        sta  _key_state
-@no_up:
-
-        ;------------------------------------------------------------
-        ; LEFT = HW row 5, col 4 → reg14 = $DF (bit 5)
-        ;------------------------------------------------------------
-        lda  #$DF
-        ldy  #14
-        jsr  psg_write
-        nop
-        nop
-        lda  VIA_ORB
-        and  #$08
-        beq  @no_left
-        lda  _key_state
-        ora  #$01             ; bit 0 → LEFT
-        sta  _key_state
-@no_left:
-
-        ;------------------------------------------------------------
-        ; DOWN = HW row 6, col 4 → reg14 = $BF (bit 6)
-        ;------------------------------------------------------------
-        lda  #$BF
-        ldy  #14
-        jsr  psg_write
-        nop
-        nop
-        lda  VIA_ORB
-        and  #$08
-        beq  @no_hyper
-        lda  _key_state
-        ora  #$10             ; bit 4 → DOWN
-        sta  _key_state
-@no_hyper:
-
-        ;------------------------------------------------------------
-        ; RIGHT = HW row 7, col 4 → reg14 = $7F (bit 7)
-        ;------------------------------------------------------------
-        lda  #$7F
-        ldy  #14
-        jsr  psg_write
-        nop
-        nop
-        lda  VIA_ORB
-        and  #$08
-        beq  @no_right
-        lda  _key_state
-        ora  #$02             ; bit 1 → RIGHT
-        sta  _key_state
-@no_right:
+@no_key:
+        asl  kb_bit
+        cpx  #10
+        bcc  @scan_loop
 
         ;------------------------------------------------------------
         ; ESC = HW row 5, col 1 → reg14 = $DF (bit 5), ORB[0:2] = 1
-        ; Touche unique sur col différente : mise à jour ORB[0:2] avant
-        ; le scan.
+        ; NON remappable (réservé quitter/annuler).
         ;------------------------------------------------------------
         lda  VIA_ORB
         and  #$F8
@@ -274,7 +245,9 @@ _key_scan:
         sta  _key_state
 @no_esc:
 
-        ; Restaurer reg14 = $FF (toutes rangées désactivées)
+        ; Restaurer reg14 = $FF (toutes rangées désactivées) AVANT le
+        ; bloc IJK : le protocole IJK exige le PSG inactif (PCR $CC,
+        ; c'est l'état post-psg_write).
         lda  #$FF
         ldy  #14
         jsr  psg_write
@@ -293,10 +266,10 @@ _key_scan:
         ;               bit3=Down,  bit4=Up,
         ;               bit5=présence (0 = interface branchée)
         ;
-        ; Le PSG doit être inactif (PCR $CC — c'est le cas ici, après
-        ; le restore R14). Sans interface, bit5 lit 1 (pull-up) ⇒ on
-        ; ignore tout : aucun input fantôme possible. Le résultat est
-        ; OR-é dans _key_state : clavier ET joystick simultanés.
+        ; Sans interface, bit5 lit 1 (pull-up) ⇒ on ignore tout :
+        ; aucun input fantôme possible. Le résultat est OR-é dans
+        ; _key_state : clavier ET joystick simultanés. Le joystick
+        ; n'est PAS remappable (mapping physique fixe de l'interface).
         ;------------------------------------------------------------
         ; PB4 = 0 (enable IJK). DDRB vaut $F7 ici → PB4 déjà en sortie.
         lda  VIA_ORB
@@ -368,5 +341,60 @@ _key_scan:
         lda  kb_ddrb_save
         sta  VIA_DDRB
 
+        cli
+        rts
+
+;-----------------------------------------------------------------
+; _key_probe — scan complet de la matrice 8×8 (Phase 40).
+; Retour cc65 : A = col*8 + row de la première touche pressée
+; (scan row-major : row 0 col 0..7, row 1, ...), ou $FF ; X = 0.
+;
+; Une écriture R14 par rangée seulement (8 psg_write au total), les
+; 8 colonnes d'une rangée se testent par simple réécriture d'ORB.
+;-----------------------------------------------------------------
+_key_probe:
+        sei
+        jsr  kb_setup
+
+        ldx  #0               ; X = row
+@row:
+        lda  kb_rowmask,x
+        ldy  #14
+        jsr  psg_write        ; préserve X et Y
+        ldy  #0               ; Y = col
+@col:
+        lda  VIA_ORB
+        and  #$F8
+        sta  kb_tmp
+        tya
+        ora  kb_tmp
+        sta  VIA_ORB
+        nop
+        nop
+        lda  VIA_ORB
+        and  #$08
+        bne  @found
+        iny
+        cpy  #8
+        bcc  @col
+        inx
+        cpx  #8
+        bcc  @row
+        lda  #$FF             ; aucune touche
+        bne  @done            ; (toujours pris)
+
+@found:
+        tya                   ; code = col*8 + row
+        asl
+        asl
+        asl
+        sta  kb_tmp
+        txa
+        ora  kb_tmp
+@done:
+        pha                   ; kb_teardown/psg_write détruisent A
+        jsr  kb_teardown
+        pla
+        ldx  #0
         cli
         rts

@@ -14,7 +14,7 @@ Prérequis :
   installé dans `/home/bmarty/Oric1` (ou ajuster `Makefile`)
 
 ```
-make            # produit build/asteroids.tap
+make            # produit build/asteroric.tap
 make run        # charge le .tap dans Phosphoric et lance le jeu
 make test       # capture headless (tests/out/phase9_release.ppm)
 make ref        # met à jour la capture de référence
@@ -49,9 +49,21 @@ relance simplement `make run` sans rien taper.
 | `↑`     | Thrust (poussée avant)              |
 | `↓`     | Hyperespace (téléportation, 25% mort) |
 | `SPACE` | Tir / Restart en game over          |
+| `K`     | (écran titre) Configuration des touches |
+| `ESC`   | Quitter (game over) / Annuler (config)  |
 
-Toutes les touches utilisent un **scan VIA direct** (`PSG reg 14 = $EF`,
-PB3) — pas de dépendance au buffer ROM Atmos `$0265`.
+**Touches configurables (Phase 40)** : sur l'écran titre, `K` ouvre
+l'écran CONTROLS. Chaque action (LEFT, RIGHT, THRUST, FIRE, HYPER) est
+soulignée à son tour : presser la touche voulue l'assigne (doublons et
+positions inconnues refusés), `ESC` annule et restaure le mapping
+précédent. Le mapping vit en RAM — retour aux défauts au rechargement.
+Le joystick IJK (Phases 38-39, `make run-joy`) n'est pas remappable
+(câblage physique de l'interface).
+
+Toutes les touches utilisent un **scan VIA direct** (PSG reg 14 + PB3) —
+pas de dépendance au buffer ROM Atmos `$0265`. Le mapping par défaut
+(flèches + SPACE) est dans `key_map` (`src/asm/input.s`), la matrice
+complète dans `src/keys_tab.h`.
 
 ## Architecture
 

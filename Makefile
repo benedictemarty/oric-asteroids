@@ -42,10 +42,12 @@ OBJ_ASTER   = $(BUILD)/asteroids.o
 OBJ_HUD     = $(BUILD)/hud.o
 OBJ_UFO     = $(BUILD)/ufo.o
 OBJ_TITLE   = $(BUILD)/title.o
+OBJ_FONT    = $(BUILD)/font.o
+OBJ_KEYS    = $(BUILD)/keys.o
 OBJS        = $(OBJ_CRT0) $(OBJ_LINE) $(OBJ_SHIP) $(OBJ_VERTS) \
               $(OBJ_INPUT) $(OBJ_SHAPES) $(OBJ_SOUND) $(OBJ_MAIN) \
               $(OBJ_GAME) $(OBJ_ASTER) $(OBJ_HUD) $(OBJ_UFO) \
-              $(OBJ_TITLE)
+              $(OBJ_TITLE) $(OBJ_FONT) $(OBJ_KEYS)
 
 BIN       = $(BUILD)/$(PROJECT).bin
 TAP       = $(BUILD)/$(PROJECT).tap
@@ -80,7 +82,7 @@ TEST_INPUT     = "0:\n"
 # (rng8 / rand_offset). Compile en quelques ms, indépendant du SDK Oric.
 HOSTCC      = gcc
 HOSTCFLAGS  = -Wall -Wextra -std=c90 -O2
-HOST_TESTS  = $(BUILD)/test_rng
+HOST_TESTS  = $(BUILD)/test_rng $(BUILD)/test_keys
 
 host-test: $(HOST_TESTS)
 	@for t in $(HOST_TESTS); do \
@@ -90,6 +92,9 @@ host-test: $(HOST_TESTS)
 	@echo ">>> Tests host PASS"
 
 $(BUILD)/test_rng: tests/host/test_rng.c | $(BUILD)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
+
+$(BUILD)/test_keys: tests/host/test_keys.c src/keys_tab.h | $(BUILD)
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 
 all: $(TAP)
@@ -158,10 +163,22 @@ $(BUILD)/ufo.s: src/ufo.c src/ufo.h src/asteroids.h | $(BUILD)
 $(OBJ_UFO): $(BUILD)/ufo.s
 	$(CA65) $(ASFLAGS) -o $@ $<
 
-$(BUILD)/title.s: src/title.c src/title.h | $(BUILD)
+$(BUILD)/title.s: src/title.c src/title.h src/font.h src/hud.h | $(BUILD)
 	$(CC65) $(CFLAGS) -o $@ $<
 
 $(OBJ_TITLE): $(BUILD)/title.s
+	$(CA65) $(ASFLAGS) -o $@ $<
+
+$(BUILD)/font.s: src/font.c src/font.h src/line.h src/hud.h | $(BUILD)
+	$(CC65) $(CFLAGS) -o $@ $<
+
+$(OBJ_FONT): $(BUILD)/font.s
+	$(CA65) $(ASFLAGS) -o $@ $<
+
+$(BUILD)/keys.s: src/keys.c src/keys.h src/keys_tab.h src/font.h src/line.h src/sound.h | $(BUILD)
+	$(CC65) $(CFLAGS) -o $@ $<
+
+$(OBJ_KEYS): $(BUILD)/keys.s
 	$(CA65) $(ASFLAGS) -o $@ $<
 
 $(BIN): $(OBJS) $(CFG)
