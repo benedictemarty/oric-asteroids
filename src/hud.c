@@ -108,9 +108,26 @@ static void draw_mini_ship(unsigned char cx, unsigned char cy)
 static void draw_lives(unsigned char n, unsigned char px, unsigned char py)
 {
     unsigned char i;
+    /* Cap à 4 icônes : la 5e serait centrée à x=240 et draw_mini_ship
+     * tracerait jusqu'à x=242, hors du contrat [0..239] de draw_line_xor
+     * (lecture hors table x_col ⇒ écriture écran à une adresse fausse).
+     * Atteignable en jeu : 3 vies + 2 extra ships à 20 000 pts. */
+    if (n > 4) n = 4;
     for (i = 0; i < n; i++) {
         draw_mini_ship(px + i * 6, py + 2);
     }
+}
+
+/* Effacer (re-XOR) le HUD tel qu'affiché. À appeler AVANT hud_init lors
+ * d'un restart : sinon hud_draw redessine « 00000 » par-dessus le score
+ * final encore tracé (XOR ancien+nouveau = chiffres corrompus, résidu
+ * jamais nettoyé puisque score_shown est remis à 0). */
+void hud_erase(void)
+{
+    if (hud_first_frame) return;    /* rien d'affiché */
+    draw_score(score_shown, SCORE_X, SCORE_Y);
+    draw_lives(lives_shown, LIVES_X, LIVES_Y);
+    hud_first_frame = 1;
 }
 
 void hud_init(void)
@@ -154,9 +171,13 @@ void hud_draw(void)
 void hud_add_score(unsigned int delta)
 {
     score += delta;
-    if (score >= score_extra) {
+    /* score_extra == 0 = sentinelle « plus de bonus » : au-delà de
+     * 60 000, seuil suivant = 70 000 qui wraperait en 16 bits (4464)
+     * et distribuerait des extra lives en rafale. */
+    if (score_extra != 0 && score >= score_extra) {
         lives++;
-        score_extra += HUD_EXTRA_BONUS;
+        if (score_extra >= 60000U) score_extra = 0;
+        else                       score_extra += HUD_EXTRA_BONUS;
     }
 }
 

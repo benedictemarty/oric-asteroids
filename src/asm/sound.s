@@ -231,8 +231,13 @@ _sound_init:
 ; du même canal. Appelle update_mixer à la fin.
 ;-----------------------------------------------------------------
 _sound_play_fx:
-        sta  sound_tmp       ; sauvegarder argument AVANT sei
-        sei
+        sei                  ; masquer AVANT d'écrire sound_tmp : c'est
+                             ; aussi le scratch de _psg_write, qu'une
+                             ; IRQ T1 (sound_tick) écraserait sinon
+                             ; entre le sta et le sei (FX corrompu
+                             ; sporadique — même famille que le bug
+                             ; tune_tmp Phase 31-33)
+        sta  sound_tmp
         lda  VIA_DDRA
         pha
         lda  #$FF

@@ -44,4 +44,13 @@ start:
         ;   Oric-1 BASIC 1.0/1.1 : $FFFC/$FFFD = $00/$F8 → reset $F800
         ;   Atmos  BASIC 1.1     : $FFFC/$FFFD = $8F/$F8 → reset $F88F
         ; Pas de bug NMOS 6502 JMP indirect : $FFFC n'est pas en $xxFF.
+        ;
+        ; Avant le saut : masquer les IRQ et désarmer le VIA. À ce
+        ; point T1 tourne encore à 50 Hz avec le vecteur $0228 pointant
+        ; vers _irq_handler en RAM — une IRQ pendant le cold-start ROM
+        ; (qui réécrit page 2) sauterait dans un vecteur à moitié
+        ; réinitialisé.
+        sei
+        lda     #$7F
+        sta     $030E           ; VIA IER : disable toutes sources
         jmp     ($FFFC)

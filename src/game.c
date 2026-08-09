@@ -983,6 +983,7 @@ static void game_reset(void)
     asteroids_init(0x42);
     asteroids_spawn_wave();
     ufo_init();
+    hud_erase();                /* effacer score/vies affichés AVANT reset */
     hud_init();
     /* Phase 36 : les init ci-dessus ont mis ttl/active à 0 mais ne
      * touchent pas l'état écran (blt_drawn / ufo_blt_drawn) — les

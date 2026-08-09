@@ -14,6 +14,8 @@ extern unsigned char lives;
 extern unsigned char gameover;
 
 void hud_init(void);
+/* Effacer (re-XOR) le HUD affiché — à appeler avant hud_init au restart. */
+void hud_erase(void);
 /* Effacer + redessiner le HUD à chaque frame uniquement si nécessaire. */
 void hud_draw(void);
 /* Ajoute delta au score, déclenche la vie bonus si seuil atteint. */

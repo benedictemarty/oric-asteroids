@@ -25,9 +25,13 @@
 #define FX_THUMP_2     10   /* beat2 sweep 129→77 Hz (sym. Beat1)        [B] */
 #define FX_UFO_SMALL   11   /* small UFO sweep montant 700→1300 Hz       [C] */
 
-extern unsigned char sfx_id;    /* canal A id (FX_NONE = libre)         */
-extern unsigned char sfx_timer; /* canal A timer                         */
-extern unsigned char frame_cnt; /* incrémenté à 50 Hz par IRQ T1        */
+/* volatile : écrites sous IRQ T1 et pollées par le main (frame_wait,
+ * tests sfx_id == FX_NONE) — sans le qualificateur, la relecture à
+ * chaque itération n'est qu'un comportement observé de cc65, pas
+ * garanti. */
+extern volatile unsigned char sfx_id;    /* canal A id (FX_NONE = libre) */
+extern volatile unsigned char sfx_timer; /* canal A timer                 */
+extern volatile unsigned char frame_cnt; /* incrémenté à 50 Hz par IRQ T1 */
 #pragma zpsym ("sfx_id")
 #pragma zpsym ("sfx_timer")
 #pragma zpsym ("frame_cnt")

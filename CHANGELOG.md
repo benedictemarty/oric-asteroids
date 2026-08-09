@@ -7,6 +7,45 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### 2026-08-09 — revue senior n°2 : 6 correctifs (bugs critiques/majeurs)
+
+Application des correctifs prioritaires de la seconde revue senior
+(3 agents : code C, assembleur, infra — rapports fichier:ligne) :
+
+- **hud.c `draw_lives`** [CRITIQUE] : cap à 4 icônes de vies. À 5 vies
+  (atteignable : 3 vies + 2 extra ships à 20 000 pts), la 5e icône
+  traçait jusqu'à x=242, hors du contrat [0..239] de `draw_line_xor`
+  (lecture hors table `x_col` ⇒ écriture écran à une adresse fausse).
+- **hud.c `hud_add_score`** [MAJEUR] : sentinelle `score_extra = 0`
+  au-delà de 60 000 pts. Le seuil suivant (70 000) wrappait en 16 bits
+  (4464) ⇒ rafale d'extra lives, qui alimentait le bug ci-dessus.
+- **hud.c/game.c `hud_erase()`** [MAJEUR] : nouveau, appelé dans
+  `game_reset` avant `hud_init`. Sans lui, le « 00000 » du restart
+  était XORé par-dessus le score final encore affiché (chiffres
+  corrompus persistants).
+- **sound.s `_sound_play_fx`** [MAJEUR] : `sei` déplacé AVANT
+  `sta sound_tmp` — `sound_tmp` est aussi le scratch de `_psg_write`
+  sous IRQ T1 : une IRQ dans la fenêtre d'une instruction corrompait
+  le FX routé (même famille que le bug `tune_tmp` Phase 31-33).
+- **sound.h** [MAJEUR] : `volatile` sur `sfx_id`/`sfx_timer`/
+  `frame_cnt` (écrites sous IRQ, pollées par le main) — la relecture
+  par cc65 n'était qu'un comportement observé, pas garanti.
+- **crt0.s** [MAJEUR] : `sei` + IER $7F avant `jmp ($FFFC)` (ESC-quit).
+  T1 tournait encore avec le vecteur $0228 en RAM pendant le
+  cold-start ROM ⇒ crash possible.
+
+Infra : `bin2tap` (binaire disparu de ~/Oric1) recompilé depuis
+`~/Oric1/tools/bin2tap.c` + `src/storage/tap.c`.
+
+Tests : host 4/4 PASS ; `make check` PASS (capture titre bit-à-bit
+identique à la référence) ; `dist/asteroric.tap` régénéré.
+
+Reste ouvert (revue n°2, non appliqué ici) : split `game.c`
+(1 429 lignes), tests host sur les vraies sources, `ASSERT_DBG`
+inutilisé, réserve pile/charset dans `oric1.cfg`, doc 15-22 c/px à
+réaligner (~45 c/px réels), tags git arrêtés à v1.2.9,
+README/ROADMAP en retard (~20 phases).
+
 ### 2026-06-12 — retitrage : « Astéroric »
 
 Le jeu s'appelle désormais **Astéroric** (« an Asteroids clone for the
