@@ -2,8 +2,14 @@
 
 **Astéroric** (« an Asteroids clone for the Oric-1 48K ») : clone
 d'étude fidèle d'**Asteroids arcade** (Atari, 1979) pour **Oric-1
-48 Ko**, développé en C + assembleur 6502. Le binaire jouable est
-`dist/asteroric.tap`.
+48 Ko**, développé en C + assembleur 6502.
+
+**➜ Télécharger la dernière version jouable :**
+[**releases/latest**](https://github.com/benedictemarty/oric-asteroids/releases/latest)
+— prendre le fichier `asteroric.tap` dans les *Assets* (autorun au
+chargement, aucun `CLOAD` à taper). Le même binaire est aussi versionné
+dans `dist/asteroric.tap` (attention : depuis l'interface GitHub,
+utiliser le bouton *Raw* / *Download*, pas le lien de la page HTML).
 
 ## Build
 

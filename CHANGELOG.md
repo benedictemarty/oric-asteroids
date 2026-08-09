@@ -7,6 +7,15 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### 2026-08-09 — première release GitHub + lien de téléchargement
+
+- **Release GitHub `phase40-done`** publiée avec `asteroric.tap` en
+  asset : https://github.com/benedictemarty/oric-asteroids/releases —
+  répond à la friction de téléchargement signalée sur le forum
+  (symoon : lien direct GitHub → HTML/XML au lieu du .tap).
+- README : lien « releases/latest » en tête + avertissement bouton
+  Raw pour `dist/asteroric.tap`.
+
 ### 2026-08-09 — Phase 40 : écran de configuration des touches
 
 Touches remappables via un écran CONTROLS accessible par `K` depuis
