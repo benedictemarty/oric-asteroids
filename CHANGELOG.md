@@ -6,6 +6,7 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Unreleased]
+- 2026-09-19 : `CLAUDE.md` retiré du dépôt (fichier de travail local, non publié).
 
 ### 2026-08-09 — première release GitHub + lien de téléchargement
 
