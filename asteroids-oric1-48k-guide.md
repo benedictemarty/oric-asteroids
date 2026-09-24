@@ -1,6 +1,6 @@
 # Portage d'Asteroids sur Oric‑1 48 Ko — Guide de développement
 
-> Document de cadrage technique pour développer un clone de l'*Asteroids* arcade Atari (1979) en fil de fer sur Oric‑1 48 Ko, en C + assembleur 6502 via l'OSDK.
+> Document de cadrage technique pour développer un clone de l'*Asteroids* arcade Atari (1979) en fil de fer sur Oric‑1 48 Ko, en C + assembleur 6502 avec la chaîne cc65.
 
 ---
 
@@ -80,16 +80,22 @@ le classe comme attribut.
 
 ## 3. Chaîne d'outils
 
-### 3.1 OSDK — Oric Software Development Kit
+### 3.1 cc65 — chaîne de compilation
 
-Cross‑compilateur C + assembleur 6502 + outils de génération de cassettes/disquettes.
-Maintenu par Dbug et la communauté Defence‑Force.
+Le projet est construit avec la chaîne **cc65** autonome : `cc65` (compilateur C
+6502), `ca65` (assembleur), `ld65` (éditeur de liens) et la bibliothèque
+`none.lib`, plus `bin2tap` pour produire l'en-tête du fichier `.tap`
+(voir `Makefile`).
 
-- Site : <http://osdk.defence-force.org/>
-- Forum : <https://forum.defence-force.org/>
+- Site : <https://cc65.github.io/>
 
-L'OSDK fournit `cc65` (compilateur C 6502), `xa` (assembleur), `header` (génère
-l'en-tête .tap), `tap2dsk`, `pictconv` (conversion d'images), etc.
+> **Note (correction, issue #1 de dma-coco)** : une version précédente de ce
+> document annonçait que l'OSDK « fournit cc65 ». C'est faux à deux titres.
+> L'**OSDK** (Oric Software Development Kit, maintenu par Dbug et la communauté
+> Defence-Force, <http://osdk.defence-force.org/>) possède **son propre
+> compilateur C** — chaîne `cpp → compiler → macrosplitter → link65 → xa`, avec
+> l'assembleur `xa` d'André Fachat — et n'embarque pas cc65. Et ce projet
+> n'utilise plus l'OSDK : il compile directement avec cc65.
 
 ### 3.2 Phosphoric — émulateur
 
@@ -127,7 +133,7 @@ Options clés pour ce projet (voir `oric1-emu --help` pour la liste complète) :
 ### 3.3 Workflow recommandé
 
 1. Édition du code sur PC (VS Code, Sublime, …)
-2. `make` → OSDK produit `asteroids.tap`
+2. `make` → cc65 + `bin2tap` produisent `asteroids.tap`
 3. Phosphoric charge le `.tap` et démarre le jeu (avec `-f` pour skipper le `CLOAD`)
 4. Débogage : `--debug` pour entrer en debugger, `-b ADDR` pour breakpoint, `--trace`
    pour log CPU.

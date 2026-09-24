@@ -8,6 +8,15 @@ adhère à [Semantic Versioning](https://semver.org/lang/fr/).
 ## [Unreleased]
 - 2026-09-19 : `CLAUDE.md` retiré du dépôt (fichier de travail local, non publié).
 
+### 2026-09-24 — documentation : la chaîne d'outils, ce n'est pas l'OSDK (issue #1)
+
+- **Correction signalée par dma-coco** (issue #1, 12/06/2026) : le guide affirmait
+  que « l'OSDK fournit `cc65` ». Faux deux fois — l'OSDK a son propre compilateur C
+  (`cpp → compiler → macrosplitter → link65 → xa`) et n'embarque pas cc65, et ce
+  projet n'utilise plus l'OSDK : le `Makefile` appelle `cc65`, `ca65`, `ld65`,
+  `none.lib` et `bin2tap`. Section 3.1 du guide réécrite (avec une note de
+  correction), workflow et en-tête du guide alignés.
+
 ### 2026-08-09 — première release GitHub + lien de téléchargement
 
 - **Release GitHub `phase40-done`** publiée avec `asteroric.tap` en
