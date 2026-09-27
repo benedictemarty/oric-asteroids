@@ -5,7 +5,7 @@ Initialement supposé faux positif Phosphoric, mais validation Oricutron
 + ROM Atmos confirme : `asteroids.tap` **ne fonctionne pas avec une ROM
 Atmos** (signalé utilisateur). La compat Atmos reste à debugger.
 
-Cible nominale du projet = Oric-1 (cf. CLAUDE.md). Atmos = bonus à
+Cible nominale du projet = Oric-1 (cf. règles locales du projet). Atmos = bonus à
 traiter en sprint dédié si priorité.
 
 **Validation cross-machine actuelle** :
@@ -81,7 +81,7 @@ Bug reproduit aussi bien avec `JMP $F800` (ancien crt0) qu'avec
 
 ## Priorité
 
-**Différé.** Le projet cible Oric‑1 48 Ko nominal (cf. CLAUDE.md).
+**Différé.** Le projet cible Oric‑1 48 Ko nominal (cf. règles locales du projet).
 La compat Atmos est un bonus, pas un objectif primaire. Ce bug n'empêche
 pas de tagger le fix vecteur reset comme amélioration de portabilité.
 

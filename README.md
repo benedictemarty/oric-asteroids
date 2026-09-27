@@ -167,7 +167,7 @@ des 9 phases.
 Développé en autonomie agile sur 9 phases.
 Identité git : `bmarty <bmarty@mailo.com>`.
 
-🤖 Co-développé avec [Claude Code](https://claude.com/claude-code).
+⚠️ Avertissement : ce programme est un programme généré par Claude Code sous la supervision d'un être humain : il a été utilisé pour améliorer, développer, rendre compatible ou traduire ce logiciel.
 
 ## Licence
 

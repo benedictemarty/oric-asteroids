@@ -1,7 +1,7 @@
 /*
  * debug.h — assertions de debug pour la logique de jeu.
  *
- * Spec CLAUDE.md §7-3 : "macro ASSERT_DBG(cond) qui émet BRK ou code
+ * Spec des règles locales du projet §7-3 : "macro ASSERT_DBG(cond) qui émet BRK ou code
  * d'erreur HIRES en build debug, compile en zéro octet en release."
  *
  * Mode debug   : ASSERT_DBG(cond) trappe à BRK si cond == 0

@@ -17,10 +17,10 @@
    Mêle boucle principale, hyperespace, debris ship, debris asteroids, hiscores, séquence game-over, audio scheduling, wave label, écran titre. Forte dette de couplage : 22 statics fichier, comments-as-fix, code mort potentiel. *Fix :* extraire `debris.c`, `hiscores.c`, `gameover.c` (séquence machine à états explicite).
 
 4. **`bullets_render`, `asteroids_render` etc. mélangent erase et draw via XOR sans contrat formel** (`src/asteroids.c:288-328`, `src/game.c:934-1047`)
-   Le pattern « `*_was_drawn` flag + `drawn` per-entity + retoggles silencieux » a déjà produit 3 bugs (Phase 9g, 18b, 18c, 18h). La sémantique XOR exige un invariant écrit, pas inférable : aucune assertion ne vérifie que `drawn` reste cohérent avec l'écran. *Fix :* macro `ASSERT_DBG` (déjà prévue dans CLAUDE.md §7-3 mais absente) + invariant doc en haut de chaque `*_render`.
+   Le pattern « `*_was_drawn` flag + `drawn` per-entity + retoggles silencieux » a déjà produit 3 bugs (Phase 9g, 18b, 18c, 18h). La sémantique XOR exige un invariant écrit, pas inférable : aucune assertion ne vérifie que `drawn` reste cohérent avec l'écran. *Fix :* macro `ASSERT_DBG` (déjà prévue dans règles locales du projet §7-3 mais absente) + invariant doc en haut de chaque `*_render`.
 
 5. **Aucun test host (x86) pour la logique portable** (`tests/` ne contient que `ref/` et `scenarios/` vides)
-   La stratégie §7 du CLAUDE.md prévoyait 3 couches (host, Phosphoric headless, assertions debug). Seul `make check` = capture PPM bit-à-bit existe. Une régression de `clamp_vel`, `rng8`, `hiscores_insert` ne se révèle que par playtest. *Fix :* harness Python ou C90 portable autour de `rng8`, `clamp_vel`, `hiscores_insert`, `rand_offset` (signed 8.8 cast — `r |= 0xF0` est sémantiquement faux sur unsigned : porte-bonheur sur cc65).
+   La stratégie §7 des règles locales du projet prévoyait 3 couches (host, Phosphoric headless, assertions debug). Seul `make check` = capture PPM bit-à-bit existe. Une régression de `clamp_vel`, `rng8`, `hiscores_insert` ne se révèle que par playtest. *Fix :* harness Python ou C90 portable autour de `rng8`, `clamp_vel`, `hiscores_insert`, `rand_offset` (signed 8.8 cast — `r |= 0xF0` est sémantiquement faux sur unsigned : porte-bonheur sur cc65).
 
 ## ★★ Optimisations CPU 6502 prioritaires
 
@@ -54,19 +54,19 @@
 5. **`Makefile` n'a pas `-Cl` / `--static-locals` / `-Or -W` / `--codesize 200` dans `$(CC65)`** (Makefile:97, 102, etc.)
    Seul `-O` est passé. *Fix :* `CFLAGS = -O -Or -Cl --register-vars -t none -I src` typique en cc65 pour gagner ~5-15 % de taille code + vitesse.
 
-## Cohérence Oric / CLAUDE.md
+## Cohérence Oric / règles locales du projet
 
-1. **`ROADMAP.md:304-311` mentionne `oricutron` comme cible de validation finale** alors que `CLAUDE.md:22` dit explicitement « **Ne jamais utiliser `oricutron`** — Phosphoric est l'émulateur du projet ». *Fix :* retirer l'item oricutron de la checklist finale ou requalifier en « test optionnel tierce machine ».
+1. **`ROADMAP.md:304-311` mentionne `oricutron` comme cible de validation finale** alors que les règles locales du projet (l. 22) disent explicitement « **Ne jamais utiliser `oricutron`** — Phosphoric est l'émulateur du projet ». *Fix :* retirer l'item oricutron de la checklist finale ou requalifier en « test optionnel tierce machine ».
 
 2. **`crt0.s:34` fait `jmp $F800` pour sortir** — c'est bien le vecteur RESET ROM **Oric-1** (Atmos = `$F88F`). OK mais non commenté comme « Oric-1 only » ; doit être renommé ou conditionnel si futur port Atmos.
 
-3. **Wraparound bullet asymétrique** (`game.c:543-546` : x ∈ [0, 238], `BLT_X_SPAN = 239`) et asteroid (`asteroids.c:147` : x ∈ [0, 239], span 240) — deux conventions co-existent. CLAUDE.md exige `[0, 239] × [0, 199]` pour `line.s`. Pas un bug actuel (clip ailleurs) mais source de confusion.
+3. **Wraparound bullet asymétrique** (`game.c:543-546` : x ∈ [0, 238], `BLT_X_SPAN = 239`) et asteroid (`asteroids.c:147` : x ∈ [0, 239], span 240) — deux conventions co-existent. règles locales du projet exige `[0, 239] × [0, 199]` pour `line.s`. Pas un bug actuel (clip ailleurs) mais source de confusion.
 
 4. **`ship_x_frac`/`ship_y_frac` en ZP mais accédés depuis C** (`ship.s:38`, `game.c:30-33`)
    Acceptable, mais ZP a 0x50 octets (`oric1.cfg:10`) et beaucoup déjà consommée par `_lx0`, `_ly0`, `_lx1`, `_ly1`, `_ship_*`, `kb_*`, `_sfx_*`, `sound_tmp`, `cs_src`, `l_*` (Bresenham seul ≈ 14 octets). Pas de carte ZP versionnée. *Fix :* commenter `bsslist.s` ou table récap dans `cfg/oric1.cfg`.
 
 5. **`hires_init` clear la zone TEXT `$BF68-$BFDF` avec espaces `$20`** (`line.s:156-162`)
-   `$20` a bits 5-0 partiellement allumés → si l'ULA passe en mode TEXT (sortie BASIC, ESC), aucun souci. OK techniquement mais à documenter : si on garde la ROM ULA, écrire `$20` (espace TEXT) là est cohérent avec `CLAUDE.md` §2.
+   `$20` a bits 5-0 partiellement allumés → si l'ULA passe en mode TEXT (sortie BASIC, ESC), aucun souci. OK techniquement mais à documenter : si on garde la ROM ULA, écrire `$20` (espace TEXT) là est cohérent avec les règles locales du projet §2.
 
 ## Risques portabilité
 
@@ -86,8 +86,8 @@ Projet **mature pour son scope** (96 commits, 19 phases, gameplay complet, son a
 
 1. Diagnostiquer le bug BSS (probablement résolu en séparant le `MEMORY` BSS du `MEMORY` RAM dans `oric1.cfg`).
 2. Refactor split `game.c` en 4 modules cohérents.
-3. Mettre en place le harness host x86 prévu (CLAUDE.md §7-1) — non négociable pour les routines arithmétiques signées 8.8.
-4. Aligner `ROADMAP.md` checklist finale sur `CLAUDE.md` (oricutron à retirer ou requalifier).
+3. Mettre en place le harness host x86 prévu (règles locales du projet §7-1) — non négociable pour les routines arithmétiques signées 8.8.
+4. Aligner `ROADMAP.md` checklist finale sur les règles locales du projet (oricutron à retirer ou requalifier).
 5. Optims line.s/ship.s/psg_write valent un dernier gain ~5-8 %, suffisant pour repasser à 50 Hz sur des frames calmes (≤ 3 asteroids).
 
 Le code dans `src/asm/` est de qualité production. Le code C, fonctionnel, gagnerait à passer en `--static-locals` et à externaliser ses statics.
